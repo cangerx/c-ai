@@ -3,12 +3,15 @@
 namespace Tests\Unit;
 
 use App\Services\ImageStorageService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 // ImageStorageService 单元测试
 class ImageStorageServiceTest extends TestCase
 {
+    use RefreshDatabase;
+
     private ImageStorageService $service;
 
     protected function setUp(): void
