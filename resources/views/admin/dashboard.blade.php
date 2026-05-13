@@ -27,7 +27,14 @@
         </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header"><span class="card-title">近 7 天生成趋势</span></div>
+        <div class="card-body">
+            <canvas id="trendChart" height="80"></canvas>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px;">
         <div class="card">
             <div class="card-header"><span class="card-title">最近用户</span></div>
             <div class="card-body" style="padding: 0;">
@@ -82,3 +89,35 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+    new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: @json($chartLabels),
+            datasets: [{
+                label: '生成次数',
+                data: @json($chartData),
+                borderColor: '#2d5bf0',
+                backgroundColor: 'rgba(45, 91, 240, 0.08)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: '#2d5bf0',
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: isDark ? '#a1a1aa' : '#71717a' } },
+                y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: isDark ? '#a1a1aa' : '#71717a', precision: 0 } }
+            }
+        }
+    });
+</script>
+@endpush

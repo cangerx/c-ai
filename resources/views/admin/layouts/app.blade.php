@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" :data-theme="theme" x-data="{ theme: localStorage.getItem('admin-theme') || 'light' }" x-init="$watch('theme', v => localStorage.setItem('admin-theme', v))"
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -37,6 +37,34 @@
             --shadow-lg: 0 12px 40px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.03);
             --sidebar-width: 260px;
             --topbar-height: 0px;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0f0f12;
+            --panel: #1a1a1e;
+            --panel-hover: #222226;
+            --text: #f0f0f2;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --line: rgba(255, 255, 255, 0.08);
+            --line-strong: rgba(255, 255, 255, 0.12);
+            --accent-soft: rgba(45, 91, 240, 0.15);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.3);
+            --shadow-lg: 0 12px 40px rgba(0,0,0,0.4);
+        }
+
+        [data-theme="dark"] body::before {
+            background:
+                radial-gradient(ellipse 80% 50% at 60% 0%, rgba(45, 91, 240, 0.06), transparent),
+                radial-gradient(ellipse 60% 40% at 20% 80%, rgba(249, 115, 22, 0.04), transparent);
+        }
+
+        [data-theme="dark"] .form-input,
+        [data-theme="dark"] .form-select {
+            background: #222226;
+            border-color: rgba(255,255,255,0.1);
+            color: var(--text);
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -435,6 +463,7 @@
         /* ── Table ── */
         .table-wrap {
             overflow-x: auto;
+            position: relative;
         }
 
         table {
@@ -750,10 +779,43 @@
         .opacity-100 { opacity: 1; }
         .scale-95 { transform: scale(0.95); }
         .scale-100 { transform: scale(1); }
+
+        /* ── Top Progress Bar ── */
+        .top-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 3px;
+            background: var(--accent);
+            z-index: 9999;
+            transition: width 0.3s ease;
+            border-radius: 0 2px 2px 0;
+            box-shadow: 0 0 8px rgba(45, 91, 240, 0.4);
+        }
+        .top-loader.loading { width: 70%; transition: width 8s cubic-bezier(0.1, 0.5, 0.3, 1); }
+        .top-loader.done { width: 100%; opacity: 0; transition: width 0.2s ease, opacity 0.3s ease 0.2s; }
+
+        /* ── Table scroll hint ── */
+        @media (max-width: 768px) {
+            .table-wrap::after {
+                content: "";
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 24px;
+                background: linear-gradient(to right, transparent, var(--panel));
+                pointer-events: none;
+                border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+            }
+            .table-wrap.scrolled-end::after { display: none; }
+        }
     </style>
     @stack('styles')
 </head>
 <body>
+    <div class="top-loader" id="topLoader"></div>
     <button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open'); document.querySelector('.sidebar-overlay').classList.toggle('open');" aria-label="菜单">☰</button>
     <div class="sidebar-overlay" onclick="document.querySelector('.sidebar').classList.remove('open'); this.classList.remove('open');"></div>
 
@@ -804,6 +866,12 @@
         </nav>
 
         <div class="sidebar-footer">
+            <button class="sidebar-item" style="width:100%; border:none; background:none; cursor:pointer; margin-bottom:8px;"
+                    @click="theme = theme === 'dark' ? 'light' : 'dark'">
+                <svg x-show="theme === 'light'" class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg x-show="theme === 'dark'" class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <span x-text="theme === 'dark' ? '浅色模式' : '深色模式'"></span>
+            </button>
             <div class="sidebar-user">
                 <div class="sidebar-avatar">{{ mb_substr(auth()->user()->name ?? 'A', 0, 1) }}</div>
                 <div class="sidebar-user-info">
@@ -947,6 +1015,19 @@
                 }
             });
         });
+
+        // Top loader on navigation
+        const loader = document.getElementById('topLoader');
+        document.addEventListener('click', e => {
+            const a = e.target.closest('a[href]');
+            if (a && a.href && !a.href.startsWith('#') && !a.target && a.origin === location.origin) {
+                loader.className = 'top-loader loading';
+            }
+        });
+        document.querySelectorAll('form').forEach(f => {
+            f.addEventListener('submit', () => { loader.className = 'top-loader loading'; });
+        });
+        window.addEventListener('pageshow', () => { loader.className = 'top-loader done'; });
     </script>
 
     @stack('scripts')
