@@ -1,0 +1,11 @@
+{
+    "name": "image-gen",
+    "title": "AI 绘图",
+    "icon": "palette",
+    "version": "1.0.0",
+    "description": "支持多模型的 AI 图像生成",
+    "menu": [
+        { "label": "生成任务", "route": "admin.image-gen.tasks", "icon": "image" },
+        { "label": "渠道管理", "route": "admin.image-gen.channels", "icon": "server" }
+    ]
+}

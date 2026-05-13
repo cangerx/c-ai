@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(composer *)",
+      "Bash(git *)",
+      "Bash(curl *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(rm *)",
+      "Bash(docker *)",
+      "Bash(lsof *)",
+      "Bash(kill *)",
+      "Bash(which *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(xargs *)"
+    ]
+  }
+}
