@@ -22,7 +22,7 @@ class ProcessGenerationTask implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    public int $tries = 5;
     public int $timeout = 420; // 单张图最多7分钟
 
     public function backoff(): array
@@ -135,6 +135,7 @@ class ProcessGenerationTask implements ShouldQueue
                     $fresh->message = $completed >= $fresh->count ? '生成完成。' : "生成完成（{$completed}/{$fresh->count} 张成功）。";
                     $fresh->items = array_values(array_filter($items, fn($i) => is_array($i)));
                     $fresh->completed_at = now();
+                    $fresh->error = null;
                     $result['status'] = 'completed';
                 } else {
                     $fresh->status = 'failed';
