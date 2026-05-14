@@ -74,16 +74,16 @@
         h1 { font-family: "Space Grotesk", sans-serif; font-size: 22px; font-weight: 700; text-align: center; letter-spacing: -0.5px; }
         .subtitle { color: var(--muted); font-size: 13px; text-align: center; margin-top: 6px; margin-bottom: 32px; }
 
-        .checks { margin-bottom: 28px; }
+        .checks { margin-bottom: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
         .check-item {
-            display: flex; align-items: center; gap: 10px;
-            padding: 9px 14px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 12px;
             font-size: 13px; font-weight: 500;
             border-radius: 10px;
-            margin-bottom: 4px;
             transition: background 0.15s;
         }
         .check-item:hover { background: var(--accent-soft); }
+        @media (max-width: 420px) { .checks { grid-template-columns: 1fr; } }
         .check-icon {
             width: 20px; height: 20px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
