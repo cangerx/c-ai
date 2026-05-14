@@ -28,7 +28,6 @@
                         ['key' => 'site_name', 'label' => '站点名称', 'placeholder' => 'CANG-AI'],
                         ['key' => 'site_description', 'label' => '站点描述（SEO Description）', 'placeholder' => 'AI 图像生成平台'],
                         ['key' => 'site_keywords', 'label' => 'SEO 关键词', 'placeholder' => 'AI,图像生成,绘画'],
-                        ['key' => 'announcement', 'label' => '公告内容', 'placeholder' => '欢迎使用 CANG-AI'],
                     ]; @endphp
                     @foreach($fields as $i => $field)
                         <div class="form-group">
@@ -40,6 +39,14 @@
                             <input type="hidden" name="settings[{{ $i }}][group]" value="general">
                         </div>
                     @endforeach
+                    <div class="form-group">
+                        <label class="form-label">首页广告横幅（每行一条，支持 HTML 链接）</label>
+                        <textarea class="form-input" name="settings[3][value]" rows="5"
+                                  placeholder="CANG-AI 全新上线，支持 GPT-image 图像生成 · <a href='#'>了解更多 →</a>">{{ \App\Models\SiteSetting::get('announcements', '') }}</textarea>
+                        <input type="hidden" name="settings[3][key]" value="announcements">
+                        <input type="hidden" name="settings[3][group]" value="general">
+                        <small style="color:var(--text-secondary);font-size:12px;">每行一条广告文案，轮播展示。留空则不显示横幅。</small>
+                    </div>
                 </div>
             </div>
             <button type="submit" class="btn btn-primary">保存</button>

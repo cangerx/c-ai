@@ -94,6 +94,8 @@
         text-align: center;
         line-height: 1.5;
         animation: announceFadeIn 0.6s ease both;
+        position: relative;
+        overflow: hidden;
       }
 
       .announce-bar a {
@@ -119,6 +121,25 @@
         flex-shrink: 0;
       }
 
+      .announce-content {
+        position: relative;
+        overflow: hidden;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .announce-text {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        animation: announceSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
+      .announce-text.out {
+        animation: announceSlideOut 0.35s cubic-bezier(0.7, 0, 0.84, 0) both;
+      }
+
       .announce-close {
         background: none;
         border: none;
@@ -138,6 +159,16 @@
       @keyframes announceFadeIn {
         from { opacity: 0; transform: translateY(-8px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes announceSlideIn {
+        from { opacity: 0; transform: translateY(100%); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      @keyframes announceSlideOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-100%); }
       }
 
       .hero {
@@ -2786,10 +2817,10 @@
   </head>
   <body>
     <main class="page">
-      <div id="announceBar" class="announce-bar">
+      <div id="announceBar" class="announce-bar" style="display:none;">
         <span class="announce-tag">NEW</span>
-        <span>CANG-AI 全新上线，支持 GPT-image 图像生成 · <a href="https://crcr.us.ci" target="_blank">了解更多 →</a></span>
-        <button class="announce-close" onclick="this.parentElement.style.display='none'" aria-label="关闭">×</button>
+        <span class="announce-content"><span id="announceText" class="announce-text"></span></span>
+        <button class="announce-close" onclick="this.parentElement.style.display='none';clearInterval(window._annTimer)" aria-label="关闭">×</button>
       </div>
       <section class="hero">
         <button id="heroLoginBtn" class="hero-login" type="button">
@@ -3230,7 +3261,32 @@
       const TASK_ENDPOINT = "generate-task.php";
       const LIST_ENDPOINT = "list.php?limit=18";
       let PROMPT_TOOL_MODEL = "gpt-5.4-mini";
-      (async () => { try { const r = await fetch("/api/config"); if (r.ok) { const d = await r.json(); if (d.prompt_tool_model) PROMPT_TOOL_MODEL = d.prompt_tool_model; } } catch {} })();
+      (async () => {
+        try {
+          const r = await fetch("/api/config");
+          if (!r.ok) return;
+          const d = await r.json();
+          if (d.prompt_tool_model) PROMPT_TOOL_MODEL = d.prompt_tool_model;
+          if (d.announcements && d.announcements.length) {
+            const bar = document.getElementById("announceBar");
+            const textEl = document.getElementById("announceText");
+            const items = d.announcements;
+            let idx = 0;
+            textEl.innerHTML = items[0];
+            bar.style.display = "";
+            if (items.length > 1) {
+              window._annTimer = setInterval(() => {
+                textEl.classList.add("out");
+                setTimeout(() => {
+                  idx = (idx + 1) % items.length;
+                  textEl.innerHTML = items[idx];
+                  textEl.classList.remove("out");
+                }, 350);
+              }, 4000);
+            }
+          }
+        } catch {}
+      })();
       const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
       const TASK_POLL_INTERVAL = 4000;
       const TASK_LONG_WAIT_MS = 3 * 60 * 1000;

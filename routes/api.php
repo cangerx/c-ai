@@ -9,8 +9,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', fn () => response()->json(['ok' => true]));
 
 Route::get('/config', function () {
+    $raw = \App\Models\SiteSetting::get('announcements', '');
+    $announcements = array_values(array_filter(array_map('trim', explode("\n", $raw))));
     return response()->json([
         'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
+        'announcements' => $announcements,
     ]);
 });
 
