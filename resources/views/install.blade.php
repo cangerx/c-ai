@@ -4,39 +4,166 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CANG-AI 安装向导</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f0f14; color: #e4e4e7; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .container { width: 100%; max-width: 520px; }
-        .card { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 16px; padding: 40px; }
-        h1 { font-size: 24px; margin-bottom: 8px; text-align: center; }
-        .subtitle { color: #888; font-size: 14px; text-align: center; margin-bottom: 32px; }
+        :root {
+            --bg: #f5f3f0;
+            --panel: rgba(255,255,255,0.72);
+            --panel-strong: rgba(255,255,255,0.92);
+            --line: rgba(0,0,0,0.06);
+            --text: #1a1a1a;
+            --muted: #6b7280;
+            --accent: #2d5bf0;
+            --accent-soft: rgba(45,91,240,0.08);
+            --shadow: 0 24px 48px -12px rgba(0,0,0,0.12);
+            --shadow-soft: 0 8px 32px -8px rgba(0,0,0,0.08);
+            --glass: saturate(1.8) blur(20px);
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 20% 0%, rgba(45,91,240,0.06), transparent),
+                radial-gradient(ellipse 60% 40% at 80% 10%, rgba(249,115,22,0.04), transparent),
+                radial-gradient(ellipse 50% 60% at 50% 100%, rgba(45,91,240,0.03), transparent);
+            pointer-events: none;
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none;
+        }
+        .container { position: relative; z-index: 1; width: 100%; max-width: 480px; }
+        .card {
+            background: var(--panel-strong);
+            backdrop-filter: var(--glass);
+            -webkit-backdrop-filter: var(--glass);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 44px 36px;
+            box-shadow: var(--shadow);
+        }
+        .logo {
+            width: 48px; height: 48px;
+            background: var(--accent);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 4px 16px rgba(45,91,240,0.25);
+        }
+        .logo svg { width: 26px; height: 26px; fill: #fff; }
+        h1 { font-family: "Space Grotesk", sans-serif; font-size: 22px; font-weight: 700; text-align: center; letter-spacing: -0.5px; }
+        .subtitle { color: var(--muted); font-size: 13px; text-align: center; margin-top: 6px; margin-bottom: 32px; }
+
         .checks { margin-bottom: 28px; }
-        .check-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; border-bottom: 1px solid #222233; }
-        .check-item:last-child { border-bottom: none; }
-        .check-ok { color: #4ade80; }
-        .check-fail { color: #f87171; }
-        .form-group { margin-bottom: 18px; }
-        .form-label { display: block; font-size: 13px; color: #aaa; margin-bottom: 6px; }
-        .form-input { width: 100%; padding: 10px 14px; background: #12121a; border: 1px solid #333; border-radius: 8px; color: #e4e4e7; font-size: 14px; outline: none; transition: border-color 0.2s; }
-        .form-input:focus { border-color: #6366f1; }
-        .btn { width: 100%; padding: 12px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        .btn:hover { background: #4f46e5; }
-        .btn:disabled { background: #444; cursor: not-allowed; }
-        .error { background: #2d1b1b; border: 1px solid #5c2a2a; color: #f87171; padding: 12px; border-radius: 8px; margin-bottom: 18px; font-size: 13px; }
+        .check-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 9px 14px;
+            font-size: 13px; font-weight: 500;
+            border-radius: 10px;
+            margin-bottom: 4px;
+            transition: background 0.15s;
+        }
+        .check-item:hover { background: var(--accent-soft); }
+        .check-icon {
+            width: 20px; height: 20px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700; flex-shrink: 0;
+        }
+        .check-ok .check-icon { background: rgba(16,185,129,0.12); color: var(--success); }
+        .check-fail .check-icon { background: rgba(239,68,68,0.12); color: var(--danger); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-input {
+            width: 100%; padding: 11px 14px;
+            background: rgba(255,255,255,0.6);
+            border: 1.5px solid var(--line);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 14px; font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(45,91,240,0.1);
+        }
+        .form-input::placeholder { color: #bbb; }
+
+        .btn {
+            width: 100%; padding: 13px;
+            background: var(--accent);
+            color: #fff;
+            border: none; border-radius: 12px;
+            font-size: 14px; font-weight: 600; font-family: inherit;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 4px 16px rgba(45,91,240,0.25);
+            margin-top: 8px;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(45,91,240,0.3); }
+        .btn:active { transform: translateY(0); }
+        .btn:disabled { background: #ccc; box-shadow: none; cursor: not-allowed; }
+        .btn-secondary {
+            background: var(--panel);
+            color: var(--text);
+            border: 1.5px solid var(--line);
+            box-shadow: var(--shadow-soft);
+        }
+        .btn-secondary:hover { box-shadow: var(--shadow); }
+
+        .error-box {
+            background: rgba(239,68,68,0.06);
+            border: 1px solid rgba(239,68,68,0.15);
+            color: var(--danger);
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .divider { height: 1px; background: var(--line); margin: 24px 0; }
+
+        @media (max-width: 520px) {
+            .card { padding: 32px 24px; border-radius: 16px; }
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="card">
-        <h1>🚀 CANG-AI 安装向导</h1>
-        <p class="subtitle">首次部署请完成以下配置</p>
+        <div class="logo">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h1>CANG-AI</h1>
+        <p class="subtitle">安装向导 · 环境检测与初始化配置</p>
 
         <div class="checks">
             @php $allOk = true; @endphp
             @foreach($checks as $check)
-                <div class="check-item">
-                    <span class="{{ $check['ok'] ? 'check-ok' : 'check-fail' }}">{{ $check['ok'] ? '✓' : '✗' }}</span>
+                <div class="check-item {{ $check['ok'] ? 'check-ok' : 'check-fail' }}">
+                    <span class="check-icon">{{ $check['ok'] ? '✓' : '✗' }}</span>
                     <span>{{ $check['name'] }}</span>
                     @if(!$check['ok']) @php $allOk = false; @endphp @endif
                 </div>
@@ -44,16 +171,18 @@
         </div>
 
         @if(!$allOk)
-            <div class="error">环境检测未通过，请先修复上方标红项后刷新页面。</div>
-            <button class="btn" onclick="location.reload()">重新检测</button>
+            <div class="error-box">环境检测未通过，请先修复标红项后刷新重试。</div>
+            <button class="btn btn-secondary" onclick="location.reload()">重新检测</button>
         @else
             @if($errors->any())
-                <div class="error">
+                <div class="error-box">
                     @foreach($errors->all() as $e)
                         <div>{{ $e }}</div>
                     @endforeach
                 </div>
             @endif
+
+            <div class="divider"></div>
 
             <form method="POST" action="/install">
                 @csrf
@@ -62,7 +191,7 @@
                     <input class="form-input" name="site_name" value="{{ old('site_name', 'CANG-AI') }}" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">站点地址（含 https://）</label>
+                    <label class="form-label">站点地址</label>
                     <input class="form-input" name="site_url" value="{{ old('site_url', request()->getSchemeAndHttpHost()) }}" placeholder="https://ai.example.com" required>
                 </div>
                 <div class="form-group">
@@ -71,7 +200,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">管理员密码</label>
-                    <input class="form-input" type="password" name="admin_password" placeholder="至少6位" required minlength="6">
+                    <input class="form-input" type="password" name="admin_password" placeholder="至少 6 位" required minlength="6">
                 </div>
                 <button type="submit" class="btn">开始安装</button>
             </form>
