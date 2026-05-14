@@ -9,8 +9,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', fn () => response()->json(['ok' => true]));
 
 Route::get('/config', function () {
-    $raw = \App\Models\SiteSetting::get('announcements', '');
-    $announcements = array_values(array_filter(array_map('trim', explode("\n", $raw))));
+    $announcements = \App\Models\Announcement::where('enabled', true)
+        ->orderBy('sort')->orderByDesc('id')
+        ->pluck('content', 'url')
+        ->map(fn($content, $url) => $url ? "{$content} · <a href='{$url}' target='_blank'>了解更多 →</a>" : $content)
+        ->values()->all();
     return response()->json([
         'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
         'announcements' => $announcements,

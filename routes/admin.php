@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BillingRuleController;
 use App\Http\Controllers\Admin\CommissionController;
@@ -44,6 +45,12 @@ Route::middleware(['auth', 'role:admin,agent'])->group(function () {
     Route::get('billing-rules/{billingRule}/edit', [BillingRuleController::class, 'edit'])->name('billing-rules.edit');
     Route::put('billing-rules/{billingRule}', [BillingRuleController::class, 'update'])->name('billing-rules.update');
     Route::delete('billing-rules/{billingRule}', [BillingRuleController::class, 'destroy'])->name('billing-rules.destroy');
+
+    Route::get('announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+    Route::post('announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+    Route::put('announcements/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
+    Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+    Route::post('announcements/{announcement}/toggle', [AnnouncementController::class, 'toggle'])->name('announcements.toggle');
 
     Route::get('commissions', [CommissionController::class, 'index'])->name('commissions.index');
 
