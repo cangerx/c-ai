@@ -14,6 +14,7 @@
         <button type="button" class="tab-btn" :class="tab === 'model' && 'active'" @click="tab = 'model'">模型设置</button>
         <button type="button" class="tab-btn" :class="tab === 'billing' && 'active'" @click="tab = 'billing'">计费设置</button>
         <button type="button" class="tab-btn" :class="tab === 'register' && 'active'" @click="tab = 'register'">注册与代理</button>
+        <button type="button" class="tab-btn" :class="tab === 'oauth' && 'active'" @click="tab = 'oauth'">第三方登录</button>
     </div>
 
     {{-- SEO / 基础信息 --}}
@@ -129,6 +130,37 @@
                                    placeholder="{{ $field['placeholder'] }}">
                             <input type="hidden" name="settings[{{ $i }}][key]" value="{{ $field['key'] }}">
                             <input type="hidden" name="settings[{{ $i }}][group]" value="{{ $field['group'] }}">
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+    </div>
+
+    {{-- 第三方登录 --}}
+    <div x-show="tab === 'oauth'" x-cloak>
+        <form method="POST" action="{{ route('admin.settings.update') }}">
+            @csrf
+            <input type="hidden" name="tab" value="oauth">
+            <div class="card">
+                <div class="card-header"><span class="card-title">GitHub OAuth 登录</span></div>
+                <div class="card-body">
+                    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">
+                        前往 <a href="https://github.com/settings/developers" target="_blank" style="color:var(--accent);">GitHub Developer Settings</a> 创建 OAuth App，回调地址填写：<code>{{ url('/api/auth/github/callback') }}</code>
+                    </p>
+                    @php $fields = [
+                        ['key' => 'github_client_id', 'label' => 'Client ID', 'placeholder' => 'Ov23li...'],
+                        ['key' => 'github_client_secret', 'label' => 'Client Secret', 'placeholder' => 'secret...'],
+                    ]; @endphp
+                    @foreach($fields as $i => $field)
+                        <div class="form-group">
+                            <label class="form-label">{{ $field['label'] }}</label>
+                            <input class="form-input" type="text" name="settings[{{ $i }}][value]"
+                                   value="{{ \App\Models\SiteSetting::get($field['key'], '') }}"
+                                   placeholder="{{ $field['placeholder'] }}">
+                            <input type="hidden" name="settings[{{ $i }}][key]" value="{{ $field['key'] }}">
+                            <input type="hidden" name="settings[{{ $i }}][group]" value="oauth">
                         </div>
                     @endforeach
                 </div>

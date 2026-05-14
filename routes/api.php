@@ -22,6 +22,8 @@ Route::get('/config', function () {
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/auth/github', [AuthController::class, 'githubRedirect']);
+Route::get('/auth/github/callback', [AuthController::class, 'githubCallback']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);

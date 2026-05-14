@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -94,6 +95,66 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => '已退出登录']);
+    }
+
+    public function githubRedirect()
+    {
+        $clientId = SiteSetting::get('github_client_id', config('services.github.client_id'));
+        $clientSecret = SiteSetting::get('github_client_secret', config('services.github.client_secret'));
+        $redirect = config('services.github.redirect');
+
+        config(['services.github.client_id' => $clientId, 'services.github.client_secret' => $clientSecret, 'services.github.redirect' => $redirect]);
+
+        return response()->json([
+            'url' => Socialite::driver('github')->stateless()->redirect()->getTargetUrl(),
+        ]);
+    }
+
+    public function githubCallback(Request $request)
+    {
+        $clientId = SiteSetting::get('github_client_id', config('services.github.client_id'));
+        $clientSecret = SiteSetting::get('github_client_secret', config('services.github.client_secret'));
+
+        config(['services.github.client_id' => $clientId, 'services.github.client_secret' => $clientSecret]);
+
+        try {
+            $ghUser = Socialite::driver('github')->stateless()->user();
+        } catch (\Exception $e) {
+            return redirect('/?auth_error=github_failed');
+        }
+
+        $user = User::where('github_id', $ghUser->getId())->first();
+
+        if (!$user && $ghUser->getEmail()) {
+            $user = User::where('email', $ghUser->getEmail())->first();
+            if ($user) {
+                $user->update(['github_id' => $ghUser->getId(), 'avatar' => $ghUser->getAvatar()]);
+            }
+        }
+
+        if (!$user) {
+            $initCredits = (int) SiteSetting::get('register_gift_credits', 5);
+            $initBalance = (float) SiteSetting::get('register_gift_balance', 0);
+
+            $user = User::create([
+                'name' => $ghUser->getNickname() ?: $ghUser->getName() ?: 'GitHub User',
+                'email' => $ghUser->getEmail() ?: $ghUser->getId() . '@github.oauth',
+                'github_id' => $ghUser->getId(),
+                'avatar' => $ghUser->getAvatar(),
+                'role' => 'user',
+                'status' => 'active',
+                'credits' => $initCredits,
+                'balance' => $initBalance,
+            ]);
+        }
+
+        if ($user->status !== 'active') {
+            return redirect('/?auth_error=account_disabled');
+        }
+
+        $token = $user->createToken('app')->plainTextToken;
+
+        return redirect('/?token=' . $token);
     }
 
     protected function userPayload(User $user): array
