@@ -25,6 +25,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // 用户中心
 Route::middleware('auth')->prefix('user')->name('user.')->group(function () {
     Route::get('/', [UserController::class, 'dashboard'])->name('dashboard');
+    Route::get('/wallet', [UserController::class, 'wallet'])->name('wallet');
     Route::get('/profile', [UserController::class, 'profile'])->name('profile');
     Route::put('/profile', [UserController::class, 'updateProfile'])->name('profile.update');
     Route::get('/usage', [UserController::class, 'usageHistory'])->name('usage');

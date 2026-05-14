@@ -93,26 +93,26 @@
             <div class="action-bar">
                 @if(in_array($task->status, ['failed', 'completed']))
                     <form method="POST" action="{{ route('admin.image-gen.tasks.retry', $task->task_id) }}"
-                          onsubmit="return this.querySelector('input[name=api_key]').value.trim() !== '';">
+                          x-data @submit.prevent="if(!$el.querySelector('input[name=api_key]').value.trim()){alert('请输入 API Key');return;} $dispatch('confirm', { title: '确认重跑', message: '确定使用该 API Key 重新执行此任务？', form: $el })">
                         @csrf
                         <input type="password" name="api_key" placeholder="API Key（用于重跑）" style="padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:12px; width: 200px;">
-                        <button type="submit" class="btn btn-primary btn-sm">重跑</button>
+                        <button type="submit" class="btn btn-primary btn-sm" data-no-loading>重跑</button>
                     </form>
                 @endif
 
                 @if($usageLog && !$usageLog->refunded_at)
                     <form method="POST" action="{{ route('admin.image-gen.tasks.refund', $task->task_id) }}"
-                          onsubmit="return confirm('确认退款 credits+{{ $usageLog->cost_credits }}, balance+¥{{ number_format($usageLog->cost_balance, 2) }}?');">
+                          x-data @submit.prevent="$dispatch('confirm', { title: '确认退款', message: '确认退款 credits+{{ $usageLog->cost_credits }}, balance+¥{{ number_format($usageLog->cost_balance, 2) }}？', form: $el })">
                         @csrf
-                        <button type="submit" class="btn btn-warning btn-sm">手动退款</button>
+                        <button type="submit" class="btn btn-warning btn-sm" data-no-loading>手动退款</button>
                     </form>
                 @endif
 
                 @if(in_array($task->status, ['pending', 'processing']))
                     <form method="POST" action="{{ route('admin.image-gen.tasks.force-fail', $task->task_id) }}"
-                          onsubmit="return confirm('强制标记为失败？不会自动退款，请另外操作。');">
+                          x-data @submit.prevent="$dispatch('confirm', { title: '强制失败', message: '强制标记为失败？不会自动退款，请另外操作。', form: $el })">
                         @csrf
-                        <button type="submit" class="btn btn-danger btn-sm">强制失败</button>
+                        <button type="submit" class="btn btn-danger btn-sm" data-no-loading>强制失败</button>
                     </form>
                 @endif
             </div>

@@ -65,13 +65,19 @@ class ProcessGenerationTask implements ShouldQueue
 
             if ($result['all_done'] && $result['status'] === 'completed') {
                 $task->refresh();
-                if ($task->user) {
-                    $task->user->notify(new TaskCompleted($task));
-                }
+                try {
+                    $task->user?->notify(new TaskCompleted($task));
+                } catch (\Throwable) {}
             }
 
         } catch (Throwable $e) {
             if ($this->isNonRetryableError($e)) {
+                $this->markSingleFailed($task, $e);
+                return;
+            }
+
+            // sync 驱动不支持重试，直接标记失败
+            if (app()->bound('queue.connection') && config('queue.default') === 'sync') {
                 $this->markSingleFailed($task, $e);
                 return;
             }
@@ -101,13 +107,13 @@ class ProcessGenerationTask implements ShouldQueue
                     'error' => $e->getMessage(),
                 ]);
                 $this->refund($task);
-                if ($task->user) {
-                    $task->user->notify(new TaskFailed($task, $this->friendlyMessage($e)));
-                }
+                try {
+                    $task->user?->notify(new TaskFailed($task, $this->friendlyMessage($e)));
+                } catch (\Throwable) {}
             } else {
-                if ($task->user) {
-                    $task->user->notify(new TaskCompleted($task));
-                }
+                try {
+                    $task->user?->notify(new TaskCompleted($task));
+                } catch (\Throwable) {}
             }
         }
     }
@@ -188,7 +194,8 @@ class ProcessGenerationTask implements ShouldQueue
 
         $channel = AiChannel::where('status', 'active')
             ->where('app_name', 'image-gen')
-            ->orderByRaw('priority DESC, RANDOM()')
+            ->orderBy('priority', 'desc')
+            ->inRandomOrder()
             ->first();
 
         if ($channel) {
@@ -204,9 +211,8 @@ class ProcessGenerationTask implements ShouldQueue
         $path = $mode === 'image' ? '/v1/images/edits' : '/v1/images/generations';
         $size = $this->resolveSizeToPixels($task->size, $task->quality);
 
-        $channel = AiChannel::where('status', 'active')
-            ->where('app_name', 'image-gen')
-            ->orderByRaw('priority DESC, RANDOM()')
+        $channel = AiChannel::where('api_key', $apiKey)
+            ->where('status', 'active')
             ->first();
 
         $baseUrl = $channel?->base_url ?? 'https://api.openai.com';
@@ -241,22 +247,21 @@ class ProcessGenerationTask implements ShouldQueue
 
     protected function callMultipartApi(string $endpoint, string $apiKey, GenerationTask $task, string $size): array
     {
-        $multipart = Http::timeout(360)
+        $pending = Http::timeout(360)
             ->connectTimeout(15)
             ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
-            ->asMultipart();
-
-        $multipart = $multipart->attach('prompt', $task->prompt);
-        $multipart = $multipart->attach('model', $task->model);
-        $multipart = $multipart->attach('size', $size);
-        $multipart = $multipart->attach('quality', $task->quality);
-        $multipart = $multipart->attach('n', '1');
+            ->asMultipart()
+            ->attach('prompt', $task->prompt)
+            ->attach('model', $task->model)
+            ->attach('size', $size)
+            ->attach('quality', $task->quality)
+            ->attach('n', '1');
 
         $files = $task->files ?? [];
         foreach ($files as $i => $file) {
             if (!empty($file['path']) && file_exists($file['path'])) {
                 $fieldName = $i === 0 ? 'image' : "image[]";
-                $multipart = $multipart->attach(
+                $pending = $pending->attach(
                     $fieldName,
                     file_get_contents($file['path']),
                     $file['name'] ?? "image_{$i}.png"
@@ -264,7 +269,7 @@ class ProcessGenerationTask implements ShouldQueue
             }
         }
 
-        $response = $multipart->post($endpoint);
+        $response = $pending->post($endpoint);
 
         if (!$response->successful()) {
             throw new RuntimeException("上游返回 {$response->status()}: " . mb_substr($response->body(), 0, 300));
@@ -295,6 +300,9 @@ class ProcessGenerationTask implements ShouldQueue
             throw new RuntimeException('Missing image payload.');
         }
 
+        $targetSize = $this->resolveSizeToPixels($task->size, $task->quality);
+        $binary = $this->enforceSize($binary, $targetSize);
+
         $key = $storage->store($binary, $mimeType);
 
         return [
@@ -303,6 +311,40 @@ class ProcessGenerationTask implements ShouldQueue
             'mime_type' => $mimeType,
             'size' => strlen($binary),
         ];
+    }
+
+    protected function enforceSize(string $binary, string $targetSize): string
+    {
+        if ($targetSize === 'auto' || !preg_match('/^(\d+)x(\d+)$/', $targetSize, $m)) {
+            return $binary;
+        }
+
+        $targetW = (int) $m[1];
+        $targetH = (int) $m[2];
+
+        $img = @imagecreatefromstring($binary);
+        if (!$img) {
+            return $binary;
+        }
+
+        $actualW = imagesx($img);
+        $actualH = imagesy($img);
+
+        if ($actualW === $targetW && $actualH === $targetH) {
+            imagedestroy($img);
+            return $binary;
+        }
+
+        $resized = imagecreatetruecolor($targetW, $targetH);
+        imagealphablending($resized, false);
+        imagesavealpha($resized, true);
+        imagecopyresampled($resized, $img, 0, 0, 0, 0, $targetW, $targetH, $actualW, $actualH);
+        imagedestroy($img);
+
+        ob_start();
+        imagepng($resized, null, 6);
+        imagedestroy($resized);
+        return ob_get_clean();
     }
 
     protected function resolveSizeToPixels(string $size, string $quality): string

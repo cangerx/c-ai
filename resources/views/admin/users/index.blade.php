@@ -66,7 +66,7 @@
                                     balance: {{ $user->balance }}
                                 })">编辑</button>
                                 <form method="POST" action="{{ route('admin.users.toggle-status', $user) }}" style="display:inline;"
-                                      x-data @submit.prevent="$dispatch('confirm', { title: '{{ $user->status === 'active' ? '禁用用户' : '启用用户' }}', message: '确定{{ $user->status === 'active' ? '禁用' : '启用' }}用户「{{ $user->nickname ?? $user->name }}」？', form: $el })">
+                                      x-data @submit.prevent="$dispatch('confirm', { title: '{{ $user->status === 'active' ? '禁用用户' : '启用用户' }}', message: '确定{{ $user->status === 'active' ? '禁用' : '启用' }}用户「{{ addslashes($user->nickname ?? $user->name) }}」？', form: $el })">
                                     @csrf
                                     <button type="submit" class="btn btn-sm {{ $user->status === 'active' ? 'btn-ghost' : 'btn-primary' }}" data-no-loading>
                                         {{ $user->status === 'active' ? '禁用' : '启用' }}

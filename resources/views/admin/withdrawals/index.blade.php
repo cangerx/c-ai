@@ -53,13 +53,15 @@
                             @if(auth()->user()->isAdmin())
                             <td>
                                 @if($req->status === 'pending')
-                                <form method="POST" action="{{ route('admin.withdrawals.approve', $req) }}" style="display:inline;">
+                                <form method="POST" action="{{ route('admin.withdrawals.approve', $req) }}" style="display:inline;"
+                                      x-data @submit.prevent="$dispatch('confirm', { title: '批准提现', message: '确认批准该提现申请？', form: $el })">
                                     @csrf
-                                    <button type="submit" class="btn btn-ghost btn-sm" onclick="return confirm('确认批准？')">批准</button>
+                                    <button type="submit" class="btn btn-ghost btn-sm" data-no-loading>批准</button>
                                 </form>
-                                <form method="POST" action="{{ route('admin.withdrawals.reject', $req) }}" style="display:inline;">
+                                <form method="POST" action="{{ route('admin.withdrawals.reject', $req) }}" style="display:inline;"
+                                      x-data @submit.prevent="$dispatch('confirm', { title: '拒绝提现', message: '确认拒绝该提现申请？此操作不可撤销。', form: $el })">
                                     @csrf
-                                    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="return confirm('确认拒绝？')">拒绝</button>
+                                    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger);" data-no-loading>拒绝</button>
                                 </form>
                                 @else
                                     <span style="color:var(--text-muted);font-size:12px;">—</span>

@@ -27,6 +27,6 @@ class SettingController extends Controller
             SiteSetting::set($item['key'], $item['value'] ?? '', $item['group']);
         }
 
-        return back()->with('success', '设置已保存');
+        return redirect()->route('admin.settings.index', ['tab' => $request->input('tab', 'seo')])->with('success', '设置已保存');
     }
 }

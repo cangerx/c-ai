@@ -23,17 +23,29 @@ class ProxyController extends Controller
                 ->header('Content-Type', 'application/json');
         }
 
+        $appName = $path === '/v1/chat/completions' ? 'chat' : 'image-gen';
         $channel = AiChannel::where('status', 'active')
-            ->where('app_name', 'image-gen')
-            ->orderByRaw('priority DESC, RANDOM()')
+            ->where('app_name', $appName)
+            ->orderBy('priority', 'desc')
+            ->inRandomOrder()
             ->first();
+
+        // fallback: 如果没有专用 chat 渠道，尝试 image-gen 渠道
+        if (!$channel && $appName === 'chat') {
+            $channel = AiChannel::where('status', 'active')
+                ->where('app_name', 'image-gen')
+                ->orderBy('priority', 'desc')
+                ->inRandomOrder()
+                ->first();
+        }
 
         if (!$channel) {
             return response(json_encode(['error' => '暂无可用渠道']), 503)
                 ->header('Content-Type', 'application/json');
         }
 
-        $isStream = ($channel->request_mode ?? 'sync') === 'stream';
+        $isStream = ($channel->request_mode ?? 'sync') === 'stream'
+            && $path !== '/v1/chat/completions'; // chat completions 不强制流式
         $targetUrl = rtrim($channel->base_url, '/') . $path;
         $authorization = 'Bearer ' . $channel->api_key;
 

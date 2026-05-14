@@ -29,7 +29,8 @@ class GenerateController extends Controller
 
         $channel = AiChannel::where('status', 'active')
             ->where('app_name', 'image-gen')
-            ->orderByRaw('priority DESC, RANDOM()')
+            ->orderBy('priority', 'desc')
+            ->inRandomOrder()
             ->first();
 
         if (!$channel) {
@@ -90,10 +91,12 @@ class GenerateController extends Controller
 
         $user->refresh();
 
-        // 余额不足提醒
-        if ($user->credits < 5 && $user->balance < 10) {
-            $user->notify(new \App\Notifications\LowBalance());
-        }
+        try {
+            if ($user->credits < 5 && $user->balance < 10) {
+                $user->notify(new \App\Notifications\LowBalance());
+            }
+        } catch (\Throwable) {}
+
 
         return response()->json([
             'ok' => true,
@@ -140,9 +143,9 @@ class GenerateController extends Controller
             default     => '生成中',
         };
 
-        // 返回已完成的 items（过滤掉 null 占位和 false 失败标记）
+        // 返回已完成的 items（过滤掉 null 占位、false 失败标记和 expired 标记）
         $allItems = $task->items ?? [];
-        $doneItems = array_values(array_filter($allItems, fn($i) => is_array($i)));
+        $doneItems = array_values(array_filter($allItems, fn($i) => is_array($i) && !empty($i['url'])));
         $progress = count($doneItems) . '/' . $task->count;
 
         $taskPayload = [
@@ -151,6 +154,7 @@ class GenerateController extends Controller
             'message'      => $publicMessage,
             'items'        => $doneItems,
             'progress'     => $progress,
+            'count'        => $task->count,
             'created_at'   => $task->created_at?->toIso8601String(),
             'completed_at' => $task->completed_at?->toIso8601String(),
         ];

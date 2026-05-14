@@ -71,4 +71,11 @@ class ChannelController extends Controller
 
         return back()->with('success', $channel->status === 'active' ? '渠道已启用' : '渠道已禁用');
     }
+
+    public function destroy(AiChannel $channel)
+    {
+        $channel->delete();
+
+        return redirect()->route('admin.image-gen.channels')->with('success', '渠道已删除');
+    }
 }

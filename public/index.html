@@ -1140,21 +1140,47 @@
       }
 
       .generation-stage {
-        max-height: 0;
-        opacity: 0;
-        overflow: hidden;
-        padding-top: 0;
-        padding-bottom: 0;
-        margin-bottom: -8px;
-        transition: max-height 0.45s ease, opacity 0.28s ease, padding 0.28s ease, margin 0.28s ease;
+        display: none;
+        order: -2;
+        border-radius: 22px;
+        background: #fff;
+        border: 1px solid var(--line);
+        box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+        padding: 20px;
+        min-height: 280px;
+        margin: 0;
       }
 
       .generation-stage.open {
-        max-height: 1200px;
-        opacity: 1;
-        padding-top: 18px;
-        padding-bottom: 18px;
-        margin-bottom: 0;
+        display: block;
+        animation: rise 0.4s cubic-bezier(0.22,1,0.36,1) both;
+      }
+
+      .page.generating .hero,
+      .page.generating .mode-cards,
+      .page.generating .gallery-card,
+      .page.generating .footer {
+        display: none;
+      }
+
+      .generation-stage .preview-grid {
+        min-height: 240px;
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .generation-stage .preview-grid:has(.preview-item:only-child) {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        margin: 0 auto;
+      }
+
+      .generation-stage .preview-item {
+        min-height: 240px;
+      }
+
+      .generation-stage .preview-box {
+        min-height: 240px;
+        border-radius: 12px;
       }
 
       .stage-summary {
@@ -1307,6 +1333,35 @@
         animation: revealSweep 0.78s ease both;
         pointer-events: none;
       }
+
+      .preview-item img { cursor: zoom-in; }
+
+      .result-actions {
+        margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;
+      }
+      .result-actions a {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 10px; border-radius: 6px; font-size: 12px;
+        text-decoration: none; transition: background 0.15s, color 0.15s;
+        border: 1px solid #e2e8f0; color: #334155; background: #f8fafc;
+      }
+      .result-actions a:hover { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+      .result-actions a.dl { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+      .result-actions a.dl:hover { background: #c7d2fe; }
+
+      .lightbox-overlay {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+        display: flex; align-items: center; justify-content: center;
+        cursor: zoom-out; animation: fadeIn 0.2s ease;
+      }
+      .lightbox-overlay img {
+        max-width: 92vw; max-height: 92vh; object-fit: contain;
+        border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+        animation: lightboxIn 0.25s cubic-bezier(0.22,1,0.36,1);
+      }
+      @keyframes lightboxIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
       .preview-item.loading {
         background:
@@ -1635,6 +1690,129 @@
         padding: 0 20px 16px;
       }
 
+      /* Bottom action buttons */
+      .bottom-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 4px;
+      }
+      .bottom-action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid var(--line);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.15s;
+      }
+      .bottom-action-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      }
+      .bottom-action-btn:active { transform: scale(0.97); }
+      .bottom-action-icon { font-size: 16px; }
+
+      /* My Works Modal */
+      .myworks-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 500;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+      .myworks-modal[hidden] { display: none; }
+      .myworks-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.4);
+        backdrop-filter: blur(4px);
+      }
+      .myworks-sheet {
+        position: relative;
+        width: 100%;
+        max-width: 720px;
+        max-height: 80vh;
+        background: #fff;
+        border-radius: 20px 20px 0 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        animation: sheetUp 0.3s ease both;
+      }
+      @keyframes sheetUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+      }
+      .myworks-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .myworks-head h3 { font-size: 16px; font-weight: 700; }
+      .myworks-grid {
+        padding: 16px;
+        overflow-y: auto;
+        flex: 1;
+        columns: 2;
+        column-gap: 12px;
+      }
+      .myworks-card {
+        break-inside: avoid;
+        margin-bottom: 12px;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f9fafb;
+        border: 1px solid var(--line);
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+      .myworks-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+      .myworks-card img {
+        width: 100%;
+        display: block;
+      }
+      .myworks-card-body {
+        padding: 8px 10px 10px;
+      }
+      .myworks-card-prompt {
+        font-size: 11px;
+        color: #52525b;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.5;
+      }
+      .myworks-card-time {
+        font-size: 10px;
+        color: #a1a1aa;
+        margin-top: 4px;
+      }
+      .myworks-loading {
+        text-align: center;
+        padding: 24px;
+        color: #a1a1aa;
+        font-size: 13px;
+      }
+      .myworks-empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: #a1a1aa;
+        font-size: 13px;
+      }
+
       .log {
         white-space: pre-wrap;
         line-height: 1.65;
@@ -1852,12 +2030,13 @@
         background: #dc2626;
       }
 
-      .task-ball-dot.queued {
+      .task-ball-dot.queued, .task-ball-dot.pending {
         background: #a1a1aa;
       }
 
       .task-ball-info {
         min-width: 0;
+        flex: 1;
       }
 
       .task-ball-info-id {
@@ -1867,6 +2046,21 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .task-ball-info-prompt {
+        font-size: 12px;
+        color: #27272a;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+
+      .task-ball-info-meta {
+        font-size: 10px;
+        color: #a1a1aa;
+        margin-top: 2px;
       }
 
       .task-ball-info-msg {
@@ -1905,6 +2099,23 @@
       .task-ball-tag.queued {
         background: #f4f4f5;
         color: #71717a;
+      }
+
+      .task-ball-action {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 6px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .task-ball-action.retry {
+        background: #fef2f2;
+        color: #dc2626;
+      }
+      .task-ball-action.view {
+        background: #f0fdf4;
+        color: #16a34a;
       }
 
       .task-ball-empty {
@@ -2557,6 +2768,7 @@
           bottom: max(16px, env(safe-area-inset-bottom, 0px));
         }
 
+
         .task-ball-orb {
           width: 48px;
           height: 48px;
@@ -2740,15 +2952,18 @@
           </div>
         </article>
 
-        <article id="generationStage" class="preview-card generation-stage">
-          <div class="section-head">
-            <h2>生成结果</h2>
-            <span class="status" id="status"><span class="dot"></span><span>未生成</span></span>
+        <article id="generationStage" class="generation-stage">
+          <div class="section-head" style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <h2 style="font-size:14px;margin:0;">生成结果</h2>
+              <span class="status" id="status"><span class="dot"></span><span>未生成</span></span>
+            </div>
+            <button id="closeStageBtn" class="mini-ghost-btn" type="button">← 返回</button>
           </div>
-          <div class="stage-summary">
+          <div class="stage-summary" style="display:none;">
             <div id="stageThumb" class="stage-thumb" style="display: none;"></div>
             <div class="stage-copy">
-              <div id="stagePrompt" class="stage-prompt">这里会显示当前生成任务的摘要。</div>
+              <div id="stagePrompt" class="stage-prompt"></div>
               <div id="stageTags" class="stage-tags"></div>
             </div>
           </div>
@@ -2756,38 +2971,40 @@
             <div id="previewGrid" class="preview-grid">
               <div class="placeholder">
                 <strong>这里会显示生成结果</strong>
-                <div>支持下载图片，失败时会展示接口原文。</div>
               </div>
             </div>
           </div>
-            <div class="meta">
-            <div id="resultInfo">未生成图片，结果保存在云端。</div>
-            <div id="retryBar" class="task-lock" hidden style="background:#fef2f2;border-color:#fecaca;">
+          <div class="meta" style="margin-top:10px;">
+            <div id="resultInfo" style="font-size:12px;color:#71717a;">未生成图片</div>
+            <div id="retryBar" class="task-lock" hidden style="background:#fef2f2;border-color:#fecaca;margin-top:8px;">
               <span class="task-lock-label" style="color:#991b1b;">生成失败</span>
               <button id="retryTaskBtn" class="ghost-btn" type="button" style="background:#dc2626;color:#fff;border-color:#dc2626;">重新生成</button>
             </div>
-            <div id="currentTaskLock" class="task-lock" hidden>
-              <span class="task-lock-label">当前任务号</span>
-              <code id="currentTaskIdText">-</code>
-              <button id="copyTaskIdBtn" class="ghost-btn" type="button">复制</button>
-              <button id="unlockTaskIdBtn" class="ghost-btn" type="button">切换</button>
-            </div>
-            <div class="task-query">
-              <input id="taskQueryInput" class="settings-input" type="text" placeholder="输入任务号查询生成结果" />
-              <div class="task-query-actions">
-                <button id="queryTaskBtn" class="ghost-btn" type="button">查询结果</button>
-                <button id="recoverTasksBtn" class="ghost-btn" type="button">找回我的任务</button>
-              </div>
-            </div>
-            <div id="resultUrl"></div>
-            <div id="taskRecoverList" class="task-recover-list"></div>
+            <div id="resultUrl" class="result-actions"></div>
           </div>
         </article>
 
-        <div class="gallery-card" style="cursor:pointer;" onclick="window.open('/explore','_blank')">
-          <div class="section-toggle" style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="bottom-actions">
+          <button class="bottom-action-btn" onclick="window.open('/explore','_blank')">
+            <span class="bottom-action-icon">✦</span>
             <span>灵感广场</span>
-            <span style="font-size:13px;color:#71717a;">探索社区公开创作 →</span>
+          </button>
+          <button class="bottom-action-btn" id="myWorksBtn">
+            <span class="bottom-action-icon">♦</span>
+            <span>我的作品</span>
+          </button>
+        </div>
+
+        <!-- 我的作品 Modal -->
+        <div id="myWorksModal" class="myworks-modal" hidden>
+          <div class="myworks-overlay" id="myWorksOverlay"></div>
+          <div class="myworks-sheet">
+            <div class="myworks-head">
+              <h3>我的作品</h3>
+              <button id="closeMyWorksBtn" class="icon-btn" type="button">×</button>
+            </div>
+            <div id="myWorksGrid" class="myworks-grid"></div>
+            <div id="myWorksLoading" class="myworks-loading" hidden>加载中...</div>
           </div>
         </div>
 
@@ -2803,6 +3020,18 @@
         </footer>
       </section>
     </main>
+
+    <!-- Hidden stubs for removed UI elements (JS compatibility) -->
+    <div hidden>
+      <div id="currentTaskLock"></div>
+      <code id="currentTaskIdText"></code>
+      <button id="copyTaskIdBtn"></button>
+      <button id="unlockTaskIdBtn"></button>
+      <input id="taskQueryInput" type="hidden" />
+      <button id="queryTaskBtn"></button>
+      <button id="recoverTasksBtn"></button>
+      <div id="taskRecoverList"></div>
+    </div>
 
     <div id="taskBall" class="task-ball">
       <div id="taskBallPanel" class="task-ball-panel">
@@ -3000,7 +3229,8 @@
       const AUTH_API_BASE = "/api";
       const TASK_ENDPOINT = "generate-task.php";
       const LIST_ENDPOINT = "list.php?limit=18";
-      const PROMPT_TOOL_MODEL = "gpt-5.4-mini";
+      let PROMPT_TOOL_MODEL = "gpt-5.4-mini";
+      (async () => { try { const r = await fetch("/api/config"); if (r.ok) { const d = await r.json(); if (d.prompt_tool_model) PROMPT_TOOL_MODEL = d.prompt_tool_model; } } catch {} })();
       const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
       const TASK_POLL_INTERVAL = 4000;
       const TASK_LONG_WAIT_MS = 3 * 60 * 1000;
@@ -3119,6 +3349,7 @@
         const loggedIn = !!authUser;
         els.keyDot.classList.toggle("ok", loggedIn);
         els.keyLabel.textContent = loggedIn ? (authUser.nickname || authUser.name) : "登录";
+        els.taskBall.classList.toggle("visible", loggedIn);
       }
 
       function showAuthPanel(panel) {
@@ -3393,12 +3624,18 @@
         }
       }
 
-      function openGenerationStage(scroll = true) {
-        renderStageHeader();
-        els.generationStage.classList.add("open");
-        if (scroll) {
-          els.generationStage.scrollIntoView({ behavior: "smooth", block: "start" });
+      function openGenerationStage(open = true) {
+        if (open) {
+          renderStageHeader();
+          els.generationStage.classList.add("open");
+          document.querySelector(".page").classList.add("generating");
+          showTaskBallPanel(false);
         }
+      }
+
+      function closeGenerationStage() {
+        els.generationStage.classList.remove("open");
+        document.querySelector(".page").classList.remove("generating");
       }
 
       const LOADING_BADGE_MSGS = [
@@ -3562,7 +3799,7 @@
         els.resultUrl.textContent = "";
         els.taskRecoverList.innerHTML = "";
         els.downloadBtn.disabled = true;
-        els.generationStage.classList.remove("open");
+        closeGenerationStage();
         clearActiveTaskId();
       }
 
@@ -3803,6 +4040,7 @@
       }
 
       function renderResults(items) {
+        items = items.filter(i => i && (i.url || i.objectUrl));
         state.downloadItems.forEach((item) => {
           if (item.objectUrl) URL.revokeObjectURL(item.objectUrl);
         });
@@ -3825,19 +4063,21 @@
         els.resultInfo.textContent = `生成完成: ${items.length} 张图片，已保存到云端。`;
         els.resultUrl.innerHTML = items
           .map((item, index) => {
+            const n = index + 1;
             if (item.objectUrl) {
-              return `<a href="${item.objectUrl}" download="${item.filename}">下载图片 ${index + 1}</a>`;
+              return `<a class="dl" href="${escapeHtml(item.objectUrl)}" download="${escapeHtml(item.filename)}">⬇ 下载 ${n}</a>`;
             }
-            const downloadHref = item.downloadUrl || item.download_url || item.url;
-            return `<a href="${downloadHref}" target="_blank" rel="noreferrer">下载图片 ${index + 1}</a> · <a href="${item.url}" target="_blank" rel="noreferrer">打开图片 ${index + 1}</a>`;
+            const downloadHref = escapeHtml(item.downloadUrl || item.download_url || item.url);
+            const openHref = escapeHtml(item.url);
+            return `<a class="dl" href="${downloadHref}" target="_blank" rel="noreferrer">⬇ 下载 ${n}</a><a href="${openHref}" target="_blank" rel="noreferrer">↗ 打开 ${n}</a>`;
           })
-          .join(" · ");
+          .join("");
         els.downloadBtn.disabled = items.length === 0;
       }
 
-      // 逐张渲染：只追加新出现的图片，不清空已有的
-      function renderProgressiveResults(items) {
-        stopLoadingMessages();
+      // 逐张渲染：只追加新出现的图片，保留剩余 loading 占位
+      function renderProgressiveResults(items, totalCount) {
+        const total = totalCount || state.count;
         const existing = els.previewGrid.querySelectorAll(".preview-item:not(.loading)");
         const existingCount = existing.length;
         if (items.length <= existingCount) return;
@@ -3856,6 +4096,23 @@
           img.alt = `generated image ${i + 1}`;
           img.style.animationDelay = `${(i - existingCount) * 90}ms`;
           card.appendChild(img);
+          els.previewGrid.appendChild(card);
+        }
+
+        // 为剩余未完成的图片保留 loading 占位
+        const remaining = Math.max(0, total - items.length);
+        for (let i = 0; i < remaining; i++) {
+          const card = document.createElement("div");
+          card.className = "preview-item loading";
+          card.innerHTML = `
+            <div class="loading-badge"><span class="badge-spinner"></span><span class="loading-badge-text">生成中 ${items.length}/${total}</span></div>
+            <div class="loading-shimmer"></div>
+            <div class="loading-grid"></div>
+            <div class="loading-orb orb-a"></div>
+            <div class="loading-orb orb-b"></div>
+            <div class="loading-line line-a"></div>
+            <div class="loading-line line-b"></div>
+          `;
           els.previewGrid.appendChild(card);
         }
 
@@ -3938,6 +4195,52 @@
         }
       }
 
+      // ── My Works ──
+      function openMyWorks() {
+        document.getElementById("myWorksModal").hidden = false;
+        loadMyWorks();
+      }
+      function closeMyWorks() {
+        document.getElementById("myWorksModal").hidden = true;
+      }
+      async function loadMyWorks() {
+        const grid = document.getElementById("myWorksGrid");
+        const loading = document.getElementById("myWorksLoading");
+        if (!state.savedKey) {
+          grid.innerHTML = '<div class="myworks-empty">请先登录</div>';
+          return;
+        }
+        grid.innerHTML = '';
+        loading.hidden = false;
+        try {
+          const res = await fetch(`${AUTH_API_BASE}/tasks?per_page=30`, { headers: buildTaskAuthHeaders() });
+          const data = await res.json();
+          const tasks = (data.data || []).filter(t => t.status === 'completed' && Array.isArray(t.items) && t.items.length > 0 && t.items[0]?.url);
+          loading.hidden = true;
+          if (!tasks.length) {
+            grid.innerHTML = '<div class="myworks-empty">还没有作品，快去生成吧</div>';
+            return;
+          }
+          grid.innerHTML = tasks.map(t => {
+            const img = t.items[0];
+            const url = img?.url || '';
+            const prompt = (t.prompt || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const displayPrompt = prompt.length > 60 ? prompt.slice(0,60)+'…' : prompt;
+            const time = t.created_at ? new Date(t.created_at).toLocaleDateString('zh-CN') : '';
+            return `<div class="myworks-card" data-task-id="${t.task_id}">
+              <img src="${url.replace(/"/g,'&quot;')}" alt="" loading="lazy" />
+              <div class="myworks-card-body">
+                <div class="myworks-card-prompt">${displayPrompt}</div>
+                <div class="myworks-card-time">${time}${t.items.length > 1 ? ' · '+t.items.length+'张' : ''}</div>
+              </div>
+            </div>`;
+          }).join('');
+        } catch {
+          loading.hidden = true;
+          grid.innerHTML = '<div class="myworks-empty">加载失败</div>';
+        }
+      }
+
       async function recoverRecentTasks() {
         const res = await fetch(`${TASK_ENDPOINT}?action=recent&limit=8`, {
           method: "GET",
@@ -4016,7 +4319,7 @@
 
       function updateTaskBallOrb() {
         const s = _taskBallState.latestStatus;
-        const hasActive = _taskBallState.tasks.some(t => t.status === "processing" || t.status === "queued");
+        const hasActive = _taskBallState.tasks.some(t => t.status === "processing" || t.status === "queued" || t.status === "pending");
         const orbInner = els.taskBallOrb.querySelector(".orb-spinner") || els.taskBallOrb.querySelector(".orb-icon");
         if (hasActive) {
           if (orbInner?.className !== "orb-spinner") orbInner.outerHTML = '<div class="orb-spinner"></div>';
@@ -4036,33 +4339,51 @@
           els.taskBallList.innerHTML = '<div class="task-ball-empty">暂无任务</div>';
           return;
         }
-        const statusLabels = { queued: "排队", processing: "处理中", completed: "完成", failed: "失败" };
+        const statusLabels = { queued: "排队", processing: "处理中", completed: "完成", failed: "失败", pending: "排队" };
         els.taskBallList.innerHTML = tasks.map(t => {
           const st = t.status || "queued";
-          const msg = t.message || t.error || "";
-          const shortId = t.task_id.length > 12 ? t.task_id.slice(0, 6) + "…" + t.task_id.slice(-6) : t.task_id;
+          const rawPrompt = t.prompt || '';
+          const prompt = rawPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const displayPrompt = prompt.length > 28 ? prompt.slice(0, 28) + '…' : prompt;
+          const time = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+          const safePrompt = rawPrompt.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          let actionHtml = '';
+          if (st === 'failed') {
+            actionHtml = `<span class="task-ball-action retry" data-action="retry" data-prompt="${safePrompt}">重试</span>`;
+          } else if (st === 'completed') {
+            actionHtml = `<span class="task-ball-action view" data-action="view">查看</span>`;
+          }
           return `<button class="task-ball-item" data-task-id="${t.task_id}" title="${t.task_id}">
             <span class="task-ball-dot ${st}"></span>
             <div class="task-ball-info">
-              <div class="task-ball-info-id">${shortId}</div>
-              ${msg ? `<div class="task-ball-info-msg">${msg.length > 40 ? msg.slice(0, 40) + '…' : msg}</div>` : ''}
+              <div class="task-ball-info-prompt">${displayPrompt || '(无提示词)'}</div>
+              <div class="task-ball-info-meta">${time} · ${statusLabels[st] || st}</div>
             </div>
-            <span class="task-ball-tag ${st}">${statusLabels[st] || st}</span>
+            ${actionHtml}
           </button>`;
         }).join("");
       }
 
       async function refreshTaskBallList() {
+        if (!state.savedKey) return;
         try {
-          const res = await fetch(`${TASK_ENDPOINT}?action=recent&limit=12`, { cache: "no-store", headers: buildTaskAuthHeaders() });
+          const res = await fetch(`${AUTH_API_BASE}/tasks?per_page=12`, { cache: "no-store", headers: buildTaskAuthHeaders() });
           const data = await res.json();
-          if (data.ok && Array.isArray(data.tasks)) {
-            _taskBallState.tasks = data.tasks;
+          const tasks = Array.isArray(data.data) ? data.data : [];
+          if (tasks.length) {
+            _taskBallState.tasks = tasks.map(t => ({
+              task_id: t.task_id,
+              status: t.status,
+              prompt: t.prompt || '',
+              message: t.message || '',
+              created_at: t.created_at,
+              items: t.items,
+            }));
             const latest = _taskBallState.tasks[0];
             _taskBallState.latestStatus = latest?.status || "";
             updateTaskBallOrb();
             renderTaskBallList();
-            if (_taskBallState.tasks.length) els.taskBall.classList.add("visible");
+            els.taskBall.classList.add("visible");
           }
         } catch {}
       }
@@ -4070,7 +4391,10 @@
       function showTaskBallPanel(show) {
         _taskBallState.panelOpen = !!show;
         els.taskBallPanel.classList.toggle("open", !!show);
-        if (show) refreshTaskBallList();
+        if (show) {
+          closeGenerationStage();
+          refreshTaskBallList();
+        }
       }
 
       function scheduleTaskPolling(taskId) {
@@ -4133,7 +4457,7 @@
         // 逐张回显：processing 时如果有已完成的 items，立即渲染
         const partialItems = Array.isArray(task.items) ? task.items : [];
         if (partialItems.length > 0) {
-          renderProgressiveResults(partialItems);
+          renderProgressiveResults(partialItems, task.count);
           els.resultInfo.textContent = task.progress ? `生成中 ${task.progress}...` : '生成中...';
         } else if (!els.previewGrid.querySelector(".preview-item.loading")) {
           renderLoadingCards();
@@ -4530,6 +4854,25 @@
         }
       });
 
+      // 图片点击放大 lightbox
+      els.previewGrid.addEventListener("click", (e) => {
+        const img = e.target.closest(".preview-item:not(.loading) img");
+        if (!img) return;
+        document.querySelector(".lightbox-overlay")?.remove();
+        const overlay = document.createElement("div");
+        overlay.className = "lightbox-overlay";
+        const bigImg = document.createElement("img");
+        bigImg.src = img.src;
+        bigImg.alt = "";
+        overlay.appendChild(bigImg);
+        const close = () => { overlay.remove(); document.removeEventListener("keydown", esc); };
+        function esc(ev) { if (ev.key === "Escape") close(); }
+        bigImg.addEventListener("click", (ev) => ev.stopPropagation());
+        overlay.addEventListener("click", close);
+        document.addEventListener("keydown", esc);
+        document.body.appendChild(overlay);
+      });
+
       els.queryTaskBtn.addEventListener("click", async () => {
         try {
           const taskId = els.taskQueryInput.value.trim();
@@ -4586,6 +4929,10 @@
       });
 
       els.taskBallOrb.addEventListener("click", () => {
+        if (els.generationStage.classList.contains("open")) {
+          closeGenerationStage();
+          return;
+        }
         showTaskBallPanel(!_taskBallState.panelOpen);
       });
 
@@ -4594,14 +4941,28 @@
       });
 
       els.taskBallList.addEventListener("click", (e) => {
+        const actionEl = e.target.closest("[data-action]");
         const item = e.target.closest(".task-ball-item");
         if (!item) return;
         const taskId = item.dataset.taskId;
         if (!taskId) return;
-        els.taskQueryInput.value = taskId;
+
+        if (actionEl?.dataset.action === "retry") {
+          const prompt = actionEl.dataset.prompt || "";
+          if (prompt) els.prompt.value = prompt;
+          if (state.mode === "image") setMode("text");
+          showTaskBallPanel(false);
+          els.generateBtn.click();
+          return;
+        }
+
         setActiveTaskId(taskId, { lock: true });
         showTaskBallPanel(false);
-        els.queryTaskBtn.click();
+        queryGenerationTask(taskId).catch(() => {});
+      });
+
+      document.getElementById("closeStageBtn").addEventListener("click", () => {
+        closeGenerationStage();
       });
 
       document.addEventListener("click", (e) => {
@@ -4624,6 +4985,19 @@
         setStatus("", state.mode === "text" ? "图片生成模式" : state.mode === "image" ? "参考图生成模式" : "提示词反推模式");
       });
 
+      document.getElementById("myWorksBtn").addEventListener("click", openMyWorks);
+      document.getElementById("closeMyWorksBtn").addEventListener("click", closeMyWorks);
+      document.getElementById("myWorksOverlay").addEventListener("click", closeMyWorks);
+      document.getElementById("myWorksGrid").addEventListener("click", (e) => {
+        const card = e.target.closest(".myworks-card");
+        if (!card) return;
+        const taskId = card.dataset.taskId;
+        if (taskId) {
+          closeMyWorks();
+          queryGenerationTask(taskId).catch(() => {});
+        }
+      });
+
       loadSavedKey();
       setPromptToolLoading(false);
       setGenerationLoading(false);
@@ -4631,6 +5005,11 @@
       clearPreview();
       loadSavedTaskId();
       setMode("text");
+      // 从 URL 读取 prompt 参数（灵感广场"使用"按钮）
+      (function() {
+        const p = new URLSearchParams(location.search).get('prompt');
+        if (p) { els.prompt.value = p; els.prompt.style.height = Math.min(els.prompt.scrollHeight, 120) + 'px'; history.replaceState(null, '', '/'); }
+      })();
       loadGalleryWall();
       refreshTaskBallList();
       if (state.activeTaskId) {

@@ -16,4 +16,5 @@ Route::post('channels', [ChannelController::class, 'store'])->name('channels.sto
 Route::get('channels/{channel}/edit', [ChannelController::class, 'edit'])->name('channels.edit');
 Route::put('channels/{channel}', [ChannelController::class, 'update'])->name('channels.update');
 Route::post('channels/{channel}/toggle', [ChannelController::class, 'toggleStatus'])->name('channels.toggle');
+Route::delete('channels/{channel}', [ChannelController::class, 'destroy'])->name('channels.destroy');
 

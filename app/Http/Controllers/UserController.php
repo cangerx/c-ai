@@ -22,6 +22,16 @@ class UserController extends Controller
         return view('user.dashboard', compact('user', 'recentLogs'));
     }
 
+    public function wallet(Request $request)
+    {
+        $user = Auth::user();
+        $logs = UsageLog::where('user_id', $user->id)
+            ->latest()
+            ->paginate(20);
+
+        return view('user.wallet', compact('user', 'logs'));
+    }
+
     public function profile()
     {
         $user = Auth::user();

@@ -9,7 +9,8 @@
 @section('content')
     <div class="card" style="max-width: 560px;">
         <div class="card-body">
-            <form method="POST" action="{{ route('admin.redeem-codes.generate.submit') }}">
+            <form method="POST" action="{{ route('admin.redeem-codes.generate.submit') }}"
+                  x-data @submit.prevent="$dispatch('confirm', { title: '确认生成', message: '确定要批量生成兑换码吗？', form: $el })">
                 @csrf
                 <div class="form-group">
                     <label class="form-label">生成数量</label>

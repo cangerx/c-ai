@@ -62,6 +62,13 @@
         .alert-success { background: rgba(34, 197, 94, 0.08); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15); }
         .alert-danger { background: rgba(239, 68, 68, 0.08); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.15); }
         .invite-box { background: var(--accent-soft); border: 1px dashed var(--accent); border-radius: var(--radius-sm); padding: 14px 18px; font-family: monospace; font-size: 16px; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; display: inline-block; }
+        [x-cloak] { display: none !important; }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 9998; display: flex; align-items: center; justify-content: center; }
+        .modal-box { background: #fff; border-radius: var(--radius-md); padding: 28px; max-width: 380px; width: 90%; box-shadow: var(--shadow-md); text-align: center; }
+        .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+        .modal-desc { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
+        .modal-actions { display: flex; gap: 12px; justify-content: center; }
+        .btn-danger { background: var(--danger); color: #fff; }
     </style>
 </head>
 <body>
@@ -93,5 +100,36 @@
 
         @yield('content')
     </div>
+
+    <!-- Confirm Modal -->
+    <div x-data="confirmModal()" @confirm.window="open($event.detail)"
+         x-show="show" x-cloak style="display:none;">
+        <div class="modal-backdrop" @click.self="cancel()"
+             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+            <div class="modal-box"
+                 x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95">
+                <div class="modal-title" x-text="title"></div>
+                <div class="modal-desc" x-text="message"></div>
+                <div class="modal-actions">
+                    <button class="btn btn-ghost btn-sm" @click="cancel()">取消</button>
+                    <button class="btn btn-danger btn-sm" @click="confirm()">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
+    <script>
+        function confirmModal() {
+            return {
+                show: false, title: '', message: '', formEl: null,
+                open(detail) { this.title = detail.title || '确认操作'; this.message = detail.message || '确定继续？'; this.formEl = detail.form || null; this.show = true; },
+                confirm() { this.show = false; if (this.formEl) this.formEl.submit(); },
+                cancel() { this.show = false; this.formEl = null; }
+            };
+        }
+    </script>
 </body>
 </html>

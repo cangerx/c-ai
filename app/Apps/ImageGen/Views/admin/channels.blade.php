@@ -45,11 +45,18 @@
                             </td>
                             <td style="white-space: nowrap;">
                                 <a href="{{ route('admin.image-gen.channels.edit', $channel) }}" class="btn btn-ghost btn-sm">编辑</a>
-                                <form method="POST" action="{{ route('admin.image-gen.channels.toggle', $channel) }}" style="display:inline;">
+                                <form method="POST" action="{{ route('admin.image-gen.channels.toggle', $channel) }}" style="display:inline;"
+                                      x-data @submit.prevent="$dispatch('confirm', { title: '{{ $channel->status === 'active' ? '禁用渠道' : '启用渠道' }}', message: '确定{{ $channel->status === 'active' ? '禁用' : '启用' }}渠道「{{ addslashes($channel->name) }}」？', form: $el })">
                                     @csrf
-                                    <button type="submit" class="btn btn-sm {{ $channel->status === 'active' ? 'btn-ghost' : 'btn-primary' }}">
+                                    <button type="submit" class="btn btn-sm {{ $channel->status === 'active' ? 'btn-ghost' : 'btn-primary' }}" data-no-loading>
                                         {{ $channel->status === 'active' ? '禁用' : '启用' }}
                                     </button>
+                                </form>
+                                <form method="POST" action="{{ route('admin.image-gen.channels.destroy', $channel) }}" style="display:inline;"
+                                      x-data @submit.prevent="$dispatch('confirm', { title: '确认删除', message: '确定要删除渠道「{{ addslashes($channel->name) }}」吗？此操作不可恢复。', form: $el })">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger,#ef4444);" data-no-loading>删除</button>
                                 </form>
                             </td>
                         </tr>
@@ -57,7 +64,7 @@
                         <tr>
                             <td colspan="8">
                                 <div class="empty-state">
-                                    <div class="empty-state-icon">�</div>
+                                    <div class="empty-state-icon">📡</div>
                                     <div class="empty-state-text">暂无渠道配置</div>
                                 </div>
                             </td>

@@ -36,11 +36,12 @@
                         </td>
                         <td>{{ $u->created_at->format('Y-m-d H:i') }}</td>
                         <td>
-                            <form method="POST" action="{{ route('agent.sub-users.recharge', $u) }}" style="display:flex; gap:6px; align-items:center;">
+                            <form method="POST" action="{{ route('agent.sub-users.recharge', $u) }}" style="display:flex; gap:6px; align-items:center;"
+                                  x-data @submit.prevent="$dispatch('confirm', { title: '确认充值', message: '确定为用户「{{ addslashes($u->name) }}」充值？', form: $el })">
                                 @csrf
                                 <input class="form-input" type="number" name="credits" placeholder="次数" min="0" style="width:70px;">
                                 <input class="form-input" type="number" name="balance" placeholder="余额" min="0" step="0.01" style="width:80px;">
-                                <button type="submit" class="btn btn-primary btn-sm">充值</button>
+                                <button type="submit" class="btn btn-primary btn-sm" data-no-loading>充值</button>
                             </form>
                         </td>
                     </tr>

@@ -586,6 +586,7 @@
         function renderCards(items, append) {
             const html = items.map((item, idx) => {
                 const globalIdx = append ? allItems.indexOf(item) : idx;
+                const lazy = (append || idx >= 4) ? ' loading="lazy"' : '';
                 const avatar = item.author.avatar
                     ? `<img src="${item.author.avatar}" alt="">`
                     : item.author.name.charAt(0);
@@ -595,7 +596,7 @@
 
                 return `<div class="card" data-idx="${globalIdx}" onclick="openLightbox(${globalIdx})">
                     <div class="card-img-wrap">
-                        <img src="${item.thumb}" alt="" onload="this.classList.add('loaded');this.parentElement.classList.add('loaded');">
+                        <img src="${item.thumb}" alt=""${lazy} onload="this.classList.add('loaded');this.parentElement.classList.add('loaded');">
                         ${badge}
                     </div>
                     <div class="card-body">

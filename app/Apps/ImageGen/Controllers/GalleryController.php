@@ -10,11 +10,11 @@ class GalleryController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = 24;
+        $perPage = 12;
 
         $query = GenerationTask::where('is_public', true)
             ->where('status', 'completed')
-            ->with('user:id,name,nickname,avatar');
+            ->with('user:id,name,nickname');
 
         if ($search = $request->input('q')) {
             $query->where('prompt', 'like', "%{$search}%");
@@ -47,7 +47,7 @@ class GalleryController extends Controller
                 'time_ago' => $task->created_at?->diffForHumans(),
                 'author' => [
                     'name' => $user?->nickname ?: $user?->name ?: '匿名',
-                    'avatar' => $user?->avatar,
+                    'avatar' => null,
                 ],
             ];
         })->filter()->values();
