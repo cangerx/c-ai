@@ -38,6 +38,7 @@ class RedeemCodeController extends Controller
             'credits' => 'required_if:type,credits,mixed|integer|min:0',
             'balance' => 'required_if:type,balance,mixed|numeric|min:0',
             'expires_days' => 'nullable|integer|min:1',
+            'plan_id' => 'nullable|exists:plans,id',
         ]);
 
         $batchId = 'B' . now()->format('ymdHis') . Str::random(4);
@@ -54,6 +55,7 @@ class RedeemCodeController extends Controller
                 'created_by' => auth()->id(),
                 'expires_at' => $expiresAt,
                 'batch_id' => $batchId,
+                'plan_id' => $data['plan_id'] ?? null,
             ]);
         }
 

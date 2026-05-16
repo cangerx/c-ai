@@ -91,7 +91,9 @@
         </div>
     </div>
     <div style="margin-top: 16px;">{{ $users->links() }}</div>
+@endsection
 
+@push('modals')
     <!-- Edit User Modal -->
     <div x-data="editUserModal()" @edit-user.window="open($event.detail)"
          x-show="show" x-cloak style="display:none; position:fixed; inset:0; z-index:9999;">
@@ -150,7 +152,7 @@
             </div>
         </div>
     </div>
-@endsection
+@endpush
 
 @push('scripts')
 <script>

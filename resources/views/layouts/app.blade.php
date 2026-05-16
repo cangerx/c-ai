@@ -47,8 +47,7 @@
                             </button>
                             <div x-show="dropdown" @click.away="dropdown = false" x-transition
                                  class="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-                                <a href="{{ route('user.dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">个人中心</a>
-                                <a href="{{ route('user.wallet') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">钱包</a>
+                                <a href="/?profile=1" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">个人中心</a>
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <button type="submit" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">退出</button>

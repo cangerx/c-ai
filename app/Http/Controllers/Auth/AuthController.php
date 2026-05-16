@@ -36,7 +36,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('user.dashboard'));
+        return redirect()->intended('/');
     }
 
     public function showRegister(Request $request)
@@ -86,7 +86,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('user.dashboard');
+        return redirect('/');
     }
 
     public function logout(Request $request)

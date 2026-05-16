@@ -11,7 +11,7 @@ class RedeemCode extends Model
     use HasFactory;
     protected $fillable = [
         'code', 'type', 'credits', 'balance', 'status',
-        'created_by', 'used_by', 'used_at', 'expires_at', 'batch_id',
+        'created_by', 'used_by', 'used_at', 'expires_at', 'batch_id', 'plan_id', 'agent_plan_id',
     ];
 
     protected function casts(): array

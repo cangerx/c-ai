@@ -211,6 +211,8 @@
         touch-action: manipulation;
         z-index: 10;
         transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+        max-width: 140px;
+        overflow: hidden;
       }
 
       .hero-login:hover {
@@ -219,6 +221,15 @@
 
       .hero-login:active {
         transform: scale(0.96);
+      }
+
+      .hero-login #keyLabel {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 80px;
+        display: inline-block;
+        vertical-align: middle;
       }
 
       .hero-login .key-dot {
@@ -3725,6 +3736,8 @@
                   </div>
                 </div>
 
+                <a href="/pricing" class="black-btn" style="display:flex;align-items:center;justify-content:center;text-decoration:none;border-radius:8px;margin-bottom:12px;">购买套餐</a>
+
                 <div class="settings-field">
                   <label>兑换码</label>
                   <div style="display:flex;gap:8px;">
@@ -4060,7 +4073,24 @@
       function syncLoginBtn() {
         const loggedIn = !!authUser;
         els.keyDot.classList.toggle("ok", loggedIn);
-        els.keyLabel.textContent = loggedIn ? `${authUser.credits ?? 0}积分` : "登录";
+        els.keyLabel.textContent = loggedIn ? (authUser.nickname || authUser.name || "我的") : "登录";
+        if (loggedIn) {
+          if (!window._keyLabelTimer) {
+            let showName = true;
+            window._keyLabelTimer = setInterval(() => {
+              if (!authUser) { clearInterval(window._keyLabelTimer); window._keyLabelTimer = null; return; }
+              showName = !showName;
+              els.keyLabel.style.transition = "opacity 0.3s";
+              els.keyLabel.style.opacity = "0";
+              setTimeout(() => {
+                els.keyLabel.textContent = showName ? (authUser.nickname || authUser.name || "我的") : `${authUser.credits ?? 0}积分`;
+                els.keyLabel.style.opacity = "1";
+              }, 300);
+            }, 3000);
+          }
+        } else {
+          if (window._keyLabelTimer) { clearInterval(window._keyLabelTimer); window._keyLabelTimer = null; }
+        }
         els.taskBall.classList.toggle("visible", loggedIn);
       }
 
@@ -6028,8 +6058,10 @@
       setMode("text");
       // 从 URL 读取 prompt 参数（灵感广场"使用"按钮）
       (function() {
-        const p = new URLSearchParams(location.search).get('prompt');
+        const params = new URLSearchParams(location.search);
+        const p = params.get('prompt');
         if (p) { els.prompt.value = p; els.prompt.style.height = Math.min(els.prompt.scrollHeight, 120) + 'px'; history.replaceState(null, '', '/'); }
+        if (params.get('profile')) { setSettingsOpen(true); history.replaceState(null, '', '/'); }
       })();
       loadGalleryWall();
       refreshTaskBallList();
@@ -6041,5 +6073,34 @@
     </script>
     <script src="https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js"></script>
     <div class="toast-container" id="toastContainer"></div>
+    <script>
+    (function(){
+      var s = window.__AGENT_SITE__;
+      if (!s) return;
+      if (s.seo_title) document.title = s.seo_title;
+      var desc = document.querySelector('meta[name="description"]');
+      if (desc && s.seo_description) desc.content = s.seo_description;
+      document.querySelectorAll('.logo-text, .nav-logo, [data-site-name]').forEach(function(el){ el.textContent = s.name; });
+      if (s.color) document.documentElement.style.setProperty('--accent', s.color);
+      if (s.logo) { var img = document.querySelector('.nav-logo-img, .logo-img'); if (img) img.src = s.logo; }
+      if (s.announcement) {
+        var bar = document.querySelector('.announcement-bar, [data-announcement]');
+        if (bar) bar.textContent = s.announcement;
+      }
+      // Auto-attach invite_code on register
+      if (s.invite_code) {
+        var origFetch = window.fetch;
+        window.fetch = function(url, opts) {
+          if (typeof url === 'string' && url.includes('/register') && opts && opts.body) {
+            try {
+              var body = JSON.parse(opts.body);
+              if (!body.invite_code) { body.invite_code = s.invite_code; opts.body = JSON.stringify(body); }
+            } catch(e){}
+          }
+          return origFetch.apply(this, arguments);
+        };
+      }
+    })();
+    </script>
   </body>
 </html>

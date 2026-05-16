@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\BillingRuleController;
 use App\Http\Controllers\Admin\CommissionController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LoginSettingController;
+use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\RedeemCodeController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\StorageController;
@@ -58,6 +59,11 @@ Route::middleware(['auth', 'role:admin,agent'])->group(function () {
     Route::post('announcements/{announcement}/toggle', [AnnouncementController::class, 'toggle'])->name('announcements.toggle');
 
     Route::get('commissions', [CommissionController::class, 'index'])->name('commissions.index');
+
+    Route::get('plans', [PlanController::class, 'index'])->name('plans.index');
+    Route::post('plans', [PlanController::class, 'store'])->name('plans.store');
+    Route::put('plans/{plan}', [PlanController::class, 'update'])->name('plans.update');
+    Route::delete('plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
 
     Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
     Route::get('withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');

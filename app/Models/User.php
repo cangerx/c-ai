@@ -34,6 +34,8 @@ class User extends Authenticatable
         'avatar',
         'wechat_openid',
         'wechat_unionid',
+        'agent_level_id',
+        'total_recharged',
     ];
 
     protected $hidden = [
@@ -52,6 +54,7 @@ class User extends Authenticatable
             'commission_credits' => 'integer',
             'total_consumed_credits' => 'integer',
             'is_distributor' => 'boolean',
+            'total_recharged' => 'decimal:2',
         ];
     }
 

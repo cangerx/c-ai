@@ -67,6 +67,11 @@
             color: var(--text);
         }
 
+        [data-theme="dark"] .modal-box {
+            background: var(--panel);
+            color: var(--text);
+        }
+
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
@@ -857,6 +862,10 @@
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
                     登录设置
                 </a>
+                <a href="{{ route('admin.plans.index') }}" class="sidebar-item {{ request()->routeIs('admin.plans.*') ? 'active' : '' }}">
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3h-8l-2 4h12l-2-4z"/></svg>
+                    套餐管理
+                </a>
                 <a href="{{ route('admin.commissions.index') }}" class="sidebar-item {{ request()->routeIs('admin.commissions.*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     分销管理
@@ -917,6 +926,8 @@
             @yield('content')
         </div>
     </main>
+
+    @stack('modals')
 
     <!-- Toast Notifications -->
     <div class="toast-container" x-data="toastManager()" x-ref="toasts" @toast.window="add($event.detail)">

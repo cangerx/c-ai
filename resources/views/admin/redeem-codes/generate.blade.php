@@ -10,8 +10,18 @@
     <div class="card" style="max-width: 560px;">
         <div class="card-body">
             <form method="POST" action="{{ route('admin.redeem-codes.generate.submit') }}"
-                  x-data @submit.prevent="$dispatch('confirm', { title: '确认生成', message: '确定要批量生成兑换码吗？', form: $el })">
+                  x-data="redeemForm()" @submit.prevent="$dispatch('confirm', { title: '确认生成', message: '确定要批量生成兑换码吗？', form: $el })">
                 @csrf
+                <div class="form-group">
+                    <label class="form-label">关联套餐（可选）</label>
+                    <select class="form-select" name="plan_id" x-model="planId" @change="onPlanChange()">
+                        <option value="">不关联套餐（手动填写）</option>
+                        @foreach(\App\Models\Plan::active()->ordered()->get() as $p)
+                        <option value="{{ $p->id }}" data-credits="{{ $p->credits }}" data-balance="{{ $p->balance }}">{{ $p->name }} (¥{{ $p->price }})</option>
+                        @endforeach
+                    </select>
+                    <div class="form-hint">选择套餐后自动填充积分和额度</div>
+                </div>
                 <div class="form-group">
                     <label class="form-label">生成数量</label>
                     <input class="form-input" type="number" name="count" value="{{ old('count', 10) }}" min="1" max="500" required>
@@ -19,20 +29,20 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">类型</label>
-                    <select class="form-select" name="type" id="codeType">
+                    <select class="form-select" name="type" x-model="codeType">
                         <option value="mixed">混合（积分 + 额度）</option>
                         <option value="credits">仅积分</option>
                         <option value="balance">仅额度</option>
                     </select>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div class="form-group" id="creditsGroup">
+                    <div class="form-group" x-show="codeType !== 'balance'">
                         <label class="form-label">积分</label>
-                        <input class="form-input" type="number" name="credits" value="{{ old('credits', 10) }}" min="0">
+                        <input class="form-input" type="number" name="credits" x-model="credits" min="0">
                     </div>
-                    <div class="form-group" id="balanceGroup">
+                    <div class="form-group" x-show="codeType !== 'credits'">
                         <label class="form-label">额度 (¥)</label>
-                        <input class="form-input" type="number" name="balance" value="{{ old('balance', 0) }}" min="0" step="0.01">
+                        <input class="form-input" type="number" name="balance" x-model="balance" min="0" step="0.01">
                     </div>
                 </div>
                 <div class="form-group">
@@ -48,10 +58,20 @@
     </div>
 
     <script>
-        document.getElementById('codeType').addEventListener('change', function() {
-            const t = this.value;
-            document.getElementById('creditsGroup').style.display = t === 'balance' ? 'none' : '';
-            document.getElementById('balanceGroup').style.display = t === 'credits' ? 'none' : '';
-        });
+        function redeemForm() {
+            return {
+                planId: '',
+                codeType: 'mixed',
+                credits: {{ old('credits', 10) }},
+                balance: {{ old('balance', 0) }},
+                onPlanChange() {
+                    const opt = this.$el.querySelector(`select[name="plan_id"] option[value="${this.planId}"]`);
+                    if (opt && this.planId) {
+                        this.credits = opt.dataset.credits || 0;
+                        this.balance = opt.dataset.balance || 0;
+                    }
+                }
+            };
+        }
     </script>
 @endsection
