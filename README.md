@@ -142,12 +142,18 @@ resources/views/admin → 管理后台
 
 ---
 
-## 📄 License
+## 📄 许可协议
 
-[MIT](LICENSE)
+本项目为**商业软件**，仅供学习参考，**不支持开源使用**。
+
+- ✅ 允许个人学习、研究、借鉴思路
+- ❌ 禁止未经授权的商业部署、二次分发、去除版权
+- ❌ 禁止将本项目代码用于任何公开或商业产品
+
+如需商业授权或定制开发，请联系作者。
 
 ---
 
 <p align="center">
-  <sub>Made by <strong>苍洱</strong> · Telegram <a href="https://t.me/cangerx">@cangerx</a></sub>
+  <sub>Made by <strong>苍洱</strong> · Telegram <a href="https://t.me/cangerx">@cangerx</a> · 商业授权咨询请私信</sub>
 </p>
