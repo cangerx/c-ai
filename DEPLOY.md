@@ -2,11 +2,11 @@
 
 ## 环境要求
 
-- PHP >= 8.3（需开启扩展：fileinfo, gd, sqlite3, pdo_sqlite）
+- PHP >= 8.3（需开启扩展：fileinfo, gd, redis, sqlite3, pdo_sqlite）
 - Composer 2.x
-- Node.js >= 18（如需编译前端资源）
+- Redis
 - SQLite 3
-- Supervisor（队列进程守护）
+- Supervisor（进程守护）
 
 ---
 
@@ -39,8 +39,15 @@ wget -O install.sh https://download.bt.cn/install/install-ubuntu_6.0.sh && sudo 
 - `fileinfo` ✅
 - `sqlite3` ✅（通常默认已有）
 - `gd` ✅
+- `redis` ✅
 
 禁用函数中移除：`putenv`, `proc_open`（Composer 和 Artisan 需要）
+
+> 如果无法安装 redis 扩展，可用 predis 替代：
+> ```bash
+> composer require predis/predis
+> # .env 中设置 REDIS_CLIENT=predis
+> ```
 
 ---
 
@@ -110,8 +117,11 @@ APP_URL=https://ai.example.com
 DB_CONNECTION=sqlite
 DB_DATABASE=/www/wwwroot/cang-ai/database/database.sqlite
 
-QUEUE_CONNECTION=database
-CACHE_STORE=database
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_CLIENT=phpredis
+
+CACHE_STORE=redis
 SESSION_DRIVER=database
 ```
 
@@ -137,17 +147,19 @@ location / {
 
 ---
 
-## 九、队列进程（Supervisor）
+## 九、Worker 进程（Supervisor）
 
 宝塔面板 → 软件商店 → Supervisor 管理器 → 添加守护进程：
 
 | 字段 | 值 |
 |------|-----|
-| 名称 | cang-ai-queue |
-| 启动命令 | `/www/server/php/83/bin/php /www/wwwroot/cang-ai/artisan queue:work --sleep=3 --tries=5 --timeout=420 --max-jobs=100` |
+| 名称 | task-worker |
+| 启动命令 | `/www/server/php/83/bin/php /www/wwwroot/cang-ai/artisan task:worker --max-retries=3` |
 | 运行目录 | `/www/wwwroot/cang-ai` |
 | 进程数量 | 2 |
-| 启动用户 | www |
+| 启动用户 | root |
+
+Worker 通过 Redis BLPOP 消费图片生成任务，支持多进程并行。
 
 ---
 
@@ -162,7 +174,14 @@ location / {
 | 执行周期 | 每 1 分钟 |
 | 脚本内容 | `cd /www/wwwroot/cang-ai && /www/server/php/83/bin/php artisan schedule:run >> /dev/null 2>&1` |
 
-这会自动执行每日 03:00 的过期图片清理任务。
+另外添加卡死任务恢复（每 5 分钟）：
+
+| 字段 | 值 |
+|------|-----|
+| 任务类型 | Shell 脚本 |
+| 任务名称 | recover-stuck-tasks |
+| 执行周期 | 每 5 分钟 |
+| 脚本内容 | `cd /www/wwwroot/cang-ai && /www/server/php/83/bin/php artisan generation:recover-stuck >> /dev/null 2>&1` |
 
 ---
 
@@ -200,11 +219,26 @@ sqlite3 database/database.sqlite "UPDATE users SET is_admin=1 WHERE email='admin
 
 **Q: 500 错误**
 ```bash
-cat /www/wwwroot/cang-ai/storage/logs/laravel.log | tail -50
+tail -50 /www/wwwroot/cang-ai/storage/logs/laravel.log
 ```
 
-**Q: 队列任务不执行**
-检查 Supervisor 进程是否运行中，日志在宝塔 Supervisor 管理器内查看。
+**Q: Worker 不消费任务 / 任务一直排队**
+```bash
+# 检查 worker 是否在跑
+ps aux | grep task:worker | grep -v grep
+# 查看 worker 日志
+tail -30 storage/logs/worker.log
+# 手动重启
+bash restart-worker.sh
+```
+
+**Q: Class "Redis" not found**
+安装 phpredis 扩展（宝塔 → PHP → 安装扩展 → redis），或改用 predis：
+```bash
+composer require predis/predis
+# .env 设置 REDIS_CLIENT=predis
+php artisan config:cache
+```
 
 **Q: 图片上传失败**
 ```bash
@@ -212,7 +246,22 @@ chmod -R 775 /www/wwwroot/cang-ai/storage
 chown -R www:www /www/wwwroot/cang-ai/storage
 ```
 
+**Q: quality=high 大图生成超时 502**
+在 New API 面板（中转站）设置环境变量 `RELAY_TIMEOUT=600`。
+
 **Q: Composer 报内存不足**
 ```bash
 php -d memory_limit=-1 /usr/local/bin/composer install --no-dev
 ```
+
+---
+
+## 日常运维
+
+| 操作 | 命令 |
+|------|------|
+| 完整部署更新 | `bash deploy.sh` |
+| 只重启 worker | `bash restart-worker.sh` |
+| 查看 worker 日志 | `tail -f storage/logs/worker.log` |
+| 查看上游 API 日志 | `tail -f storage/logs/upstream-*.log` |
+| 恢复卡死任务 | `php artisan generation:recover-stuck` |
