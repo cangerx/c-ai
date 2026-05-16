@@ -237,6 +237,7 @@ class ProcessGenerationTask implements ShouldQueue
             $this->currentChannelId = $channel->id;
             for ($attempt = 1; $attempt <= 3; $attempt++) {
                 try {
+                    $task->touch();
                     return $this->callApi($task, $channel->api_key);
                 } catch (Throwable $e) {
                     $lastException = $e;
@@ -285,7 +286,7 @@ class ProcessGenerationTask implements ShouldQueue
             }
         }
 
-        $response = Http::timeout(360)
+        $response = Http::timeout(300)
             ->connectTimeout(15)
             ->withHeaders([
                 'Authorization' => "Bearer {$apiKey}",
@@ -351,7 +352,7 @@ class ProcessGenerationTask implements ShouldQueue
 
     protected function callMultipartApi(string $endpoint, string $apiKey, GenerationTask $task, string $size): array
     {
-        $pending = Http::timeout(360)
+        $pending = Http::timeout(300)
             ->connectTimeout(15)
             ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
             ->asMultipart()
