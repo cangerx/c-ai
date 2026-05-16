@@ -24,17 +24,17 @@
             </label>
         </div>
         <div class="card-body">
-            <div class="help-box" style="background:rgba(45,91,240,0.04); border:1px solid rgba(45,91,240,0.1); border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; line-height:1.8; color:#374151;">
-                <strong>配置步骤：</strong>
-                <ol style="margin:6px 0 0 16px; padding:0;">
-                    <li>打开 <a href="https://github.com/settings/developers" target="_blank" style="color:var(--accent);">GitHub Developer Settings</a></li>
+            <details class="help-details">
+                <summary>📖 配置步骤</summary>
+                <ol>
+                    <li>打开 <a href="https://github.com/settings/developers" target="_blank">GitHub Developer Settings</a></li>
                     <li>点击 <b>New OAuth App</b></li>
                     <li><b>Application name</b>：填你的站点名称</li>
                     <li><b>Homepage URL</b>：填 <code>{{ request()->getSchemeAndHttpHost() }}</code></li>
                     <li><b>Authorization callback URL</b>：填 <code>{{ request()->getSchemeAndHttpHost() }}/api/auth/github/callback</code></li>
                     <li>创建后复制 <b>Client ID</b> 和 <b>Client Secret</b> 填入下方</li>
                 </ol>
-            </div>
+            </details>
             @php $idx++; @endphp
             <div class="form-group">
                 <label class="form-label">Client ID</label>
@@ -87,10 +87,16 @@
 
 <style>
 .toggle-switch { position:relative; display:inline-block; width:44px; height:24px; }
-.toggle-switch input { opacity:0; width:0; height:0; }
-.toggle-slider { position:absolute; cursor:pointer; inset:0; background:var(--bg-tertiary); border-radius:24px; transition:.2s; }
-.toggle-slider:before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
-.toggle-switch input:checked + .toggle-slider { background:var(--accent); }
+.toggle-switch input[type="checkbox"] { opacity:0; width:0; height:0; position:absolute; }
+.toggle-slider { position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:24px; transition:.2s; }
+.toggle-slider:before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.toggle-switch input:checked + .toggle-slider { background:#2d5bf0; }
 .toggle-switch input:checked + .toggle-slider:before { transform:translateX(20px); }
+
+.help-details { background:rgba(45,91,240,0.04); border:1px solid rgba(45,91,240,0.1); border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; line-height:1.8; color:#374151; }
+.help-details summary { cursor:pointer; font-weight:600; user-select:none; }
+.help-details ol { margin:8px 0 0 16px; padding:0; }
+.help-details code { background:rgba(0,0,0,0.05); padding:2px 6px; border-radius:4px; font-size:12px; }
+.help-details a { color:#2d5bf0; }
 </style>
 @endsection
