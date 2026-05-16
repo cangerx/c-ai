@@ -24,6 +24,17 @@
             </label>
         </div>
         <div class="card-body">
+            <div class="help-box" style="background:rgba(45,91,240,0.04); border:1px solid rgba(45,91,240,0.1); border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; line-height:1.8; color:#374151;">
+                <strong>配置步骤：</strong>
+                <ol style="margin:6px 0 0 16px; padding:0;">
+                    <li>打开 <a href="https://github.com/settings/developers" target="_blank" style="color:var(--accent);">GitHub Developer Settings</a></li>
+                    <li>点击 <b>New OAuth App</b></li>
+                    <li><b>Application name</b>：填你的站点名称</li>
+                    <li><b>Homepage URL</b>：填 <code>{{ request()->getSchemeAndHttpHost() }}</code></li>
+                    <li><b>Authorization callback URL</b>：填 <code>{{ request()->getSchemeAndHttpHost() }}/api/auth/github/callback</code></li>
+                    <li>创建后复制 <b>Client ID</b> 和 <b>Client Secret</b> 填入下方</li>
+                </ol>
+            </div>
             @php $idx++; @endphp
             <div class="form-group">
                 <label class="form-label">Client ID</label>
