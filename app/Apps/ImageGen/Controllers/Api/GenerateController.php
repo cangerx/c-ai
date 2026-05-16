@@ -3,11 +3,11 @@
 namespace App\Apps\ImageGen\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessGenerationTask;
 use App\Models\AiChannel;
 use App\Models\GenerationTask;
 use App\Services\BillingService;
 use App\Services\ContentFilterService;
+use Illuminate\Support\Facades\Redis;
 use App\Services\ImageStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -105,9 +105,9 @@ class GenerateController extends Controller
 
             $usageLog->update(['task_id' => $taskId]);
 
-            // 每张图独立 Job，并发执行
+            // 每张图独立任务，推入 Redis
             for ($i = 0; $i < $count; $i++) {
-                ProcessGenerationTask::dispatch($taskId, $i);
+                Redis::rpush('image_gen_tasks', json_encode(['task_id' => $taskId, 'index' => $i]));
             }
         } catch (\Throwable $e) {
             // 任务创建或 dispatch 失败，退款
@@ -257,7 +257,7 @@ class GenerateController extends Controller
         $items = $task->items ?? [];
         for ($i = 0; $i < $task->count; $i++) {
             if (!isset($items[$i]) || $items[$i] === null) {
-                ProcessGenerationTask::dispatch($task->task_id, $i);
+                Redis::rpush('image_gen_tasks', json_encode(['task_id' => $task->task_id, 'index' => $i]));
             }
         }
     }

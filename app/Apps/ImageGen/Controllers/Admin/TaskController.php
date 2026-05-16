@@ -3,11 +3,11 @@
 namespace App\Apps\ImageGen\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ProcessGenerationTask;
 use App\Models\GenerationTask;
 use App\Models\UsageLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\DB;
 
 class TaskController extends Controller
@@ -116,11 +116,11 @@ class TaskController extends Controller
             'attempts' => 0,
         ]);
 
-        // 重新 dispatch 所有未完成的 index
+        // 重新推入 Redis 所有未完成的 index
         $items = $task->items ?? [];
         for ($i = 0; $i < max(1, $task->count); $i++) {
             if (!isset($items[$i]) || !is_array($items[$i])) {
-                ProcessGenerationTask::dispatch($task->task_id, $i);
+                Redis::rpush('image_gen_tasks', json_encode(['task_id' => $task->task_id, 'index' => $i]));
             }
         }
 

@@ -123,6 +123,12 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        'upstream' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/upstream.log'),
+            'days' => 7,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

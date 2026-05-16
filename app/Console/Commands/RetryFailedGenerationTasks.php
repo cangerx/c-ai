@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\ProcessGenerationTask;
 use App\Models\GenerationTask;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Redis;
 
 class RetryFailedGenerationTasks extends Command
 {
@@ -30,7 +30,7 @@ class RetryFailedGenerationTasks extends Command
             $items = $task->items ?? [];
             for ($i = 0; $i < max(1, $task->count); $i++) {
                 if (!isset($items[$i]) || !is_array($items[$i])) {
-                    ProcessGenerationTask::dispatch($task->task_id, $i);
+                    Redis::rpush('image_gen_tasks', json_encode(['task_id' => $task->task_id, 'index' => $i]));
                 }
             }
         }

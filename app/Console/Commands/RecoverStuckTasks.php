@@ -2,11 +2,10 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\ProcessGenerationTask;
 use App\Models\GenerationTask;
 use App\Models\UsageLog;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 
 class RecoverStuckTasks extends Command
 {
@@ -30,15 +29,6 @@ class RecoverStuckTasks extends Command
             ->get();
 
         foreach ($stuck as $task) {
-            // 检查 jobs 表是否已有该任务的 job 在排队/执行中
-            $existingJob = DB::table('jobs')
-                ->where('payload', 'like', '%' . $task->task_id . '%')
-                ->exists();
-
-            if ($existingJob) {
-                continue; // job 还在队列里，不重复 dispatch
-            }
-
             $task->update([
                 'status' => 'pending',
                 'message' => '正在重试...',
@@ -48,7 +38,7 @@ class RecoverStuckTasks extends Command
             $items = $task->items ?? [];
             for ($i = 0; $i < $task->count; $i++) {
                 if (!isset($items[$i]) || $items[$i] === null) {
-                    ProcessGenerationTask::dispatch($task->task_id, $i);
+                    Redis::rpush('image_gen_tasks', json_encode(['task_id' => $task->task_id, 'index' => $i]));
                 }
             }
             $recovered++;
