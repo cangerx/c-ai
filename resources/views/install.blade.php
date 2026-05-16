@@ -198,11 +198,9 @@
             </div>
             <button class="btn btn-secondary" onclick="location.reload()">重新检测</button>
         @else
-            @if($errors->any())
+            @if(!empty($error))
                 <div class="error-box">
-                    @foreach($errors->all() as $e)
-                        <div>{{ $e }}</div>
-                    @endforeach
+                    <div>{{ $error }}</div>
                 </div>
                 <div class="tip-box">
                     <strong>安装失败？试试：</strong>

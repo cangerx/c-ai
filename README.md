@@ -63,11 +63,12 @@
 <tr><td>3</td><td>网站目录 → 运行目录设为 <code>/public</code></td></tr>
 <tr><td>4</td><td>伪静态 → 选择 <code>laravel5</code></td></tr>
 <tr><td>5</td><td>PHP 管理 → 安装扩展：<code>fileinfo</code></td></tr>
-<tr><td>6</td><td>终端执行：<code>composer install --no-dev --optimize-autoloader</code></td></tr>
-<tr><td>7</td><td>浏览器访问 <code>/install</code> 完成安装向导</td></tr>
-<tr><td>8</td><td>宝塔 Supervisor → 添加守护进程：<code>php artisan queue:work --sleep=3 --tries=3</code></td></tr>
-<tr><td>9</td><td>SSL → Let's Encrypt 一键申请</td></tr>
-<tr><td>10</td><td>管理后台 → AI 渠道 → 添加 API Key</td></tr>
+<tr><td>6</td><td>PHP 管理 → 禁用函数 → 删除：<code>putenv</code> <code>proc_open</code> <code>proc_get_status</code> <code>proc_close</code> <code>symlink</code></td></tr>
+<tr><td>7</td><td>终端执行：<code>composer install --no-dev --optimize-autoloader</code></td></tr>
+<tr><td>8</td><td>浏览器访问 <code>/install</code> 完成安装向导</td></tr>
+<tr><td>9</td><td>宝塔 Supervisor → 添加守护进程：<code>php artisan queue:work --sleep=3 --tries=3</code></td></tr>
+<tr><td>10</td><td>SSL → Let's Encrypt 一键申请</td></tr>
+<tr><td>11</td><td>管理后台 → AI 渠道 → 添加 API Key</td></tr>
 </table>
 
 ---

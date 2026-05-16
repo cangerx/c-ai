@@ -15,6 +15,7 @@ class InstallController extends Controller
         if ($this->isInstalled()) {
             return redirect('/');
         }
+        $this->ensureEnvExists();
         return view('install', ['checks' => $this->checkEnv()]);
     }
 
@@ -24,12 +25,19 @@ class InstallController extends Controller
             return redirect('/');
         }
 
-        $request->validate([
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'site_name' => 'required|string|max:100',
             'site_url' => 'required|url',
             'admin_email' => 'required|email',
             'admin_password' => 'required|min:6',
         ]);
+
+        if ($validator->fails()) {
+            return view('install', [
+                'checks' => $this->checkEnv(),
+                'error' => $validator->errors()->first(),
+            ]);
+        }
 
         try {
             // 写 .env
@@ -54,6 +62,11 @@ class InstallController extends Controller
 
             // 迁移
             Artisan::call('migrate', ['--force' => true]);
+
+            // 迁移完成后切换到 database 驱动
+            $this->setEnv('SESSION_DRIVER', 'database');
+            $this->setEnv('CACHE_STORE', 'database');
+            $this->setEnv('QUEUE_CONNECTION', 'database');
 
             // 创建存储链接
             try {
@@ -82,7 +95,10 @@ class InstallController extends Controller
                 'admin_email' => $request->input('admin_email'),
             ]);
         } catch (\Throwable $e) {
-            return back()->withInput()->withErrors(['install' => '安装失败：' . $e->getMessage()]);
+            return view('install', [
+                'checks' => $this->checkEnv(),
+                'error' => '安装失败：' . $e->getMessage(),
+            ]);
         }
     }
 
@@ -121,5 +137,18 @@ class InstallController extends Controller
         }
 
         file_put_contents($envPath, $content);
+    }
+
+    private function ensureEnvExists(): void
+    {
+        $envPath = base_path('.env');
+        if (!file_exists($envPath)) {
+            copy(base_path('.env.example'), $envPath);
+        }
+        // 确保 SQLite 文件存在以防应用启动时访问
+        $dbPath = database_path('database.sqlite');
+        if (!file_exists($dbPath)) {
+            touch($dbPath);
+        }
     }
 }

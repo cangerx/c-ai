@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
+            // 安装向导 — 无中间件，不依赖数据库
+            Route::get('/install', [\App\Http\Controllers\InstallController::class, 'index']);
+            Route::post('/install', [\App\Http\Controllers\InstallController::class, 'run']);
+
             Route::middleware('web')
                 ->prefix('admin')
                 ->name('admin.')

@@ -5,10 +5,6 @@ use App\Http\Controllers\InstallController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
-// 安装向导
-Route::get('/install', [InstallController::class, 'index']);
-Route::post('/install', [InstallController::class, 'run']);
-
 // 首页：直接返回 public/index.html，不做 Laravel 重构
 Route::get('/', function () {
     if (!file_exists(storage_path('installed'))) {
