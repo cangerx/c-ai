@@ -122,6 +122,76 @@ APP_URL=https://your-domain.com
 QUEUE_CONNECTION=database
 ```
 
+### 宝塔面板部署
+
+1. **创建站点**
+   - 新建 PHP 站点，域名填写你的域名
+   - PHP 版本选择 8.3+
+   - 数据库选 MySQL 8.0
+
+2. **上传代码**
+   ```bash
+   cd /www/wwwroot/your-domain.com
+   git clone https://github.com/cangerx/c-ai.git .
+   ```
+
+3. **站点设置**
+   - 网站目录 → 运行目录设为 `/public`
+   - 伪静态 → 选择 `laravel5`
+   - PHP 设置 → 安装扩展：fileinfo、redis（可选）
+
+4. **安装依赖**
+   ```bash
+   cd /www/wwwroot/your-domain.com
+   composer install --no-dev --optimize-autoloader
+   cp .env.example .env
+   php artisan key:generate
+   ```
+
+5. **配置 .env**
+   ```env
+   APP_ENV=production
+   APP_DEBUG=false
+   APP_URL=https://your-domain.com
+
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_DATABASE=cang_ai
+   DB_USERNAME=cang_ai
+   DB_PASSWORD=你的数据库密码
+
+   QUEUE_CONNECTION=database
+   ```
+
+6. **初始化数据库**
+   ```bash
+   php artisan migrate --force
+   php artisan db:seed --force
+   php artisan storage:link
+   ```
+
+7. **目录权限**
+   ```bash
+   chown -R www:www storage bootstrap/cache
+   chmod -R 775 storage bootstrap/cache
+   ```
+
+8. **队列 Worker（宝塔 Supervisor）**
+   - 宝塔 → 软件商店 → 安装 Supervisor
+   - 添加守护进程：
+     - 名称：`cang-ai-queue`
+     - 运行目录：`/www/wwwroot/your-domain.com`
+     - 启动命令：`php artisan queue:work --sleep=3 --tries=3 --max-time=3600`
+     - 进程数：`2`
+
+9. **SSL 证书**
+   - 宝塔 → 站点 → SSL → Let's Encrypt 一键申请
+
+10. **验证**
+    - 访问 `https://your-domain.com` 看到绘图首页
+    - 访问 `https://your-domain.com/admin` 进入管理后台
+    - 管理员账号：`admin@cang-ai.com`
+
 ## API 接口
 
 | 方法 | 路径 | 说明 |
