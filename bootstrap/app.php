@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
         then: function () {
             // 安装向导 — 无中间件，不依赖数据库
             Route::get('/install', [\App\Http\Controllers\InstallController::class, 'index']);
+            Route::get('/install/step2', [\App\Http\Controllers\InstallController::class, 'step2']);
+            Route::post('/install/test-db', [\App\Http\Controllers\InstallController::class, 'testDb']);
             Route::post('/install', [\App\Http\Controllers\InstallController::class, 'run']);
 
             Route::middleware('web')
