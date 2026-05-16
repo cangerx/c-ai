@@ -149,5 +149,5 @@ resources/views/admin → 管理后台
 ---
 
 <p align="center">
-  <sub>Built with ♥ for creators</sub>
+  <sub>Made by <strong>苍洱</strong> · Telegram <a href="https://t.me/cangerx">@cangerx</a></sub>
 </p>
