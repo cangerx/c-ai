@@ -7,6 +7,18 @@ cd /www/wwwroot/vxvx.eu.cc
 echo ">>> 拉取最新代码"
 git pull origin main
 
+echo ">>> 检查 .env 文件"
+if [ ! -f .env ]; then
+    cp .env.example .env
+    php artisan key:generate
+    echo "    .env 已创建，请编辑填写数据库等配置后重新运行此脚本"
+    exit 0
+fi
+
+echo ">>> 修复权限"
+chown -R www:www storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
+
 echo ">>> 安装依赖"
 composer install --no-dev --optimize-autoloader --no-interaction
 
