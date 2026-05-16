@@ -22,8 +22,8 @@ return new class extends Migration
             $table->unsignedTinyInteger('input_count')->default(0);
             $table->string('message')->nullable();
             $table->text('error')->nullable();
-            $table->json('items')->default(DB::raw('(JSON_ARRAY())'));
-            $table->json('files')->default(DB::raw('(JSON_ARRAY())'));
+            $table->json('items')->nullable();
+            $table->json('files')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
 

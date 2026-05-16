@@ -20,6 +20,11 @@ class GenerationTask extends Model
         'message', 'error', 'items', 'files', 'completed_at', 'attempts',
     ];
 
+    protected $attributes = [
+        'items' => '[]',
+        'files' => '[]',
+    ];
+
     protected function casts(): array
     {
         return [
