@@ -37,13 +37,19 @@ return [
 
     'image_storage' => [
         'disk' => env('IMAGE_STORAGE_DISK', 'public'),
-        'prefix' => env('IMAGE_STORAGE_PREFIX', 'images'),
+        'prefix' => env('IMAGE_STORAGE_PREFIX', 'cang-api-draw'),
     ],
 
     'github' => [
         'client_id' => env('GITHUB_CLIENT_ID'),
         'client_secret' => env('GITHUB_CLIENT_SECRET'),
         'redirect' => env('GITHUB_REDIRECT_URI', '/api/auth/github/callback'),
+    ],
+
+    'wechat' => [
+        'client_id' => env('WECHAT_APPID'),
+        'client_secret' => env('WECHAT_SECRET'),
+        'redirect' => env('WECHAT_REDIRECT_URI', '/api/auth/wechat/callback'),
     ],
 
 ];

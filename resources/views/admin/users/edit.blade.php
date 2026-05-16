@@ -47,6 +47,14 @@
                     <label class="form-label">重置密码</label>
                     <input class="form-input" type="password" name="password" placeholder="留空则不修改">
                 </div>
+                <div class="form-group">
+                    <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+                        <input type="hidden" name="is_distributor" value="0">
+                        <input type="checkbox" name="is_distributor" value="1" {{ $user->is_distributor ? 'checked' : '' }}>
+                        分销者
+                    </label>
+                    <div class="form-hint">开启后用户可获得下级消费返利</div>
+                </div>
                 <div style="display: flex; gap: 12px; margin-top: 8px;">
                     <button type="submit" class="btn btn-primary">保存</button>
                     <a href="{{ route('admin.users.index') }}" class="btn btn-ghost">取消</a>

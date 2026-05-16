@@ -10,7 +10,7 @@ class GalleryController extends Controller
 {
     public function index(Request $request)
     {
-        $perPage = 12;
+        $perPage = min((int) $request->input('per_page', 12), 50);
 
         $query = GenerationTask::where('is_public', true)
             ->where('status', 'completed')

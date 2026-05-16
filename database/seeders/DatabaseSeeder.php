@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
         User::create([
             'name' => 'Admin',
             'email' => 'admin@cang-ai.com',
-            'password' => bcrypt('admin123'),
+            'password' => bcrypt(env('ADMIN_PASSWORD', 'ChangeMe!2024')),
             'nickname' => '超级管理员',
             'role' => 'admin',
             'status' => 'active',

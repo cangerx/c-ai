@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BillingRuleController;
 use App\Http\Controllers\Admin\CommissionController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\LoginSettingController;
 use App\Http\Controllers\Admin\RedeemCodeController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\StorageController;
@@ -34,6 +35,10 @@ Route::middleware(['auth', 'role:admin,agent'])->group(function () {
 
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::post('settings/test-mail', [SettingController::class, 'testMail'])->name('settings.test-mail');
+
+    Route::get('login-settings', [LoginSettingController::class, 'index'])->name('login-settings.index');
+    Route::post('login-settings', [LoginSettingController::class, 'update'])->name('login-settings.update');
 
     Route::get('storage', [StorageController::class, 'index'])->name('storage.index');
     Route::post('storage', [StorageController::class, 'update'])->name('storage.update');

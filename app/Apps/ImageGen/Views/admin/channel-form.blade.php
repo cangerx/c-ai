@@ -18,6 +18,11 @@
                     <input class="form-input" type="text" name="name" value="{{ old('name', $channel?->name) }}" required placeholder="例: 主渠道">
                 </div>
                 <div class="form-group">
+                    <label class="form-label">前端显示名称</label>
+                    <input class="form-input" type="text" name="display_name" value="{{ old('display_name', $channel?->display_name) }}" placeholder="留空则使用模型名，如: GPT 绘图">
+                    <div class="form-hint">用户在前端看到的模型名称</div>
+                </div>
+                <div class="form-group">
                     <label class="form-label">服务商</label>
                     <input class="form-input" type="text" name="provider" value="{{ old('provider', $channel?->provider ?? 'openai') }}" required placeholder="openai / azure / custom">
                 </div>
@@ -38,9 +43,10 @@
                         <label class="form-label">请求模式</label>
                         <select class="form-input" name="request_mode">
                             <option value="sync" {{ old('request_mode', $channel?->request_mode ?? 'sync') === 'sync' ? 'selected' : '' }}>同步</option>
+                            <option value="async" {{ old('request_mode', $channel?->request_mode) === 'async' ? 'selected' : '' }}>异步轮询 (dm)</option>
                             <option value="stream" {{ old('request_mode', $channel?->request_mode) === 'stream' ? 'selected' : '' }}>流式 (SSE)</option>
                         </select>
-                        <div class="form-hint">Codex 等接口选流式</div>
+                        <div class="form-hint">异步适用于 duomiapi 等接口</div>
                     </div>
                     <div class="form-group">
                         <label class="form-label">优先级</label>

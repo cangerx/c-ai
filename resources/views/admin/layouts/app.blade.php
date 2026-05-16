@@ -853,6 +853,14 @@
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     广告横幅
                 </a>
+                <a href="{{ route('admin.login-settings.index') }}" class="sidebar-item {{ request()->routeIs('admin.login-settings.*') ? 'active' : '' }}">
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                    登录设置
+                </a>
+                <a href="{{ route('admin.commissions.index') }}" class="sidebar-item {{ request()->routeIs('admin.commissions.*') ? 'active' : '' }}">
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    分销管理
+                </a>
             </div>
 
             {{-- App Sections from AppLoader --}}

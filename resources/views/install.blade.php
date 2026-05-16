@@ -142,6 +142,21 @@
             font-size: 13px;
             line-height: 1.6;
         }
+        .tip-box {
+            background: rgba(249,115,22,0.06);
+            border: 1px solid rgba(249,115,22,0.15);
+            color: #92400e;
+            padding: 14px 16px;
+            border-radius: 10px;
+            margin-bottom: 18px;
+            font-size: 12px;
+            line-height: 1.8;
+            text-align: left;
+        }
+        .tip-box strong { display: block; margin-bottom: 6px; font-size: 13px; }
+        .tip-box ul { padding-left: 16px; margin: 0; }
+        .tip-box li { margin-bottom: 2px; }
+        .tip-box code { background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
 
         .divider { height: 1px; background: var(--line); margin: 24px 0; }
 
@@ -172,6 +187,15 @@
 
         @if(!$allOk)
             <div class="error-box">环境检测未通过，请先修复标红项后刷新重试。</div>
+            <div class="tip-box">
+                <strong>常见解决方法：</strong>
+                <ul>
+                    <li><b>PHP 版本不足</b> → 升级到 PHP 8.3+：<code>apt install php8.3</code></li>
+                    <li><b>缺少扩展</b> → 安装对应扩展：<code>apt install php8.3-sqlite3 php8.3-gd php8.3-mbstring</code></li>
+                    <li><b>目录不可写</b> → 修改权限：<code>chmod -R 775 storage database</code> 并 <code>chown -R www-data:www-data .</code></li>
+                    <li><b>.env 不可写</b> → <code>touch .env && chmod 664 .env</code></li>
+                </ul>
+            </div>
             <button class="btn btn-secondary" onclick="location.reload()">重新检测</button>
         @else
             @if($errors->any())
@@ -179,6 +203,15 @@
                     @foreach($errors->all() as $e)
                         <div>{{ $e }}</div>
                     @endforeach
+                </div>
+                <div class="tip-box">
+                    <strong>安装失败？试试：</strong>
+                    <ul>
+                        <li><b>数据库迁移失败</b> → 删除 <code>database/database.sqlite</code> 后重试</li>
+                        <li><b>邮箱已存在</b> → 换一个管理员邮箱，或删除数据库重装</li>
+                        <li><b>权限问题</b> → 确保 <code>storage/</code> 和 <code>database/</code> 目录可写</li>
+                        <li><b>仍然失败</b> → 查看 <code>storage/logs/laravel.log</code> 获取详细错误</li>
+                    </ul>
                 </div>
             @endif
 

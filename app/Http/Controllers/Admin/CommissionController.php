@@ -3,34 +3,31 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CommissionLog;
 use App\Models\SiteSetting;
-use App\Models\UsageLog;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class CommissionController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth()->user();
-        $rate = (float) SiteSetting::get('agent_commission_rate', 0.10);
+        $rate = (float) SiteSetting::get('distributor_commission_rate', 0.10);
 
-        if ($user->isAdmin()) {
-            // Admin 看所有有 parent_id 的使用记录
-            $logs = UsageLog::where('cost_balance', '>', 0)
-                ->whereHas('user', fn($q) => $q->whereNotNull('parent_id'))
-                ->with('user', 'user.parent')
-                ->latest()
-                ->paginate(20);
-        } else {
-            // 代理商只看自己下级的
-            $childIds = $user->children()->pluck('id');
-            $logs = UsageLog::whereIn('user_id', $childIds)
-                ->where('cost_balance', '>', 0)
-                ->with('user')
-                ->latest()
-                ->paginate(20);
+        $distributors = User::where('is_distributor', true)
+            ->withCount('children')
+            ->orderByDesc('commission_credits')
+            ->get();
+
+        $query = CommissionLog::with('user:id,nickname,name,email', 'fromUser:id,nickname,name,email')
+            ->orderByDesc('created_at');
+
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
         }
 
-        return view('admin.commissions.index', compact('logs', 'rate'));
+        $logs = $query->paginate(30)->withQueryString();
+
+        return view('admin.commissions.index', compact('distributors', 'logs', 'rate'));
     }
 }

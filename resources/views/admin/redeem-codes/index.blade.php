@@ -22,7 +22,7 @@
             @endif
         </form>
         <a href="{{ route('admin.redeem-codes.export', request()->query()) }}" class="btn btn-ghost btn-sm">导出 CSV</a>
-        <a href="{{ route('admin.redeem-codes.generate') }}" class="btn btn-primary btn-sm">批量生成</a>
+        <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('generateModal').showModal()">批量生成</button>
     </div>
 
     <div class="card">
@@ -33,7 +33,7 @@
                         <tr>
                             <th>兑换码</th>
                             <th>类型</th>
-                            <th>次数</th>
+                            <th>积分</th>
                             <th>额度</th>
                             <th>状态</th>
                             <th>创建者</th>
@@ -89,4 +89,56 @@
         </div>
     </div>
     <div style="margin-top: 16px;">{{ $codes->links() }}</div>
+
+    {{-- 批量生成弹窗 --}}
+    <dialog id="generateModal" style="border:none; border-radius:12px; padding:0; max-width:480px; width:90%; box-shadow: 0 20px 60px rgba(0,0,0,.3);">
+        <div style="padding: 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="margin:0; font-size:18px;">批量生成兑换码</h3>
+                <button type="button" onclick="document.getElementById('generateModal').close()" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-muted);">✕</button>
+            </div>
+            <form method="POST" action="{{ route('admin.redeem-codes.generate.submit') }}">
+                @csrf
+                <div class="form-group">
+                    <label class="form-label">生成数量</label>
+                    <input class="form-input" type="number" name="count" value="10" min="1" max="500" required>
+                    <div class="form-hint">单次最多 500 个</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">类型</label>
+                    <select class="form-select" name="type" id="modalCodeType">
+                        <option value="mixed">混合（积分 + 额度）</option>
+                        <option value="credits">仅积分</option>
+                        <option value="balance">仅额度</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" id="modalCreditsGroup">
+                        <label class="form-label">积分</label>
+                        <input class="form-input" type="number" name="credits" value="10" min="0">
+                    </div>
+                    <div class="form-group" id="modalBalanceGroup">
+                        <label class="form-label">额度 (¥)</label>
+                        <input class="form-input" type="number" name="balance" value="0" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">有效期（天）</label>
+                    <input class="form-input" type="number" name="expires_days" min="1" placeholder="留空则永不过期">
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 16px;">
+                    <button type="submit" class="btn btn-primary">生成</button>
+                    <button type="button" class="btn btn-ghost" onclick="document.getElementById('generateModal').close()">取消</button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+
+    <script>
+        document.getElementById('modalCodeType').addEventListener('change', function() {
+            const t = this.value;
+            document.getElementById('modalCreditsGroup').style.display = t === 'balance' ? 'none' : '';
+            document.getElementById('modalBalanceGroup').style.display = t === 'credits' ? 'none' : '';
+        });
+    </script>
 @endsection

@@ -27,7 +27,12 @@ class RetryFailedGenerationTasks extends Command
 
         foreach ($tasks as $task) {
             $task->update(['status' => 'pending', 'message' => '等待重试...', 'error' => null]);
-            ProcessGenerationTask::dispatch($task->task_id);
+            $items = $task->items ?? [];
+            for ($i = 0; $i < max(1, $task->count); $i++) {
+                if (!isset($items[$i]) || !is_array($items[$i])) {
+                    ProcessGenerationTask::dispatch($task->task_id, $i);
+                }
+            }
         }
 
         $this->info("已重新派发 {$tasks->count()} 个任务。");

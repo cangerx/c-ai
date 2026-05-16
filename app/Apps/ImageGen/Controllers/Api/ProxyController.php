@@ -24,84 +24,96 @@ class ProxyController extends Controller
         }
 
         $appName = $path === '/v1/chat/completions' ? 'chat' : 'image-gen';
-        $channel = AiChannel::where('status', 'active')
+        $channels = AiChannel::where('status', 'active')
             ->where('app_name', $appName)
             ->orderBy('priority', 'desc')
-            ->inRandomOrder()
-            ->first();
+            ->get();
 
         // fallback: 如果没有专用 chat 渠道，尝试 image-gen 渠道
-        if (!$channel && $appName === 'chat') {
-            $channel = AiChannel::where('status', 'active')
+        if ($channels->isEmpty() && $appName === 'chat') {
+            $channels = AiChannel::where('status', 'active')
                 ->where('app_name', 'image-gen')
                 ->orderBy('priority', 'desc')
-                ->inRandomOrder()
-                ->first();
+                ->get();
         }
 
-        if (!$channel) {
+        if ($channels->isEmpty()) {
             return response(json_encode(['error' => '暂无可用渠道']), 503)
                 ->header('Content-Type', 'application/json');
         }
 
-        $isStream = ($channel->request_mode ?? 'sync') === 'stream'
-            && $path !== '/v1/chat/completions'; // chat completions 不强制流式
-        $targetUrl = rtrim($channel->base_url, '/') . $path;
-        $authorization = 'Bearer ' . $channel->api_key;
-
         $contentType = $request->header('Content-Type', '');
         $isMultipart = stripos($contentType, 'multipart/form-data') !== false;
 
-        $headers = ['Authorization: ' . $authorization];
+        // 尝试每个渠道，失败则 fallback 下一个
+        foreach ($channels as $channel) {
+            $isStream = ($channel->request_mode ?? 'sync') === 'stream'
+                && $path !== '/v1/chat/completions';
+            $isAsync = ($channel->request_mode ?? 'sync') === 'async';
+            $targetUrl = rtrim($channel->base_url, '/') . $path;
+            if ($isAsync) {
+                $targetUrl .= '?async=true';
+            }
+            $authorization = 'Bearer ' . $channel->api_key;
 
-        if ($isMultipart) {
-            [$body, $mpContentType] = $this->rebuildMultipart($request);
-            $headers[] = 'Content-Type: ' . $mpContentType;
-        } else {
-            $body = $request->getContent();
-            if ($isStream && stripos($contentType, 'application/json') !== false) {
-                $json = json_decode($body, true);
-                if (is_array($json)) {
-                    $json['stream'] = true;
-                    $body = json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $headers = ['Authorization: ' . $authorization];
+
+            if ($isMultipart) {
+                [$body, $mpContentType] = $this->rebuildMultipart($request);
+                $headers[] = 'Content-Type: ' . $mpContentType;
+            } else {
+                $body = $request->getContent();
+                if ($isStream && stripos($contentType, 'application/json') !== false) {
+                    $json = json_decode($body, true);
+                    if (is_array($json)) {
+                        $json['stream'] = true;
+                        $body = json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    }
+                }
+                if ($contentType) {
+                    $headers[] = 'Content-Type: ' . $contentType;
                 }
             }
-            if ($contentType) {
-                $headers[] = 'Content-Type: ' . $contentType;
+
+            if ($isStream) {
+                return $this->streamResponse($targetUrl, $headers, $body);
             }
-        }
 
-        if ($isStream) {
-            return $this->streamResponse($targetUrl, $headers, $body);
-        }
+            $ch = curl_init($targetUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 300,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_HEADER => true,
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_POSTFIELDS => $body,
+                CURLOPT_HTTPHEADER => $headers,
+            ]);
 
-        $ch = curl_init($targetUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 300,
-            CURLOPT_CONNECTTIMEOUT => 30,
-            CURLOPT_HEADER => true,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_POSTFIELDS => $body,
-            CURLOPT_HTTPHEADER => $headers,
-        ]);
+            $result = curl_exec($ch);
 
-        $result = curl_exec($ch);
+            if ($result === false) {
+                curl_close($ch);
+                continue; // 网络错误，尝试下一个渠道
+            }
 
-        if ($result === false) {
-            $err = curl_error($ch);
+            $statusCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            $responseBody = substr($result, $headerSize);
             curl_close($ch);
-            return response(json_encode(['error' => 'Upstream error', 'detail' => $err]), 502)
+
+            // 5xx 或模型不可用，尝试下一个渠道
+            if ($statusCode >= 500 || $statusCode === 404) {
+                continue;
+            }
+
+            return response($responseBody, $statusCode)
                 ->header('Content-Type', 'application/json');
         }
 
-        $statusCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $responseBody = substr($result, $headerSize);
-        curl_close($ch);
-
-        return response($responseBody, $statusCode)
+        // 所有渠道都失败
+        return response(json_encode(['error' => '所有渠道暂时不可用，请稍后重试']), 502)
             ->header('Content-Type', 'application/json');
     }
 

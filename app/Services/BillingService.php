@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\BillingRule;
+use App\Models\CommissionLog;
 use App\Models\SiteSetting;
 use App\Models\UsageLog;
 use App\Models\User;
@@ -11,66 +11,29 @@ use RuntimeException;
 
 class BillingService
 {
-    public function getCost(string $quality, ?string $model = null, string $appName = 'image-gen'): array
+    public function getCost(): int
     {
-        if ($model) {
-            $rule = BillingRule::where('app_name', $appName)
-                ->where(function ($q) use ($model) {
-                    $q->where('model_pattern', $model)
-                      ->orWhere('model_pattern', '*');
-                })
-                ->where(function ($q) use ($quality) {
-                    $q->where('quality', $quality)
-                      ->orWhereNull('quality');
-                })
-                ->orderByRaw("CASE WHEN model_pattern = '*' THEN 1 ELSE 0 END")
-                ->orderByRaw("CASE WHEN quality IS NULL THEN 1 ELSE 0 END")
-                ->first();
-
-            if ($rule) {
-                return [
-                    'credits' => $rule->cost_credits,
-                    'balance' => (float) $rule->cost_balance,
-                ];
-            }
-        }
-
-        $credits = (int) SiteSetting::get("billing_{$quality}_credits", 1);
-        $balance = (float) SiteSetting::get("billing_{$quality}_balance", 0.10);
-
-        return [
-            'credits' => $credits,
-            'balance' => $balance,
-        ];
+        return (int) SiteSetting::get('billing_per_generation', 1);
     }
 
-    public function canAfford(User $user, string $quality, ?string $model = null): bool
+    public function canAfford(User $user): bool
     {
-        $cost = $this->getCost($quality, $model);
-        return $user->credits >= $cost['credits'] || $user->balance >= $cost['balance'];
+        return $user->credits >= $this->getCost();
     }
 
     public function charge(User $user, string $quality, array $meta = []): UsageLog
     {
-        $model = $meta['model'] ?? null;
-        $appName = $meta['app_name'] ?? 'image-gen';
-        $cost = $this->getCost($quality, $model, $appName);
+        $cost = $this->getCost();
 
         return DB::transaction(function () use ($user, $cost, $quality, $meta) {
             $user = User::lockForUpdate()->find($user->id);
 
-            $deductedCredits = 0;
-            $deductedBalance = 0.0;
-
-            if ($user->credits >= $cost['credits']) {
-                $user->decrement('credits', $cost['credits']);
-                $deductedCredits = $cost['credits'];
-            } elseif ($user->balance >= $cost['balance']) {
-                $user->decrement('balance', $cost['balance']);
-                $deductedBalance = $cost['balance'];
-            } else {
-                throw new RuntimeException('余额不足，请先兑换充值');
+            if ($user->credits < $cost) {
+                throw new RuntimeException('积分不足，请先充值');
             }
+
+            $user->decrement('credits', $cost);
+            $user->increment('total_consumed_credits', $cost);
 
             $log = UsageLog::create([
                 'user_id' => $user->id,
@@ -79,26 +42,48 @@ class BillingService
                 'channel_id' => $meta['channel_id'] ?? null,
                 'model' => $meta['model'] ?? null,
                 'quality' => $quality,
-                'cost_credits' => $deductedCredits,
-                'cost_balance' => $deductedBalance,
+                'cost_credits' => $cost,
+                'cost_balance' => 0,
             ]);
 
-            if ($deductedBalance > 0 && $user->parent_id) {
-                $this->awardCommission($user->parent_id, $deductedBalance);
+            if ($user->parent_id) {
+                $this->awardCommission($user->parent_id, $user->id, $log->id, $cost);
             }
 
             return $log;
         });
     }
 
-    protected function awardCommission(int $agentId, float $amount): void
+    protected function awardCommission(int $distributorId, int $fromUserId, int $usageLogId, int $credits): void
     {
-        $rate = (float) SiteSetting::get('agent_commission_rate', 0.10);
+        $distributor = User::where('id', $distributorId)->where('is_distributor', true)->first();
+        if (!$distributor) return;
+
+        $rate = (float) SiteSetting::get('distributor_commission_rate', 0.10);
         if ($rate <= 0) return;
 
-        $commission = round($amount * $rate, 2);
-        if ($commission < 0.01) return;
+        $reward = (int) floor($credits * $rate);
+        if ($reward < 1) return;
 
-        User::where('id', $agentId)->increment('commission_balance', $commission);
+        $distributor->increment('commission_credits', $reward);
+        $distributor->increment('credits', $reward);
+
+        CommissionLog::create([
+            'user_id' => $distributorId,
+            'from_user_id' => $fromUserId,
+            'usage_log_id' => $usageLogId,
+            'credits' => $reward,
+        ]);
+    }
+
+    public function refundLog(UsageLog $log): void
+    {
+        $affected = UsageLog::where('id', $log->id)
+            ->whereNull('refunded_at')
+            ->update(['refunded_at' => now()]);
+
+        if ($affected > 0 && $log->cost_credits > 0) {
+            User::where('id', $log->user_id)->increment('credits', $log->cost_credits);
+        }
     }
 }

@@ -3,18 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CANG-AI 绘图</title>
+    <title>CANG-AI 绘图 - AI智能绘画平台 | 一键生成高质量图片</title>
+    <meta name="description" content="CANG-AI 是专业的AI绘图平台，支持文生图、图生图、提示词反推，多种AI模型一键生成高质量创意图片。简单易用，快速出图。" />
+    <meta name="keywords" content="AI绘图,AI画图,AI生成图片,文生图,图生图,AI绘画,CANG-AI,人工智能绘画,AI创作" />
+    <link rel="canonical" href="https://cang-ai.com/" />
+    <meta property="og:title" content="CANG-AI 绘图 - AI智能绘画平台" />
+    <meta property="og:description" content="专业AI绘图平台，支持文生图、图生图、提示词反推，多种模型一键生成高质量图片。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cang-ai.com/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="CANG-AI 绘图 - AI智能绘画平台" />
+    <meta name="twitter:description" content="专业AI绘图平台，支持文生图、图生图、提示词反推，多种模型一键生成高质量图片。" />
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;600;700&display=swap');
 
       :root {
         color-scheme: light;
         --bg: #f5f3f0;
+        --bg-secondary: #f8f8f8;
         --panel: rgba(255, 255, 255, 0.72);
         --panel-strong: rgba(255, 255, 255, 0.92);
         --line: rgba(0, 0, 0, 0.06);
         --line-strong: rgba(0, 0, 0, 0.1);
         --text: #1a1a1a;
+        --text-primary: #1a1a1a;
+        --text-secondary: #6b7280;
+        --text-tertiary: #9ca3af;
+        --border-color: rgba(0, 0, 0, 0.08);
         --muted: #6b7280;
         --muted-soft: #9ca3af;
         --accent: #2d5bf0;
@@ -807,8 +822,8 @@
       .settings-modal {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.24);
-        backdrop-filter: blur(6px);
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(10px);
         display: none;
         align-items: center;
         justify-content: center;
@@ -821,17 +836,18 @@
       }
 
       .settings-card {
-        width: min(480px, 100%);
-        border-radius: 22px;
-        background: #fff;
-        border: 1px solid var(--line);
-        box-shadow: 0 24px 64px rgba(0,0,0,0.16);
-        padding: 20px;
-        animation: slideUp 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+        width: min(720px, 95vw);
+        border-radius: 20px;
+        background: #ffffff;
+        box-shadow: 0 24px 80px rgba(0,0,0,0.2);
+        padding: 36px;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUp 0.25s cubic-bezier(0.22, 1, 0.36, 1);
       }
 
       @keyframes slideUp {
-        from { opacity: 0; transform: translateY(24px) scale(0.97); }
+        from { opacity: 0; transform: translateY(16px) scale(0.97); }
         to   { opacity: 1; transform: translateY(0) scale(1); }
       }
 
@@ -853,59 +869,256 @@
       .settings-head {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 18px;
+        justify-content: center;
+        position: relative;
+        margin-bottom: 28px;
       }
 
       .settings-head h3 {
         margin: 0;
-        font-size: 20px;
+        font-size: 22px;
+        font-weight: 700;
+        color: #1a1a1a;
+        text-align: center;
+      }
+
+      .settings-head .icon-btn {
+        position: absolute;
+        right: -8px;
+        top: -8px;
       }
 
       .settings-body {
-        display: grid;
-        gap: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
       }
 
       .settings-field {
-        display: grid;
-        gap: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
       }
 
       .settings-field label {
-        font-size: 14px;
-        color: #3f3f46;
+        font-size: 13px;
+        font-weight: 500;
+        color: #666;
       }
 
       .settings-input {
         height: 46px;
         width: 100%;
-        border-radius: 14px;
-        border: 1px solid var(--line-strong);
-        background: #fff;
-        color: #18181b;
-        padding: 0 14px;
+        border-radius: 12px;
+        border: 1.5px solid transparent;
+        background: #f5f5f5;
+        color: #1a1a1a;
+        padding: 0 16px;
         font: inherit;
+        font-size: 15px;
         outline: none;
+        transition: all 0.2s;
+      }
+
+      .settings-input:focus {
+        background: #fff;
+        border-color: #111113;
+        box-shadow: 0 0 0 3px rgba(17, 17, 19, 0.06);
+      }
+
+      .settings-input::placeholder {
+        color: #aaa;
+      }
+
+      .settings-input:-webkit-autofill,
+      .settings-input:-webkit-autofill:hover,
+      .settings-input:-webkit-autofill:focus {
+        -webkit-box-shadow: 0 0 0 1000px #f5f5f5 inset !important;
+        -webkit-text-fill-color: #1a1a1a !important;
+        border-color: transparent;
+        transition: background-color 5000s ease-in-out 0s;
       }
 
       .settings-foot {
         display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        margin-top: 6px;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 8px;
+      }
+
+      .settings-foot .black-btn {
+        width: 100%;
+        height: 46px;
+        border-radius: 12px;
+        background: #111113;
+        font-size: 15px;
+        font-weight: 600;
+        min-width: unset;
+      }
+
+      .settings-foot .black-btn:hover {
+        transform: none;
+        opacity: 0.88;
+      }
+
+      .settings-foot .ghost-btn {
+        width: 100%;
+        height: auto;
+        padding: 0;
+        border: none;
+        background: none;
+        font-size: 13px;
+        color: #888;
+        text-align: center;
+      }
+
+      .settings-foot .ghost-btn:hover {
+        color: #111;
+        transform: none;
       }
 
       .auth-error {
+        display: none;
         font-size: 13px;
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin-top: 4px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        line-height: 1.4;
       }
-      .auth-error.err { background: rgba(239,68,68,0.08); color: #dc2626; }
-      .auth-error.ok { background: rgba(34,197,94,0.08); color: #16a34a; }
+      .auth-error.err { display: block; background: #fef2f2; color: #dc2626; }
+      .auth-error.ok { display: block; background: #f0fdf4; color: #16a34a; }
+
+      .auth-subtitle {
+        font-size: 14px;
+        color: #888;
+        text-align: center;
+        margin: -12px 0 8px;
+        line-height: 1.4;
+      }
+
+      .input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+
+      .input-icon {
+        position: absolute;
+        left: 14px;
+        color: #aaa;
+        pointer-events: none;
+        transition: color 0.2s;
+      }
+
+      .input-wrap:focus-within .input-icon {
+        color: #111113;
+      }
+
+      .settings-input.has-icon {
+        padding-left: 40px;
+      }
+
+      .toggle-pwd-btn {
+        position: absolute;
+        right: 4px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #bbb;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        transition: color 0.15s;
+      }
+
+      .toggle-pwd-btn:hover {
+        color: #555;
+      }
+
+      .auth-links {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+      }
+
+      .auth-link-btn {
+        background: none;
+        border: none;
+        font-size: 13px;
+        color: #888;
+        cursor: pointer;
+        padding: 0;
+        font: inherit;
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+
+      .auth-link-btn:hover {
+        color: #111;
+      }
+
+      .auth-link-dot {
+        color: #ddd;
+        font-size: 14px;
+      }
+
+      .auth-terms {
+        font-size: 11px;
+        color: #bbb;
+        text-align: center;
+        margin: 4px 0 0;
+        line-height: 1.5;
+      }
+
+      .auth-terms a {
+        color: #888;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        transition: color 0.15s;
+      }
+
+      .auth-terms a:hover {
+        color: #111;
+      }
+
+      .oauth-section { margin-bottom: 0; }
+      .oauth-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1.5px solid #e8e8e8;
+        background: #fff;
+        color: #333;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        margin-bottom: 8px;
+      }
+      .oauth-btn:hover { border-color: #111; background: #fafafa; }
+      .oauth-btn-wechat:hover { border-color: #07C160; }
+      .oauth-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 16px 0 12px;
+      }
+      .oauth-divider::before, .oauth-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #eee;
+      }
+      .oauth-divider span { font-size: 12px; color: #999; white-space: nowrap; }
+
+      .wechat-qr-wrap { display:flex; flex-direction:column; align-items:center; }
+      .wechat-qr-wrap iframe { border:none; width:300px; height:340px; }
+      .wechat-qr-tip { font-size:12px; color:var(--text-secondary); margin-top:8px; }
 
       .auth-user-card {
         display: flex;
@@ -960,6 +1173,122 @@
         color: var(--text);
         margin-top: 4px;
         display: block;
+      }
+
+      .profile-asset-card {
+        background: #1a1a1c;
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .profile-asset-value {
+        font-size: 28px;
+        font-weight: 800;
+        color: #fff;
+        line-height: 1.1;
+      }
+      .profile-asset-label {
+        font-size: 11px;
+        color: rgba(255,255,255,0.55);
+        margin-bottom: 2px;
+      }
+      .profile-asset-sub {
+        font-size: 11px;
+        color: rgba(255,255,255,0.4);
+        margin-top: 4px;
+      }
+      .profile-role-badge {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: #f0f0f0;
+        color: #666;
+        font-weight: 500;
+      }
+      .profile-role-badge.dist {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .profile-invite-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        padding: 16px 18px;
+        margin-bottom: 14px;
+      }
+      .profile-invite-card h4 {
+        font-size: 13px;
+        font-weight: 700;
+        margin: 0 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .profile-invite-card h4 .badge {
+        font-size: 10px;
+        padding: 2px 7px;
+        border-radius: 8px;
+        background: #dcfce7;
+        color: #166534;
+        font-weight: 600;
+      }
+      .profile-invite-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #f5f5f5;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+      }
+      .profile-invite-row code {
+        flex: 1;
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--text-primary);
+      }
+      .profile-invite-row .copy-btn {
+        flex-shrink: 0;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        background: #fff;
+        cursor: pointer;
+        font-weight: 500;
+        transition: background 0.15s;
+      }
+      .profile-invite-row .copy-btn:active {
+        background: #e5e5e5;
+      }
+      .profile-invite-stats {
+        display: flex;
+        gap: 16px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+      }
+      .profile-invite-stats strong {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+      .profile-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .profile-grid > div {
+        min-width: 0;
+      }
+      @media (max-width: 600px) {
+        .profile-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       .config-block + .config-block {
@@ -1456,11 +1785,6 @@
         animation: dots 1.5s steps(3) infinite;
       }
 
-      @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(8px); }
-        to   { opacity: 1; transform: translateY(0); }
-      }
-
       @keyframes dots {
         0%   { content: '.'; }
         33%  { content: '..'; }
@@ -1792,6 +2116,7 @@
         border-bottom: 1px solid var(--line);
       }
       .myworks-head h3 { font-size: 16px; font-weight: 700; }
+      .myworks-notice { padding: 8px 20px; font-size: 12px; color: #92400e; background: #fffbeb; border-bottom: 1px solid var(--line); }
       .myworks-grid {
         padding: 16px;
         overflow-y: auto;
@@ -1862,7 +2187,7 @@
         display: block;
         border-radius: 16px;
         overflow: hidden;
-        background: #f4f4f5;
+        background: #f0f0f0;
         aspect-ratio: 1 / 1;
         box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -1878,14 +2203,39 @@
         height: 100%;
         object-fit: cover;
         display: block;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .gallery-item img.loaded {
+        opacity: 1;
+      }
+
+      .gallery-item::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+      }
+
+      .gallery-item.img-loaded::before {
+        display: none;
+      }
+
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
       }
 
       .gallery-item::after {
         content: "";
         position: absolute;
         inset: 0;
-        background: linear-gradient(180deg, transparent 45%, rgba(0, 0, 0, 0.18) 100%);
+        background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.15) 100%);
         pointer-events: none;
+        z-index: 1;
       }
 
       .gallery-empty {
@@ -1913,8 +2263,8 @@
         width: 52px;
         height: 52px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #34363d, #1f2126);
-        border: none;
+        background: radial-gradient(circle at 30% 30%, #2a2a2e, #111113 60%, #000 100%);
+        border: 1px solid rgba(255,255,255,0.08);
         color: #fff;
         font: inherit;
         font-size: 11px;
@@ -1923,20 +2273,70 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 6px 24px rgba(15, 23, 42, 0.22);
-        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 1px rgba(255,255,255,0.06);
+        transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s;
         touch-action: manipulation;
         position: relative;
-        overflow: hidden;
+        animation: orbFloat 5s ease-in-out infinite;
+      }
+
+      .task-ball-orb.tapped {
+        animation: orbTap 0.4s cubic-bezier(0.34,1.56,0.64,1);
+      }
+
+      @keyframes orbTap {
+        0% { transform: scale(1); }
+        30% { transform: scale(0.82); }
+        60% { transform: scale(1.12); }
+        100% { transform: scale(1); }
+      }
+
+      .task-ball-orb::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.12) 10%, transparent 20%, transparent 50%, rgba(255,255,255,0.08) 60%, transparent 70%);
+        animation: orbRotate 6s linear infinite;
+      }
+
+      .task-ball-orb::after {
+        content: "";
+        position: absolute;
+        width: 20px;
+        height: 10px;
+        top: 11px;
+        left: 12px;
+        border-radius: 50%;
+        background: radial-gradient(ellipse, rgba(255,255,255,0.35), transparent 70%);
+        filter: blur(3px);
+        animation: orbShine 4s ease-in-out infinite;
+      }
+
+      @keyframes orbFloat {
+        0%, 100% { transform: translateY(0) scale(1); }
+        25% { transform: translateY(-2px) scale(1.02); }
+        50% { transform: translateY(0) scale(1); }
+        75% { transform: translateY(1px) scale(0.98); }
+      }
+
+      @keyframes orbRotate {
+        to { rotate: 360deg; }
+      }
+
+      @keyframes orbShine {
+        0%, 100% { opacity: 0.6; transform: translate(0, 0) scale(1); }
+        50% { opacity: 1; transform: translate(1px, 1px) scale(1.1); }
       }
 
       .task-ball-orb:hover {
-        transform: scale(1.06);
-        box-shadow: 0 8px 28px rgba(15, 23, 42, 0.3);
+        transform: scale(1.12);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(255,255,255,0.06), inset 0 1px 2px rgba(255,255,255,0.1);
+        animation-play-state: paused;
       }
 
       .task-ball-orb:active {
-        transform: scale(0.95);
+        transform: scale(0.92);
       }
 
       .task-ball-orb .orb-spinner {
@@ -1946,11 +2346,15 @@
         border-top-color: #fff;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
+        position: relative;
+        z-index: 1;
       }
 
       .task-ball-orb .orb-icon {
         font-size: 18px;
         line-height: 1;
+        position: relative;
+        z-index: 1;
       }
 
       .task-ball-orb .orb-badge {
@@ -1961,6 +2365,7 @@
         height: 14px;
         border-radius: 50%;
         border: 2px solid #1f2126;
+        z-index: 2;
       }
 
       .task-ball-orb .orb-badge.processing {
@@ -1974,6 +2379,69 @@
 
       .task-ball-orb .orb-badge.failed {
         background: #dc2626;
+      }
+
+      .orb-tip {
+        position: absolute;
+        bottom: 16px;
+        right: 62px;
+        background: rgba(0,0,0,0.82);
+        color: #fff;
+        font-size: 12px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateX(6px);
+        transition: opacity 0.35s, transform 0.35s;
+      }
+      .orb-tip.visible {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      .orb-tip::after {
+        content: "";
+        position: absolute;
+        right: -5px;
+        top: 50%;
+        translate: 0 -50%;
+        border: 5px solid transparent;
+        border-left-color: rgba(0,0,0,0.82);
+      }
+
+      .toast-container {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        translate: -50% 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        pointer-events: none;
+      }
+      .toast {
+        background: rgba(17,17,19,0.92);
+        backdrop-filter: blur(12px);
+        color: #fff;
+        font-size: 13px;
+        padding: 10px 18px;
+        border-radius: 10px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        animation: toastIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+        pointer-events: auto;
+      }
+      .toast.out {
+        animation: toastOut 0.3s ease both;
+      }
+      @keyframes toastIn {
+        from { opacity: 0; transform: translateY(-12px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes toastOut {
+        to { opacity: 0; transform: translateY(-8px) scale(0.95); }
       }
 
       .task-ball-panel {
@@ -2350,25 +2818,9 @@
         100% { background-position: -200% 0; }
       }
 
-      @keyframes toolSweep {
-        0% { left: -40%; opacity: 0; }
-        30% { opacity: 1; }
-        70% { opacity: 1; }
-        100% { left: 110%; opacity: 0; }
-      }
-
       @keyframes btnDisabledPulse {
         0%, 100% { opacity: 0.55; }
         50% { opacity: 0.72; }
-      }
-
-      @keyframes sweep {
-        from {
-          transform: translateX(-100%);
-        }
-        to {
-          transform: translateX(100%);
-        }
       }
 
       @keyframes floatOrbA {
@@ -2536,13 +2988,42 @@
 
         .settings-modal {
           align-items: flex-end;
-          padding: 12px;
+          padding: 0;
         }
 
         .settings-card {
           width: 100%;
-          border-radius: 24px 24px 18px 18px;
-          padding: 18px;
+          border-radius: 20px 20px 0 0;
+          padding: 24px 18px;
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+
+        .profile-grid {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .profile-asset-card {
+          padding: 14px 16px;
+        }
+        .profile-asset-value {
+          font-size: 22px;
+        }
+
+        .profile-invite-card {
+          padding: 14px 14px;
+        }
+
+        .profile-invite-row code {
+          font-size: 11px;
+        }
+
+        #usageHistoryList {
+          max-height: 150px !important;
+        }
+        #distTabInvites, #distTabCommissions {
+          max-height: 150px !important;
         }
 
         .input-card {
@@ -2813,9 +3294,22 @@
           overflow-y: auto;
         }
       }
+      .drop-overlay { position:fixed; inset:0; z-index:9999; background:rgba(99,102,241,.12); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; animation:dropFadeIn .2s ease; }
+      .drop-overlay[hidden] { display:none; }
+      .drop-overlay-content { text-align:center; padding:40px 60px; border-radius:20px; border:2px dashed rgba(99,102,241,.6); background:rgba(255,255,255,.85); animation:dropBounce .3s ease; }
+      .drop-icon { font-size:48px; margin-bottom:8px; }
+      .drop-text { font-size:16px; font-weight:600; color:#4f46e5; }
+      @keyframes dropFadeIn { from{opacity:0} to{opacity:1} }
+      @keyframes dropBounce { from{transform:scale(.9);opacity:0} to{transform:scale(1);opacity:1} }
     </style>
   </head>
   <body>
+    <div id="dropOverlay" class="drop-overlay" hidden>
+      <div class="drop-overlay-content">
+        <div class="drop-icon">⬇</div>
+        <div class="drop-text">松开上传图片</div>
+      </div>
+    </div>
     <main class="page">
       <div id="announceBar" class="announce-bar" style="display:none;">
         <span class="announce-tag">NEW</span>
@@ -3026,6 +3520,8 @@
           </button>
         </div>
 
+        <div id="galleryGrid" class="gallery-grid"></div>
+
         <!-- 我的作品 Modal -->
         <div id="myWorksModal" class="myworks-modal" hidden>
           <div class="myworks-overlay" id="myWorksOverlay"></div>
@@ -3034,6 +3530,7 @@
               <h3>我的作品</h3>
               <button id="closeMyWorksBtn" class="icon-btn" type="button">×</button>
             </div>
+            <div class="myworks-notice">图片仅保留 3 天，请及时下载保存。公开作品不受影响。</div>
             <div id="myWorksGrid" class="myworks-grid"></div>
             <div id="myWorksLoading" class="myworks-loading" hidden>加载中...</div>
           </div>
@@ -3046,7 +3543,14 @@
               <span class="footer-logo">C</span>
               <span class="footer-brand-text">CANG-AI</span>
             </div>
-            <div class="footer-copyright">&copy; 2026 CANG-AI &middot; All rights reserved</div>
+            <div class="footer-links">
+              <a href="mailto:support@cang-ai.com">联系我们</a>
+              <span class="dot">&middot;</span>
+              <a href="/terms" target="_blank">服务条款</a>
+              <span class="dot">&middot;</span>
+              <a href="/privacy" target="_blank">隐私政策</a>
+            </div>
+            <div class="footer-copyright">&copy; 2025 CANG-AI &middot; AI智能绘画平台 &middot; All rights reserved</div>
           </div>
         </footer>
       </section>
@@ -3065,6 +3569,7 @@
     </div>
 
     <div id="taskBall" class="task-ball">
+      <div id="taskBallTip" class="orb-tip"></div>
       <div id="taskBallPanel" class="task-ball-panel">
         <div class="task-ball-panel-head">
           <h4>全部任务</h4>
@@ -3087,94 +3592,195 @@
         <div class="settings-body">
           <!-- Login Form -->
           <div id="authLogin" class="auth-panel">
+            <p class="auth-subtitle">登录以使用完整的 AI 绘画功能</p>
+            <div id="oauthMethodsWrap" class="oauth-section" style="display:none;">
+              <button id="githubLoginBtn" type="button" class="oauth-btn" style="display:none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                使用 GitHub 登录
+              </button>
+              <button id="wechatLoginBtn" type="button" class="oauth-btn oauth-btn-wechat" style="display:none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#07C160"><path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.045c.133 0 .241-.11.241-.245 0-.06-.024-.12-.04-.178l-.325-1.233a.492.492 0 0 1 .178-.554C23.028 18.553 24 16.803 24 14.87c0-3.18-2.797-5.768-7.062-6.012zm-2.53 2.702c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982z"/></svg>
+                微信扫码登录
+              </button>
+              <div class="oauth-divider">
+                <span>或使用邮箱</span>
+              </div>
+            </div>
             <div class="settings-field">
               <label>邮箱</label>
-              <input id="loginEmail" class="settings-input" type="email" placeholder="your@email.com" />
+              <div class="input-wrap">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                <input id="loginEmail" class="settings-input has-icon" type="email" placeholder="请输入邮箱地址" />
+              </div>
             </div>
             <div class="settings-field">
               <label>密码</label>
-              <input id="loginPassword" class="settings-input" type="password" placeholder="••••••" />
+              <div class="input-wrap">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input id="loginPassword" class="settings-input has-icon" type="password" placeholder="请输入密码" />
+                <button type="button" class="toggle-pwd-btn" aria-label="显示密码">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
             </div>
             <div id="loginError" class="auth-error" style="display:none;"></div>
             <div class="settings-foot">
-              <button id="switchToRegister" class="ghost-btn" type="button">注册账号</button>
               <button id="loginBtn" class="black-btn" type="button">登录</button>
+              <div class="auth-links">
+                <button id="switchToRegister" class="auth-link-btn" type="button">注册账号</button>
+                <span class="auth-link-dot">·</span>
+                <a id="forgotPwdLink" href="javascript:void(0)" class="auth-link-btn">忘记密码</a>
+              </div>
+              <p class="auth-terms">登录即表示您同意 <a href="/terms" target="_blank">服务条款</a> 和 <a href="/privacy" target="_blank">隐私政策</a></p>
             </div>
-            <div style="display:flex; align-items:center; gap:10px; margin-top:16px;">
-              <div style="flex:1; height:1px; background:var(--line);"></div>
-              <span style="font-size:11px; color:var(--text-secondary);">或</span>
-              <div style="flex:1; height:1px; background:var(--line);"></div>
+          </div>
+          <!-- Forgot Password Panel -->
+          <div id="authForgotPwd" class="auth-panel" style="display:none;">
+            <p class="auth-subtitle">输入注册邮箱，我们将发送重置链接</p>
+            <div class="settings-field">
+              <label>注册邮箱</label>
+              <div class="input-wrap">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                <input id="forgotEmail" class="settings-input has-icon" type="email" placeholder="请输入注册邮箱" />
+              </div>
             </div>
-            <button id="githubLoginBtn" type="button" style="margin-top:12px; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--card-bg); color:var(--text-primary); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-              使用 GitHub 登录
-            </button>
+            <div id="forgotMsg" class="auth-error" style="display:none;"></div>
+            <div class="settings-foot">
+              <button id="forgotSubmitBtn" class="black-btn" type="button">发送重置链接</button>
+              <div class="auth-links">
+                <button id="forgotBackBtn" class="auth-link-btn" type="button">← 返回登录</button>
+              </div>
+            </div>
+          </div>
+          <!-- WeChat QR Code View -->
+          <div id="authWechatQr" class="auth-panel" style="display:none;">
+            <div class="wechat-qr-wrap">
+              <div id="wechatQrContainer"></div>
+              <p class="wechat-qr-tip">请使用微信扫描二维码登录</p>
+            </div>
+            <button id="wechatQrBack" class="auth-link-btn" type="button" style="width:100%; margin-top:12px;">← 返回</button>
           </div>
           <!-- Register Form -->
           <div id="authRegister" class="auth-panel" style="display:none;">
+            <p class="auth-subtitle">创建账号，开启 AI 创作之旅</p>
             <div class="settings-field">
               <label>用户名</label>
-              <input id="regName" class="settings-input" type="text" placeholder="昵称" />
+              <input id="regName" class="settings-input" type="text" placeholder="输入昵称" />
             </div>
             <div class="settings-field">
               <label>邮箱</label>
-              <input id="regEmail" class="settings-input" type="email" placeholder="your@email.com" />
+              <input id="regEmail" class="settings-input" type="email" placeholder="请输入邮箱地址" />
             </div>
             <div class="settings-field">
               <label>密码</label>
-              <input id="regPassword" class="settings-input" type="password" placeholder="至少 6 位" />
+              <div class="input-wrap">
+                <input id="regPassword" class="settings-input" type="password" placeholder="至少 6 位字符" />
+                <button type="button" class="toggle-pwd-btn" aria-label="显示密码">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
             </div>
             <div class="settings-field">
               <label>确认密码</label>
-              <input id="regPasswordConfirm" class="settings-input" type="password" placeholder="再次输入密码" />
+              <div class="input-wrap">
+                <input id="regPasswordConfirm" class="settings-input" type="password" placeholder="再次输入密码" />
+                <button type="button" class="toggle-pwd-btn" aria-label="显示密码">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
             </div>
             <div class="settings-field">
-              <label>邀请码 <span style="color:#a1a1aa; font-weight:400;">(选填)</span></label>
-              <input id="regInviteCode" class="settings-input" type="text" placeholder="代理邀请码" maxlength="32" />
+              <label>邀请码 <span style="color:#bbb; font-weight:400;">(选填)</span></label>
+              <input id="regInviteCode" class="settings-input" type="text" placeholder="输入邀请码" maxlength="32" />
             </div>
             <div id="regError" class="auth-error" style="display:none;"></div>
             <div class="settings-foot">
-              <button id="switchToLogin" class="ghost-btn" type="button">已有账号</button>
-              <button id="registerBtn" class="black-btn" type="button">注册</button>
+              <button id="registerBtn" class="black-btn" type="button">创建账号</button>
+              <div class="auth-links">
+                <button id="switchToLogin" class="auth-link-btn" type="button">已有账号？登录</button>
+              </div>
+              <p class="auth-terms">注册即表示您同意 <a href="/terms" target="_blank">服务条款</a> 和 <a href="/privacy" target="_blank">隐私政策</a></p>
             </div>
           </div>
           <!-- Profile (logged in) -->
           <div id="authProfile" class="auth-panel" style="display:none;">
-            <div class="auth-user-card">
-              <div class="auth-user-avatar" id="profileAvatar">U</div>
-              <div class="auth-user-info">
-                <div class="auth-user-name" id="profileName">—</div>
-                <div class="auth-user-email" id="profileEmail">—</div>
+            <div class="profile-grid">
+              <div class="profile-left">
+                <div class="auth-user-card" style="margin-bottom:14px;">
+                  <div class="auth-user-avatar" id="profileAvatar" style="width:52px;height:52px;border-radius:50%;font-size:20px;">U</div>
+                  <div class="auth-user-info">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <div class="auth-user-name" id="profileName">—</div>
+                      <span class="profile-role-badge" id="profileRoleBadge">用户</span>
+                    </div>
+                    <div class="auth-user-email" id="profileEmail">—</div>
+                  </div>
+                </div>
+
+                <div class="profile-asset-card">
+                  <div>
+                    <div class="profile-asset-label">可用积分</div>
+                    <div class="profile-asset-value" id="profileCredits">0</div>
+                    <div class="profile-asset-sub">累计消费 <span id="profileConsumed">0</span></div>
+                  </div>
+                </div>
+
+                <div class="settings-field">
+                  <label>兑换码</label>
+                  <div style="display:flex;gap:8px;">
+                    <input id="redeemInput" class="settings-input" type="text" placeholder="输入 32 位兑换码" maxlength="32" style="flex:1;" />
+                    <button id="redeemBtn" class="black-btn" type="button" style="white-space:nowrap;">兑换</button>
+                  </div>
+                </div>
+                <div id="redeemMsg" class="auth-error" style="display:none;"></div>
+
+                <div id="distributorApplySection" style="display:none;">
+                  <div style="background:var(--bg-secondary);border:1px dashed var(--border-color);border-radius:10px;padding:16px;text-align:center;">
+                    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">开通分销，邀请好友注册即可获得返利积分</div>
+                    <button id="distributorApplyBtn" class="black-btn" type="button" style="width:100%;border-radius:8px;">申请开通分销</button>
+                    <div id="distributorApplyMsg" class="auth-error" style="display:none;margin-top:8px;"></div>
+                  </div>
+                </div>
+
+                <div class="settings-field">
+                  <label>使用记录</label>
+                  <div id="usageHistoryList" style="font-size:12px;color:var(--text-secondary);max-height:200px;overflow-y:auto;">加载中...</div>
+                </div>
+              </div>
+
+              <div class="profile-right">
+                <div id="distributorSection" style="display:none;">
+                  <div class="profile-invite-card">
+                    <h4>邀请好友计划 <span class="badge">返佣10%</span></h4>
+                    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">邀请码</div>
+                    <div class="profile-invite-row">
+                      <code id="profileInviteCode" style="font-size:18px;letter-spacing:0.12em;font-weight:800;">—</code>
+                      <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('profileInviteCode').textContent);this.textContent='已复制';setTimeout(()=>this.textContent='复制',1500)">复制</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">邀请链接</div>
+                    <div class="profile-invite-row">
+                      <code id="profileInviteLink">—</code>
+                      <button type="button" class="copy-btn" id="copyInviteLinkBtn">复制</button>
+                    </div>
+                    <div class="profile-invite-stats">
+                      <span>已邀请 <strong id="profileInviteCount">0</strong> 人</span>
+                      <span>累计返利 <strong id="profileCommission">0</strong> 积分</span>
+                    </div>
+                  </div>
+                  <div class="settings-field">
+                    <div style="display:flex;gap:0;border-bottom:1px solid var(--border-color);margin-bottom:10px;">
+                      <button type="button" class="ghost-btn dist-tab active" data-tab="invites" style="border-radius:0;border-bottom:2px solid var(--text-primary);padding:8px 14px;font-size:12px;font-weight:600;">邀请记录</button>
+                      <button type="button" class="ghost-btn dist-tab" data-tab="commissions" style="border-radius:0;border-bottom:2px solid transparent;padding:8px 14px;font-size:12px;font-weight:600;">返利记录</button>
+                    </div>
+                    <div id="distTabInvites" style="max-height:220px;overflow-y:auto;font-size:12px;color:var(--text-secondary);">加载中...</div>
+                    <div id="distTabCommissions" style="max-height:220px;overflow-y:auto;font-size:12px;color:var(--text-secondary);display:none;">加载中...</div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="auth-stats">
-              <div class="auth-stat">
-                <span class="auth-stat-label">剩余次数</span>
-                <span class="auth-stat-value" id="profileCredits">0</span>
-              </div>
-              <div class="auth-stat">
-                <span class="auth-stat-label">余额</span>
-                <span class="auth-stat-value" id="profileBalance">¥0.00</span>
-              </div>
-            </div>
-            <div id="inviteCodeSection" class="settings-field" style="display:none;">
-              <label>我的邀请码</label>
-              <div style="display:flex; gap:8px; align-items:center;">
-                <code id="profileInviteCode" style="font-size:16px; letter-spacing:0.1em; font-weight:700; color:#2d5bf0;">—</code>
-                <button type="button" class="ghost-btn" style="font-size:11px;" onclick="navigator.clipboard.writeText(document.getElementById('profileInviteCode').textContent)">复制</button>
-              </div>
-            </div>
-            <div class="settings-field">
-              <label>兑换码</label>
-              <div style="display:flex; gap:8px;">
-                <input id="redeemInput" class="settings-input" type="text" placeholder="输入 32 位兑换码" maxlength="32" style="flex:1;" />
-                <button id="redeemBtn" class="black-btn" type="button" style="white-space:nowrap;">兑换</button>
-              </div>
-            </div>
-            <div id="redeemMsg" class="auth-error" style="display:none;"></div>
-            <div class="settings-foot">
-              <button id="logoutBtn" class="ghost-btn" type="button">退出登录</button>
-              <button id="refreshProfileBtn" class="ghost-btn" type="button">刷新</button>
+            <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border-color);display:flex;justify-content:center;gap:16px;">
+              <button id="logoutBtn" class="ghost-btn" type="button" style="font-size:12px;color:var(--text-tertiary);">退出登录</button>
+              <button id="refreshProfileBtn" class="ghost-btn" type="button" style="font-size:12px;color:var(--text-tertiary);">刷新</button>
             </div>
           </div>
         </div>
@@ -3258,6 +3864,8 @@
         activeTaskId: "",
         activeTaskLocked: false,
         pollTimer: 0,
+        pollStartTime: 0,
+        pollConsecutiveErrors: 0,
         taskDelayNoticeLevel: "",
         publicGallery: true,
       };
@@ -3267,15 +3875,31 @@
       const AUTH_USER_KEY = "cangai_auth_user";
       const TASK_STORAGE_NAME = "openai_image_last_task_id";
       const AUTH_API_BASE = "/api";
-      const TASK_ENDPOINT = "generate-task.php";
-      const LIST_ENDPOINT = "list.php?limit=18";
+      const LIST_ENDPOINT = "/explore?per_page=18";
       let PROMPT_TOOL_MODEL = "gpt-5.4-mini";
+      let REVERSE_PROMPT_MODEL = "gpt-5.4-mini";
+      let LOGIN_METHODS = { github: false, wechat: false };
+      let COST_PER_GENERATION = 1;
       (async () => {
         try {
           const r = await fetch("/api/config");
           if (!r.ok) return;
           const d = await r.json();
           if (d.prompt_tool_model) PROMPT_TOOL_MODEL = d.prompt_tool_model;
+          if (d.reverse_prompt_model) REVERSE_PROMPT_MODEL = d.reverse_prompt_model;
+          if (d.cost_per_generation) { COST_PER_GENERATION = d.cost_per_generation; updateGenerateBtn(); }
+          if (d.login_methods) {
+            LOGIN_METHODS = d.login_methods;
+            const oauthWrap = document.getElementById("oauthMethodsWrap");
+            if (oauthWrap) {
+              const hasAny = LOGIN_METHODS.github || LOGIN_METHODS.wechat;
+              oauthWrap.style.display = hasAny ? "block" : "none";
+              const ghBtn = document.getElementById("githubLoginBtn");
+              const wxBtn = document.getElementById("wechatLoginBtn");
+              if (ghBtn) ghBtn.style.display = LOGIN_METHODS.github ? "flex" : "none";
+              if (wxBtn) wxBtn.style.display = LOGIN_METHODS.wechat ? "flex" : "none";
+            }
+          }
           if (d.announcements && d.announcements.length) {
             const bar = document.getElementById("announceBar");
             const textEl = document.getElementById("announceText");
@@ -3294,13 +3918,30 @@
               }, 4000);
             }
           }
+          if (d.models && d.models.length) {
+            MODEL_LABELS = {};
+            const container = document.getElementById("modelOptions");
+            container.innerHTML = "";
+            d.models.forEach((m, i) => {
+              MODEL_LABELS[m.id] = m.name;
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.dataset.value = m.id;
+              btn.textContent = m.name;
+              if (i === 0) btn.classList.add("active");
+              container.appendChild(btn);
+            });
+            state.model = d.models[0].id;
+            container.closest(".segmented").className = "segmented cols-" + Math.min(d.models.length, 3);
+            updateConfigButton();
+          }
         } catch {}
       })();
       const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
       const TASK_POLL_INTERVAL = 4000;
       const TASK_LONG_WAIT_MS = 3 * 60 * 1000;
       const TASK_VERY_LONG_WAIT_MS = 5 * 60 * 1000;
-      const MODEL_LABELS = {
+      let MODEL_LABELS = {
         "gpt-image-2": "gpt-image-2",
       };
       const QUALITY_LABELS = {
@@ -3398,6 +4039,12 @@
         }, 700);
       }
 
+      function updateGenerateBtn() {
+        if (state.mode === "reverse") { els.generateBtn.textContent = "反推"; return; }
+        const total = COST_PER_GENERATION * state.count;
+        els.generateBtn.textContent = `生成 (${total}积分)`;
+      }
+
       function setGenerationLoading(loading) {
         els.generateBtn.disabled = loading;
         els.generateBtn.classList.toggle("loading", loading);
@@ -3405,7 +4052,7 @@
           els.generateBtn.textContent = loading ? "反推中" : "反推";
           return;
         }
-        els.generateBtn.textContent = loading ? "生成中" : "生成";
+        if (loading) { els.generateBtn.textContent = "生成中"; } else { updateGenerateBtn(); }
       }
 
       let authUser = null;
@@ -3413,15 +4060,17 @@
       function syncLoginBtn() {
         const loggedIn = !!authUser;
         els.keyDot.classList.toggle("ok", loggedIn);
-        els.keyLabel.textContent = loggedIn ? (authUser.nickname || authUser.name) : "登录";
+        els.keyLabel.textContent = loggedIn ? `${authUser.credits ?? 0}积分` : "登录";
         els.taskBall.classList.toggle("visible", loggedIn);
       }
 
       function showAuthPanel(panel) {
         document.getElementById("authLogin").style.display = panel === "login" ? "" : "none";
+        document.getElementById("authWechatQr").style.display = panel === "wechatQr" ? "" : "none";
         document.getElementById("authRegister").style.display = panel === "register" ? "" : "none";
+        document.getElementById("authForgotPwd").style.display = panel === "forgotPwd" ? "" : "none";
         document.getElementById("authProfile").style.display = panel === "profile" ? "" : "none";
-        const titles = { login: "登录", register: "注册", profile: "我的账号" };
+        const titles = { login: "登录", wechatQr: "微信扫码登录", register: "注册", forgotPwd: "找回密码", profile: "我的账号" };
         document.getElementById("authTitle").textContent = titles[panel] || "账号";
       }
 
@@ -3431,14 +4080,97 @@
         document.getElementById("profileName").textContent = authUser.nickname || authUser.name;
         document.getElementById("profileEmail").textContent = authUser.email;
         document.getElementById("profileCredits").textContent = authUser.credits ?? 0;
-        document.getElementById("profileBalance").textContent = "¥" + Number(authUser.balance ?? 0).toFixed(2);
-        const invSec = document.getElementById("inviteCodeSection");
-        if (authUser.invite_code) {
-          invSec.style.display = "";
-          document.getElementById("profileInviteCode").textContent = authUser.invite_code;
+        document.getElementById("profileConsumed").textContent = authUser.total_consumed_credits ?? 0;
+
+        const badge = document.getElementById("profileRoleBadge");
+        if (authUser.is_distributor) {
+          badge.textContent = "分销者";
+          badge.className = "profile-role-badge dist";
         } else {
-          invSec.style.display = "none";
+          badge.textContent = "用户";
+          badge.className = "profile-role-badge";
         }
+
+        const distSec = document.getElementById("distributorSection");
+        const distApply = document.getElementById("distributorApplySection");
+        if (authUser.is_distributor) {
+          distSec.style.display = "";
+          distApply.style.display = "none";
+          document.getElementById("profileInviteCode").textContent = authUser.invite_code || "—";
+          document.getElementById("profileCommission").textContent = authUser.commission_credits ?? 0;
+          const inviteLink = location.origin + "?ref=" + (authUser.invite_code || "");
+          document.getElementById("profileInviteLink").textContent = inviteLink;
+          document.getElementById("copyInviteLinkBtn").onclick = function() {
+            navigator.clipboard.writeText(inviteLink);
+            this.textContent = "已复制";
+            setTimeout(() => this.textContent = "复制", 1500);
+          };
+          loadDistributorData();
+        } else {
+          distSec.style.display = "none";
+          distApply.style.display = "";
+        }
+        // Collapse grid to single column if right side has no distributor content
+        const grid = document.querySelector(".profile-grid");
+        if (!authUser.is_distributor) {
+          grid.style.gridTemplateColumns = "1fr";
+        } else {
+          grid.style.gridTemplateColumns = "";
+        }
+
+        loadUsageHistory();
+      }
+
+      async function loadUsageHistory() {
+        const list = document.getElementById("usageHistoryList");
+        try {
+          const d = await authApiFetch("/usage?per_page=10");
+          const items = d.data || d;
+          if (!items.length) { list.textContent = "暂无记录"; return; }
+          list.innerHTML = items.map(i => {
+            const t = new Date(i.created_at).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+            return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--line)"><span>${t} · ${MODEL_LABELS[i.model] || i.model || "—"}${i.task_id ? ' · <code style="font-size:10px;color:var(--text-tertiary)">' + i.task_id.slice(0,8) + '</code>' : ''}</span><span>-${i.cost_credits}积分</span></div>`;
+          }).join("");
+        } catch { list.textContent = "加载失败"; }
+      }
+
+      async function loadDistributorData() {
+        const invitesEl = document.getElementById("distTabInvites");
+        const commissionsEl = document.getElementById("distTabCommissions");
+
+        // Tab switching
+        document.querySelectorAll(".dist-tab").forEach(btn => {
+          btn.onclick = () => {
+            document.querySelectorAll(".dist-tab").forEach(b => { b.classList.remove("active"); b.style.borderBottomColor = "transparent"; });
+            btn.classList.add("active"); btn.style.borderBottomColor = "var(--text-primary)";
+            invitesEl.style.display = btn.dataset.tab === "invites" ? "" : "none";
+            commissionsEl.style.display = btn.dataset.tab === "commissions" ? "" : "none";
+          };
+        });
+
+        // Load invites
+        try {
+          const d = await authApiFetch("/distributor/invites");
+          const items = d.data || [];
+          document.getElementById("profileInviteCount").textContent = d.total || items.length;
+          if (!items.length) { invitesEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">暂无邀请记录</div>'; }
+          else { invitesEl.innerHTML = items.map(u => {
+            const t = new Date(u.created_at).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line);gap:8px"><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--border-color);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:11px;font-weight:700;">${(u.nickname||u.name||u.email||'?')[0].toUpperCase()}</div><div><div style="font-size:12px;font-weight:500;color:var(--text-primary)">${u.nickname||u.name||u.email}</div><div style="font-size:10px;color:var(--text-tertiary)">${t}</div></div></div><div style="font-size:11px;color:var(--text-secondary)">消费 ${u.total_consumed_credits||0}</div></div>`;
+          }).join(""); }
+        } catch { invitesEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">加载失败</div>'; }
+
+        // Load commissions
+        try {
+          const d = await authApiFetch("/distributor/commissions");
+          const items = d.data || [];
+          if (!items.length) { commissionsEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">暂无返利记录</div>'; }
+          else { commissionsEl.innerHTML = items.map(c => {
+            const t = new Date(c.created_at).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+            const from = c.from_user ? (c.from_user.nickname||c.from_user.name||c.from_user.email) : "用户";
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line)"><div style="font-size:12px;color:var(--text-primary)">来自 ${from}<div style="font-size:10px;color:var(--text-tertiary)">${t}</div></div><div style="font-size:13px;color:#16a34a;font-weight:700;">+${c.credits}</div></div>`;
+          }).join(""); }
+        } catch { commissionsEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">加载失败</div>'; }
       }
 
       function showAuthMsg(elId, msg, isErr) {
@@ -3446,6 +4178,18 @@
         el.style.display = "";
         el.textContent = msg;
         el.className = "auth-error " + (isErr ? "err" : "ok");
+      }
+
+      function handleAuthExpired() {
+        state.savedKey = "";
+        authUser = null;
+        try {
+          localStorage.removeItem(AUTH_TOKEN_KEY);
+          localStorage.removeItem(AUTH_USER_KEY);
+        } catch {}
+        syncLoginBtn();
+        setSettingsOpen(true);
+        showToast("登录已过期，请重新登录");
       }
 
       async function authApiFetch(path, opts = {}) {
@@ -3456,6 +4200,10 @@
           opts.body = JSON.stringify(opts.body);
         }
         const res = await fetch(AUTH_API_BASE + path, { ...opts, headers });
+        if (res.status === 401) {
+          handleAuthExpired();
+          throw new Error("登录已过期，请重新登录");
+        }
         const json = await res.json();
         if (!res.ok) throw new Error(json.message || json.errors?.email?.[0] || "请求失败");
         return json;
@@ -3562,6 +4310,8 @@
           clearTimeout(state.pollTimer);
           state.pollTimer = 0;
         }
+        state.pollStartTime = 0;
+        state.pollConsecutiveErrors = 0;
       }
 
       function resetTaskDelayNotice() {
@@ -3629,19 +4379,6 @@
         els.configPanel.classList.toggle("open", open);
       }
 
-      function buildFilename(index = 1) {
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, "0");
-        const dd = String(now.getDate()).padStart(2, "0");
-        const hh = String(now.getHours()).padStart(2, "0");
-        const mi = String(now.getMinutes()).padStart(2, "0");
-        const ss = String(now.getSeconds()).padStart(2, "0");
-        const mode = state.mode === "text" ? "text" : "edit";
-        const size = SIZE_LABELS[state.size].replace(":", "x");
-        return `image-${mode}-${size}-${yyyy}${mm}${dd}-${hh}${mi}${ss}-${index}.png`;
-      }
-
       els.stagePrompt.addEventListener("click", () => {
         els.stagePrompt.classList.toggle("expanded");
       });
@@ -3653,7 +4390,7 @@
 
         const tags = state.mode === "reverse"
           ? [
-              PROMPT_TOOL_MODEL,
+              REVERSE_PROMPT_MODEL,
               "反推提示词",
               state.files[0] ? "已载入图片" : "等待图片",
             ]
@@ -3701,6 +4438,10 @@
       function closeGenerationStage() {
         els.generationStage.classList.remove("open");
         document.querySelector(".page").classList.remove("generating");
+        if (state._galleryStale) {
+          state._galleryStale = false;
+          loadGalleryWall();
+        }
       }
 
       const LOADING_BADGE_MSGS = [
@@ -4006,23 +4747,6 @@
         log(kind === "optimize" ? "提示词优化完成。" : "提示词翻译完成。");
       }
 
-      function fileToBase64DataUrl(file) {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error("图片读取失败"));
-          reader.readAsDataURL(file);
-        });
-      }
-
-      function toAbsoluteUrl(url) {
-        try {
-          return new URL(String(url), window.location.href).toString();
-        } catch {
-          throw new Error(`无效的图片地址: ${url}`);
-        }
-      }
-
       function extractAssistantText(data) {
         const messageContent = data?.choices?.[0]?.message?.content;
         if (typeof messageContent === "string") {
@@ -4051,9 +4775,18 @@
         if (!token || !authUser) { setSettingsOpen(true); throw new Error("请先登录"); };
         if (!file) throw new Error("请先上传 1 张图片");
 
-        log("正在读取图片，准备反推提示词...");
-        const imageUrl = await fileToBase64DataUrl(file);
-        log(`请求中\nPOST /v1/chat/completions\nmodel: ${PROMPT_TOOL_MODEL}\nmode: reverse-prompt`);
+        log("正在上传图片...");
+        const formData = new FormData();
+        formData.append("image", file);
+        const uploadRes = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        if (!uploadRes.ok) throw new Error("图片上传失败");
+        const { url: imageUrl } = await uploadRes.json();
+
+        log(`请求中\nPOST /v1/chat/completions\nmodel: ${REVERSE_PROMPT_MODEL}\nmode: reverse-prompt`);
         const res = await fetch(`${FIXED_BASE_URL}${encodeURIComponent("/v1/chat/completions")}`, {
           method: "POST",
           headers: {
@@ -4061,7 +4794,7 @@
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: PROMPT_TOOL_MODEL,
+            model: REVERSE_PROMPT_MODEL,
             messages: [
               {
                 role: "system",
@@ -4076,9 +4809,7 @@
                   },
                   {
                     type: "image_url",
-                    image_url: {
-                      url: imageUrl,
-                    },
+                    image_url: { url: imageUrl },
                   },
                 ],
               },
@@ -4132,9 +4863,12 @@
             if (item.objectUrl) {
               return `<a class="dl" href="${escapeHtml(item.objectUrl)}" download="${escapeHtml(item.filename)}">⬇ 下载 ${n}</a>`;
             }
-            const downloadHref = escapeHtml(item.downloadUrl || item.download_url || item.url);
-            const openHref = escapeHtml(item.url);
-            return `<a class="dl" href="${downloadHref}" target="_blank" rel="noreferrer">⬇ 下载 ${n}</a><a href="${openHref}" target="_blank" rel="noreferrer">↗ 打开 ${n}</a>`;
+            const dlUrl = escapeHtml(item.downloadUrl || item.download_url || item.url);
+            let html = `<a class="dl" href="${dlUrl}" download="image_${n}.png" onclick="event.preventDefault();blobDownload('${dlUrl}','image_${n}.png')">⬇ 下载 ${n}</a>`;
+            if (item.origin_url) {
+              html += `<a class="dl" href="${escapeHtml(item.origin_url)}" download="image_${n}.png" onclick="event.preventDefault();blobDownload('${escapeHtml(item.origin_url)}','image_${n}.png')">⚡ 加速下载 ${n}</a>`;
+            }
+            return html;
           })
           .join("");
         els.downloadBtn.disabled = items.length === 0;
@@ -4226,7 +4960,7 @@
 
       async function loadGalleryWall() {
         try {
-          const res = await fetch(LIST_ENDPOINT, { method: "GET" });
+          const res = await fetch(LIST_ENDPOINT, { method: "GET", headers: { Accept: "application/json" } });
           const raw = await res.text();
           let data;
           try {
@@ -4239,7 +4973,7 @@
             throw new Error(data.error || `图片流加载失败 ${res.status}`);
           }
 
-          const items = Array.isArray(data.items) ? data.items : [];
+          const items = Array.isArray(data.items) ? data.items.slice(0, 20) : [];
           if (!items.length) {
             els.galleryGrid.innerHTML = `<div class="gallery-empty">今日还没有最新图片，生成后会自动展示在这里。</div>`;
             return;
@@ -4247,14 +4981,30 @@
 
           els.galleryGrid.innerHTML = items
             .map((item, index) => {
-              const label = item.last_modified ? new Date(item.last_modified).toLocaleString() : `图片 ${index + 1}`;
+              const imgUrl = item.thumb || item.url || (item.images && item.images[0]);
+              if (!imgUrl) return "";
+              const label = item.created_at ? new Date(item.created_at).toLocaleString() : `图片 ${index + 1}`;
               return `
-                <a class="gallery-item" href="${item.url}" target="_blank" rel="noreferrer" title="${label}">
-                  <img src="${item.url}" alt="最新图片 ${index + 1}" loading="lazy" />
+                <a class="gallery-item" href="${imgUrl}" target="_blank" rel="noreferrer" title="${label}">
+                  <img data-src="${imgUrl}" alt="最新图片 ${index + 1}" loading="lazy" decoding="async" />
                 </a>
               `;
             })
             .join("");
+
+          // IntersectionObserver 懒加载
+          const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                const img = entry.target;
+                img.src = img.dataset.src;
+                img.onload = () => { img.classList.add("loaded"); img.closest(".gallery-item").classList.add("img-loaded"); };
+                observer.unobserve(img);
+              }
+            });
+          }, { rootMargin: "100px" });
+
+          els.galleryGrid.querySelectorAll("img[data-src]").forEach(img => observer.observe(img));
         } catch (err) {
           els.galleryGrid.innerHTML = `<div class="gallery-empty">${err && err.message ? err.message : String(err)}</div>`;
         }
@@ -4307,24 +5057,20 @@
       }
 
       async function recoverRecentTasks() {
-        const res = await fetch(`${TASK_ENDPOINT}?action=recent&limit=8`, {
+        const res = await fetch(`${AUTH_API_BASE}/tasks?per_page=8`, {
           method: "GET",
           cache: "no-store",
+          headers: buildTaskAuthHeaders(),
         });
-        const raw = await res.text();
-        let data;
-        try {
-          data = JSON.parse(raw);
-        } catch {
-          throw new Error(raw || "找回任务返回异常");
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.message || `找回任务失败 ${res.status}`);
         }
 
-        if (!res.ok || !data.ok || !Array.isArray(data.tasks)) {
-          throw new Error(data?.error || `找回任务失败 ${res.status}`);
-        }
-
-        renderRecoveredTasks(data.tasks);
-        log(`已找回 ${data.tasks.length} 条最近任务记录。`);
+        const tasks = data.data || [];
+        renderRecoveredTasks(tasks);
+        log(`已找回 ${tasks.length} 条最近任务记录。`);
       }
 
 
@@ -4361,6 +5107,39 @@
         }
       }
 
+      // ── Toast ──
+      function showToast(msg) {
+        const c = document.getElementById("toastContainer");
+        const el = document.createElement("div");
+        el.className = "toast";
+        el.textContent = msg;
+        c.appendChild(el);
+        setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 300); }, 3000);
+      }
+
+      // ── Orb Tip ──
+      const ORB_TIP_MSGS = ["AI 正在创作中…","灵感涌现中…","精心绘制每个细节…","色彩融合中…","构图优化中…","即将完成…"];
+      let _orbTipTimer = null, _orbTipIdx = 0;
+      function startOrbTip() {
+        if (_orbTipTimer) return;
+        const tip = document.getElementById("taskBallTip");
+        function show() {
+          tip.textContent = ORB_TIP_MSGS[_orbTipIdx % ORB_TIP_MSGS.length];
+          _orbTipIdx++;
+          tip.classList.add("visible");
+        }
+        show();
+        _orbTipTimer = setInterval(() => {
+          tip.classList.remove("visible");
+          setTimeout(show, 350);
+        }, 3500);
+      }
+      function stopOrbTip() {
+        if (_orbTipTimer) { clearInterval(_orbTipTimer); _orbTipTimer = null; }
+        const tip = document.getElementById("taskBallTip");
+        tip.classList.remove("visible");
+      }
+
       // ── Task Ball ──
       const _taskBallState = { panelOpen: false, tasks: [], latestStatus: "" };
 
@@ -4389,12 +5168,15 @@
         if (hasActive) {
           if (orbInner?.className !== "orb-spinner") orbInner.outerHTML = '<div class="orb-spinner"></div>';
           els.taskBallBadge.className = "orb-badge processing";
+          startOrbTip();
         } else if (s === "failed") {
           orbInner.outerHTML = '<span class="orb-icon">!</span>';
           els.taskBallBadge.className = "orb-badge failed";
+          stopOrbTip();
         } else {
           orbInner.outerHTML = '<span class="orb-icon">✓</span>';
           els.taskBallBadge.className = "orb-badge completed";
+          stopOrbTip();
         }
       }
 
@@ -4422,7 +5204,7 @@
             <span class="task-ball-dot ${st}"></span>
             <div class="task-ball-info">
               <div class="task-ball-info-prompt">${displayPrompt || '(无提示词)'}</div>
-              <div class="task-ball-info-meta">${time} · ${statusLabels[st] || st}</div>
+              <div class="task-ball-info-meta">${time} · ${MODEL_LABELS[t.model] || t.model || ''} · ${statusLabels[st] || st}</div>
             </div>
             ${actionHtml}
           </button>`;
@@ -4433,6 +5215,7 @@
         if (!state.savedKey) return;
         try {
           const res = await fetch(`${AUTH_API_BASE}/tasks?per_page=12`, { cache: "no-store", headers: buildTaskAuthHeaders() });
+          if (res.status === 401) { handleAuthExpired(); return; }
           const data = await res.json();
           const tasks = Array.isArray(data.data) ? data.data : [];
           if (tasks.length) {
@@ -4440,6 +5223,7 @@
               task_id: t.task_id,
               status: t.status,
               prompt: t.prompt || '',
+              model: t.model || '',
               message: t.message || '',
               created_at: t.created_at,
               items: t.items,
@@ -4463,10 +5247,29 @@
       }
 
       function scheduleTaskPolling(taskId) {
+        if (state.activeTaskId && taskId !== state.activeTaskId) return;
         stopTaskPolling();
+        if (!state.pollStartTime) state.pollStartTime = Date.now();
+        // 30分钟硬上限
+        if (Date.now() - state.pollStartTime > 30 * 60 * 1000) {
+          stopLoadingMessages();
+          setStatus("bad", "任务查询超时，请刷新页面或重新提交");
+          showRetryBar(true);
+          return;
+        }
         state.pollTimer = window.setTimeout(() => {
-          queryGenerationTask(taskId, { silent: true }).catch((err) => {
+          queryGenerationTask(taskId, { silent: true }).then(() => {
+            state.pollConsecutiveErrors = 0;
+          }).catch((err) => {
+            state.pollConsecutiveErrors++;
             log(err && err.message ? err.message : String(err));
+            if (state.pollConsecutiveErrors >= 30) {
+              stopLoadingMessages();
+              setStatus("bad", "网络连接异常，请检查网络后刷新页面");
+              showRetryBar(true);
+              return;
+            }
+            scheduleTaskPolling(taskId);
           });
         }, TASK_POLL_INTERVAL);
       }
@@ -4479,6 +5282,7 @@
           cache: "no-store",
           headers: buildTaskAuthHeaders(),
         });
+        if (res.status === 401) { handleAuthExpired(); return; }
         const raw = await res.text();
         let data;
         try {
@@ -4492,18 +5296,30 @@
         }
 
         const task = data.task;
+
+        // 如果是后台轮询且当前活跃任务已切换，忽略旧结果
+        if (silent && state.activeTaskId && task.task_id !== state.activeTaskId) {
+          return task;
+        }
+
         setActiveTaskId(task.task_id);
         openGenerationStage(!silent);
+        if (task.prompt && !silent) {
+          els.prompt.value = task.prompt;
+          els.prompt.style.height = Math.min(els.prompt.scrollHeight, 120) + 'px';
+        }
         updateTaskStatus(task);
         updateTaskBall(task);
 
         if (task.status === "completed") {
           stopTaskPolling();
+          stopLoadingMessages();
           const items = Array.isArray(task.items) ? task.items : [];
-          renderResults(items);
+          try { renderResults(items); } catch {}
           els.resultInfo.textContent = `生成完成，共 ${items.length} 张图片。`;
           showRetryBar(false);
-          await loadGalleryWall();
+          state._galleryStale = true;
+          showToast("🎨 图片生成完成！");
           return task;
         }
 
@@ -4513,6 +5329,7 @@
           els.previewGrid.innerHTML = "";
           setStatus("bad", "生成失败");
           showRetryBar(true);
+          showToast("⚠ 生成失败，请重试");
           if (!silent) {
             log(task.error === "timeout" ? "任务处理超时，请重新提交。" : (task.message || "任务失败。"));
           }
@@ -4588,6 +5405,20 @@
         return data;
       }
 
+      async function blobDownload(url, filename) {
+        try {
+          const fetchUrl = `/api/download?url=${encodeURIComponent(url)}`;
+          const blob = await fetch(fetchUrl).then(r => r.blob());
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        } catch {
+          window.open(url, "_blank");
+        }
+      }
+
       async function downloadCurrent() {
         if (!state.downloadItems.length) throw new Error("当前没有可下载的图片");
         for (const item of state.downloadItems) {
@@ -4642,6 +5473,60 @@
         } catch (e) {
           showAuthMsg("loginError", "GitHub 登录暂不可用", true);
         }
+      });
+
+      document.getElementById("wechatLoginBtn").addEventListener("click", async () => {
+        try {
+          const data = await authApiFetch("/auth/wechat");
+          showAuthPanel("wechatQr");
+          const container = document.getElementById("wechatQrContainer");
+          container.innerHTML = "";
+          new WxLogin({
+            self_redirect: false,
+            id: "wechatQrContainer",
+            appid: data.appid,
+            scope: "snsapi_login",
+            redirect_uri: encodeURIComponent(data.redirect_uri),
+            state: data.state,
+            style: "black",
+            href: ""
+          });
+        } catch (e) {
+          showAuthMsg("loginError", "微信登录暂不可用", true);
+        }
+      });
+
+      document.getElementById("wechatQrBack").addEventListener("click", () => showAuthPanel("login"));
+
+      document.getElementById("forgotPwdLink").addEventListener("click", () => showAuthPanel("forgotPwd"));
+
+      // 密码显示/隐藏切换
+      document.querySelectorAll(".toggle-pwd-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const input = btn.parentElement.querySelector("input");
+          const show = input.type === "password";
+          input.type = show ? "text" : "password";
+          btn.innerHTML = show
+            ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+            : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        });
+      });
+      document.getElementById("forgotBackBtn").addEventListener("click", () => showAuthPanel("login"));
+      document.getElementById("forgotSubmitBtn").addEventListener("click", async () => {
+        const email = document.getElementById("forgotEmail").value.trim();
+        if (!email) return showAuthMsg("forgotMsg", "请输入邮箱", true);
+        const btn = document.getElementById("forgotSubmitBtn");
+        btn.disabled = true;
+        try {
+          const res = await fetch(AUTH_API_BASE + "/forgot-password", {
+            method: "POST",
+            headers: {"Content-Type":"application/json","Accept":"application/json"},
+            body: JSON.stringify({email})
+          });
+          const data = await res.json();
+          showAuthMsg("forgotMsg", data.message, !res.ok);
+        } catch { showAuthMsg("forgotMsg", "网络错误", true); }
+        btn.disabled = false;
       });
 
       // Handle OAuth callback token
@@ -4709,7 +5594,7 @@
           renderProfile();
           syncLoginBtn();
         } catch (e) {
-          showAuthMsg("redeemMsg", e.message, true);
+          alert(e.message);
         }
       });
 
@@ -4720,16 +5605,37 @@
           document.getElementById("redeemBtn").disabled = true;
           const data = await authApiFetch("/redeem", { method: "POST", body: { code } });
           authUser.credits = data.user.credits;
-          authUser.balance = data.user.balance;
           localStorage.setItem(AUTH_USER_KEY, JSON.stringify(authUser));
           renderProfile();
           syncLoginBtn();
           document.getElementById("redeemInput").value = "";
-          showAuthMsg("redeemMsg", `兑换成功！次数 +${data.added_credits}，额度 +¥${Number(data.added_balance).toFixed(2)}`, false);
+          showAuthMsg("redeemMsg", `兑换成功！积分 +${data.added_credits}`, false);
         } catch (e) {
           showAuthMsg("redeemMsg", e.message, true);
         } finally {
           document.getElementById("redeemBtn").disabled = false;
+        }
+      });
+
+      document.getElementById("distributorApplyBtn").addEventListener("click", async () => {
+        const btn = document.getElementById("distributorApplyBtn");
+        const msgEl = document.getElementById("distributorApplyMsg");
+        try {
+          btn.disabled = true;
+          const d = await authApiFetch("/distributor/apply", { method: "POST", body: {} });
+          authUser.is_distributor = true;
+          authUser.invite_code = d.invite_code;
+          localStorage.setItem(AUTH_USER_KEY, JSON.stringify(authUser));
+          renderProfile();
+          msgEl.style.display = "";
+          msgEl.textContent = "分销开通成功！";
+          msgEl.className = "auth-error ok";
+        } catch (e) {
+          msgEl.style.display = "";
+          msgEl.textContent = e.message || "申请失败";
+          msgEl.className = "auth-error err";
+        } finally {
+          btn.disabled = false;
         }
       });
 
@@ -4780,6 +5686,7 @@
         state.count = Number(button.dataset.value);
         setActiveButton(els.countOptions, state.count);
         updateConfigButton();
+        updateGenerateBtn();
       });
 
       els.imageInput.addEventListener("change", (event) => {
@@ -4832,27 +5739,39 @@
 
       els.prompt.addEventListener("input", autoResizePrompt);
 
-      els.prompt.addEventListener("dragover", (e) => {
-        if (state.mode !== "image" && state.mode !== "reverse") return;
+      // 全局拖拽上传
+      let dragCounter = 0;
+      const dropOverlay = document.getElementById('dropOverlay');
+      document.addEventListener('dragenter', (e) => {
+        if (state.mode !== 'image' && state.mode !== 'reverse') return;
+        if (!e.dataTransfer?.types?.includes('Files')) return;
         e.preventDefault();
-        e.dataTransfer.dropEffect = "copy";
+        dragCounter++;
+        dropOverlay.hidden = false;
       });
-
-      els.prompt.addEventListener("drop", (e) => {
-        if (state.mode !== "image" && state.mode !== "reverse") return;
+      document.addEventListener('dragover', (e) => {
+        if (!dropOverlay.hidden) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }
+      });
+      document.addEventListener('dragleave', (e) => {
+        if (dropOverlay.hidden) return;
+        dragCounter--;
+        if (dragCounter <= 0) { dragCounter = 0; dropOverlay.hidden = true; }
+      });
+      document.addEventListener('drop', (e) => {
+        dragCounter = 0;
+        dropOverlay.hidden = true;
+        if (state.mode !== 'image' && state.mode !== 'reverse') return;
         e.preventDefault();
-        const droppedFiles = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
+        const droppedFiles = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
         if (!droppedFiles.length) return;
         Promise.resolve()
           .then(async () => {
             const normalized = await normalizeUploadFiles(droppedFiles);
-            state.files = state.mode === "reverse" ? normalized : [...state.files, ...normalized].slice(0, 16);
+            state.files = state.mode === 'reverse' ? normalized : [...state.files, ...normalized].slice(0, 16);
             renderThumbs();
             log(`已拖入 ${normalized.length} 张图片。`);
           })
-          .catch((err) => {
-            log(err && err.message ? err.message : String(err));
-          });
+          .catch((err) => { log(err && err.message ? err.message : String(err)); });
       });
 
       els.optimizePromptBtn.addEventListener("click", async () => {
@@ -4914,6 +5833,7 @@
             setStatus("good", "反推完成");
             return;
           }
+          stopTaskPolling();
           openGenerationStage();
           renderLoadingCards();
           setStatus("warn", "提交中");
@@ -4927,8 +5847,10 @@
         } catch (err) {
           stopLoadingMessages();
           els.previewGrid.innerHTML = "";
+          const errMsg = err && err.message ? err.message : "提交失败，请稍后重试。";
           setStatus("bad", state.mode === "reverse" ? "反推失败" : "生成失败");
-          els.resultInfo.textContent = "提交失败，请稍后重试。";
+          els.resultInfo.textContent = errMsg;
+          log(errMsg, { flash: true });
           showRetryBar(true);
         } finally {
           setGenerationLoading(false);
@@ -5025,6 +5947,9 @@
       });
 
       els.taskBallOrb.addEventListener("click", () => {
+        els.taskBallOrb.classList.remove("tapped");
+        void els.taskBallOrb.offsetWidth;
+        els.taskBallOrb.classList.add("tapped");
         if (els.generationStage.classList.contains("open")) {
           closeGenerationStage();
           return;
@@ -5114,5 +6039,7 @@
         });
       }
     </script>
+    <script src="https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js"></script>
+    <div class="toast-container" id="toastContainer"></div>
   </body>
 </html>

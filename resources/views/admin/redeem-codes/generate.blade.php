@@ -20,14 +20,14 @@
                 <div class="form-group">
                     <label class="form-label">类型</label>
                     <select class="form-select" name="type" id="codeType">
-                        <option value="mixed">混合（次数 + 额度）</option>
-                        <option value="credits">仅次数</option>
+                        <option value="mixed">混合（积分 + 额度）</option>
+                        <option value="credits">仅积分</option>
                         <option value="balance">仅额度</option>
                     </select>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div class="form-group" id="creditsGroup">
-                        <label class="form-label">次数</label>
+                        <label class="form-label">积分</label>
                         <input class="form-input" type="number" name="credits" value="{{ old('credits', 10) }}" min="0">
                     </div>
                     <div class="form-group" id="balanceGroup">

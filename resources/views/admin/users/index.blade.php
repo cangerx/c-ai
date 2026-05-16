@@ -63,7 +63,8 @@
                                     nickname: '{{ addslashes($user->nickname ?? '') }}',
                                     role: '{{ $user->role }}',
                                     credits: {{ $user->credits }},
-                                    balance: {{ $user->balance }}
+                                    balance: {{ $user->balance }},
+                                    is_distributor: {{ $user->is_distributor ? 'true' : 'false' }}
                                 })">编辑</button>
                                 <form method="POST" action="{{ route('admin.users.toggle-status', $user) }}" style="display:inline;"
                                       x-data @submit.prevent="$dispatch('confirm', { title: '{{ $user->status === 'active' ? '禁用用户' : '启用用户' }}', message: '确定{{ $user->status === 'active' ? '禁用' : '启用' }}用户「{{ addslashes($user->nickname ?? $user->name) }}」？', form: $el })">
@@ -134,6 +135,13 @@
                         <label class="form-label">重置密码</label>
                         <input class="form-input" type="password" name="password" placeholder="留空则不修改">
                     </div>
+                    <div class="form-group">
+                        <label class="form-label" style="display:flex; align-items:center; gap:8px;">
+                            <input type="hidden" name="is_distributor" value="0">
+                            <input type="checkbox" name="is_distributor" value="1" :checked="form.is_distributor">
+                            分销者
+                        </label>
+                    </div>
                     <div style="display: flex; gap: 12px; margin-top: 8px;">
                         <button type="submit" class="btn btn-primary">保存</button>
                         <button type="button" class="btn btn-ghost" @click="show = false">取消</button>
@@ -150,10 +158,10 @@ function editUserModal() {
     return {
         show: false,
         userId: null,
-        form: { name: '', nickname: '', role: 'user', credits: 0, balance: 0 },
+        form: { name: '', nickname: '', role: 'user', credits: 0, balance: 0, is_distributor: false },
         open(data) {
             this.userId = data.id;
-            this.form = { name: data.name, nickname: data.nickname, role: data.role, credits: data.credits, balance: data.balance };
+            this.form = { name: data.name, nickname: data.nickname, role: data.role, credits: data.credits, balance: data.balance, is_distributor: data.is_distributor };
             this.show = true;
         }
     };

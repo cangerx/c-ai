@@ -7,14 +7,34 @@ use App\Jobs\ProcessGenerationTask;
 use App\Models\AiChannel;
 use App\Models\GenerationTask;
 use App\Services\BillingService;
+use App\Services\ContentFilterService;
+use App\Services\ImageStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GenerateController extends Controller
 {
     public function submit(Request $request, BillingService $billing): JsonResponse
     {
         $user = $request->user();
+
+        // Per-user rate limit: 5 requests per minute
+        $rateKey = 'gen_rate:' . $user->id;
+        $attempts = (int) \Illuminate\Support\Facades\Cache::get($rateKey, 0);
+        if ($attempts >= 5) {
+            return response()->json(['error' => '生成过于频繁，请稍后再试'], 429);
+        }
+        \Illuminate\Support\Facades\Cache::put($rateKey, $attempts + 1, 60);
+
+        $prompt = trim($request->input('prompt', ''));
+        if ($prompt === '') {
+            return response()->json(['error' => '请输入提示词'], 422);
+        }
+
+        if (!(new ContentFilterService())->isClean($prompt)) {
+            return response()->json(['error' => '提示词包含违规内容，请修改后重试'], 422);
+        }
 
         $quality = $request->input('quality', 'medium');
         if (!in_array($quality, ['low', 'medium', 'high'])) {
@@ -23,8 +43,8 @@ class GenerateController extends Controller
 
         $count = max(1, min(4, (int) $request->input('count', 1)));
 
-        if (!$billing->canAfford($user, $quality)) {
-            return response()->json(['error' => '余额不足，请先兑换充值'], 402);
+        if (!$billing->canAfford($user)) {
+            return response()->json(['error' => '积分不足，请先充值'], 402);
         }
 
         $channel = AiChannel::where('status', 'active')
@@ -52,41 +72,47 @@ class GenerateController extends Controller
         if ($mode === 'image' && $request->hasFile('image')) {
             $uploadedFiles = $request->file('image');
             $uploadedFiles = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
-            $taskDir = storage_path('app/temp/tasks/' . bin2hex(random_bytes(8)));
-            @mkdir($taskDir, 0755, true);
+            $storage = app(ImageStorageService::class);
 
             foreach ($uploadedFiles as $file) {
-                $path = $file->store('temp/task-inputs');
+                $binary = file_get_contents($file->getRealPath());
+                $key = $storage->store($binary, $file->getMimeType());
                 $files[] = [
-                    'path' => storage_path('app/' . $path),
                     'name' => $file->getClientOriginalName(),
                     'mime_type' => $file->getMimeType(),
+                    'url' => $storage->url($key),
                 ];
             }
         }
 
-        $taskId = bin2hex(random_bytes(16));
-        $task = GenerationTask::create([
-            'task_id' => $taskId,
-            'user_id' => $user->id,
-            'status' => 'pending',
-            'mode' => $mode,
-            'model' => $request->input('model', 'gpt-image-2'),
-            'prompt' => $request->input('prompt', ''),
-            'size' => $request->input('size', 'auto'),
-            'quality' => $quality,
-            'count' => $count,
-            'is_public' => (bool) $request->input('public', false),
-            'input_count' => count($files),
-            'files' => $files,
-            'items' => array_fill(0, $count, null), // 占位
-        ]);
+        try {
+            $taskId = bin2hex(random_bytes(16));
+            $task = GenerationTask::create([
+                'task_id' => $taskId,
+                'user_id' => $user->id,
+                'status' => 'pending',
+                'mode' => $mode,
+                'model' => $request->input('model', 'gpt-image-2'),
+                'prompt' => $prompt,
+                'size' => $request->input('size', 'auto'),
+                'quality' => $quality,
+                'count' => $count,
+                'is_public' => (bool) $request->input('public', false),
+                'input_count' => count($files),
+                'files' => $files,
+                'items' => array_fill(0, $count, null), // 占位
+            ]);
 
-        $usageLog->update(['task_id' => $taskId]);
+            $usageLog->update(['task_id' => $taskId]);
 
-        // 每张图独立 Job，并发执行
-        for ($i = 0; $i < $count; $i++) {
-            ProcessGenerationTask::dispatch($taskId, $i, $channel->api_key);
+            // 每张图独立 Job，并发执行
+            for ($i = 0; $i < $count; $i++) {
+                ProcessGenerationTask::dispatch($taskId, $i);
+            }
+        } catch (\Throwable $e) {
+            // 任务创建或 dispatch 失败，退款
+            $billing->refundLog($usageLog);
+            return response()->json(['error' => '任务创建失败，已退款，请重试'], 500);
         }
 
         $user->refresh();
@@ -122,12 +148,20 @@ class GenerateController extends Controller
         }
 
         // 兜底：任务超过 10 分钟仍未结束，强制失败并退款。
-        // 用于 worker 崩溃/机器断电等极端情况；Job 自身正常重试链路不会走到这里。
-        $MAX_TASK_SECONDS = 15 * 60;
+        $MAX_TASK_SECONDS = 10 * 60;
         if (in_array($task->status, ['pending', 'processing'], true)
             && $task->created_at
             && $task->created_at->diffInSeconds(now()) > $MAX_TASK_SECONDS) {
-            $this->forceFailAndRefund($task, '任务处理超过 10 分钟未完成。');
+            $this->forceFailAndRefund($task, '任务处理超时未完成。');
+            $task->refresh();
+        }
+
+        // 中间兜底：卡死超过 5 分钟但未到最终超时，尝试重新 dispatch
+        if (in_array($task->status, ['pending', 'processing'], true)
+            && $task->updated_at
+            && $task->updated_at->diffInSeconds(now()) > 300
+            && ($task->attempts ?? 0) < 3) {
+            $this->retryStuckTask($task);
             $task->refresh();
         }
 
@@ -152,6 +186,7 @@ class GenerateController extends Controller
             'task_id'      => $task->task_id,
             'status'       => $publicStatus,
             'message'      => $publicMessage,
+            'prompt'       => $task->prompt,
             'items'        => $doneItems,
             'progress'     => $progress,
             'count'        => $task->count,
@@ -184,15 +219,46 @@ class GenerateController extends Controller
             'error'   => $reason,
         ]);
 
-        $log = \App\Models\UsageLog::where('task_id', $task->task_id)->first();
-        if ($log && $task->user && is_null($log->refunded_at)) {
-            if ($log->cost_credits > 0) {
-                $task->user->increment('credits', $log->cost_credits);
+        // 原子更新防止 double refund
+        $affected = \App\Models\UsageLog::where('task_id', $task->task_id)
+            ->whereNull('refunded_at')
+            ->update(['refunded_at' => now()]);
+
+        if ($affected > 0) {
+            $log = \App\Models\UsageLog::where('task_id', $task->task_id)->first();
+            if ($log && $task->user) {
+                if ($log->cost_credits > 0) {
+                    $task->user->increment('credits', $log->cost_credits);
+                }
+                if ($log->cost_balance > 0) {
+                    $task->user->increment('balance', $log->cost_balance);
+                }
             }
-            if ($log->cost_balance > 0) {
-                $task->user->increment('balance', $log->cost_balance);
+        }
+    }
+
+    protected function retryStuckTask(GenerationTask $task): void
+    {
+        // 检查 jobs 表是否已有该任务的 job
+        $existingJob = DB::table('jobs')
+            ->where('payload', 'like', '%' . $task->task_id . '%')
+            ->exists();
+
+        if ($existingJob) {
+            return;
+        }
+
+        $task->update([
+            'status' => 'pending',
+            'message' => '正在重试...',
+            'attempts' => ($task->attempts ?? 0) + 1,
+        ]);
+
+        $items = $task->items ?? [];
+        for ($i = 0; $i < $task->count; $i++) {
+            if (!isset($items[$i]) || $items[$i] === null) {
+                ProcessGenerationTask::dispatch($task->task_id, $i);
             }
-            $log->update(['refunded_at' => now()]);
         }
     }
 }

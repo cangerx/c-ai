@@ -109,11 +109,6 @@ class TaskController extends Controller
             return back()->with('error', '只有已完成或失败的任务可重试，当前状态：' . $task->status);
         }
 
-        $apiKey = $request->input('api_key', '');
-        if ($apiKey === '') {
-            return back()->with('error', '请提供 API Key 以供 Job 重新请求上游。');
-        }
-
         $task->update([
             'status'   => 'pending',
             'message'  => '管理员手动重跑，已入队。',
@@ -121,7 +116,13 @@ class TaskController extends Controller
             'attempts' => 0,
         ]);
 
-        ProcessGenerationTask::dispatch($task->task_id, $apiKey);
+        // 重新 dispatch 所有未完成的 index
+        $items = $task->items ?? [];
+        for ($i = 0; $i < max(1, $task->count); $i++) {
+            if (!isset($items[$i]) || !is_array($items[$i])) {
+                ProcessGenerationTask::dispatch($task->task_id, $i);
+            }
+        }
 
         return back()->with('success', '任务已重新入队：' . $task->task_id);
     }

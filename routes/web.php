@@ -21,6 +21,10 @@ Route::get('/', function () {
     return response()->file($path);
 });
 
+Route::get('/terms', fn () => response()->file(public_path('terms.html')));
+Route::get('/privacy', fn () => response()->file(public_path('privacy.html')));
+Route::get('/reset-password', fn () => view('auth.reset-password'));
+
 Route::get('/explore', [\App\Apps\ImageGen\Controllers\GalleryController::class, 'index'])->name('explore');
 
 // 认证路由

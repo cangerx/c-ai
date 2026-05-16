@@ -22,36 +22,44 @@ class ProcessGenerationTask implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 5;
+    public int $tries = 3;
     public int $timeout = 420; // 单张图最多7分钟
+
+    protected ?int $currentChannelId = null;
 
     public function backoff(): array
     {
-        return [10, 30, 60];
+        return [15, 60, 120];
     }
 
     public function __construct(
         protected string $taskId,
         protected int $index = 0,
-        protected string $apiKey = '',
     ) {}
 
     public function handle(ImageStorageService $storage): void
     {
         $task = GenerationTask::findOrFail($this->taskId);
 
-        if ($task->status === 'failed') {
-            return; // 已被标记失败，不再处理
+        if (in_array($task->status, ['failed', 'completed'])) {
+            return; // 已终态，不再处理
         }
 
         // 标记为 processing（仅首个 job 触发）
         if ($task->status === 'pending') {
             $task->update(['status' => 'processing', 'message' => '正在生成图片...']);
+        } else {
+            // touch updated_at 防止被 recover-stuck 误判为卡死
+            $task->touch();
         }
 
         try {
-            $apiKey = $this->resolveApiKey($task);
-            $response = $this->callApi($task, $apiKey);
+            $response = $this->callApiWithFailover($task);
+
+            // 记录实际使用的渠道
+            if ($this->currentChannelId && $this->index === 0) {
+                UsageLog::where('task_id', $this->taskId)->update(['channel_id' => $this->currentChannelId]);
+            }
             $extracted = $this->extractItems($response);
 
             if (empty($extracted)) {
@@ -84,6 +92,7 @@ class ProcessGenerationTask implements ShouldQueue
 
             $attemptsLeft = max(0, $this->tries - $this->attempts());
             if ($attemptsLeft > 0) {
+                $task->touch(); // 更新 updated_at 防止 recover-stuck 在 backoff 期间误判
                 throw $e; // 让 Laravel 重试
             }
 
@@ -173,36 +182,72 @@ class ProcessGenerationTask implements ShouldQueue
 
     protected function refund(GenerationTask $task): void
     {
+        // 原子更新 refunded_at 防止并发 double refund
+        $affected = UsageLog::where('task_id', $this->taskId)
+            ->whereNull('refunded_at')
+            ->update(['refunded_at' => now()]);
+
+        if ($affected === 0) {
+            return; // 已被其他进程退款
+        }
+
         $usageLog = UsageLog::where('task_id', $this->taskId)->first();
-        if ($usageLog && $task->user && is_null($usageLog->refunded_at)) {
-            $user = $task->user;
+        if ($usageLog && $task->user) {
             if ($usageLog->cost_credits > 0) {
-                $user->increment('credits', $usageLog->cost_credits);
+                $task->user->increment('credits', $usageLog->cost_credits);
             }
             if ($usageLog->cost_balance > 0) {
-                $user->increment('balance', $usageLog->cost_balance);
+                $task->user->increment('balance', $usageLog->cost_balance);
             }
-            $usageLog->update(['refunded_at' => now()]);
         }
     }
 
     protected function resolveApiKey(GenerationTask $task): string
     {
-        if ($this->apiKey) {
-            return $this->apiKey;
-        }
-
-        $channel = AiChannel::where('status', 'active')
+        $channels = AiChannel::where('status', 'active')
             ->where('app_name', 'image-gen')
             ->orderBy('priority', 'desc')
-            ->inRandomOrder()
-            ->first();
+            ->get();
 
-        if ($channel) {
-            return $channel->api_key;
+        if ($channels->isEmpty()) {
+            throw new RuntimeException('暂无可用渠道');
         }
 
-        throw new RuntimeException('暂无可用渠道');
+        $channel = $channels->first();
+        $this->currentChannelId = $channel->id;
+        return $channel->api_key;
+    }
+
+    /**
+     * 带 failover 的 API 调用：依次尝试所有渠道
+     */
+    protected function callApiWithFailover(GenerationTask $task): array
+    {
+        $channels = AiChannel::where('status', 'active')
+            ->where('app_name', 'image-gen')
+            ->orderBy('priority', 'desc')
+            ->get();
+
+        if ($channels->isEmpty()) {
+            throw new RuntimeException('暂无可用渠道');
+        }
+
+        $lastException = null;
+        foreach ($channels as $channel) {
+            $this->currentChannelId = $channel->id;
+            for ($attempt = 1; $attempt <= 3; $attempt++) {
+                try {
+                    return $this->callApi($task, $channel->api_key);
+                } catch (Throwable $e) {
+                    $lastException = $e;
+                    if ($attempt < 3) {
+                        sleep(2 * $attempt);
+                    }
+                }
+            }
+        }
+
+        throw $lastException;
     }
 
     protected function callApi(GenerationTask $task, string $apiKey): array
@@ -211,14 +256,17 @@ class ProcessGenerationTask implements ShouldQueue
         $path = $mode === 'image' ? '/v1/images/edits' : '/v1/images/generations';
         $size = $this->resolveSizeToPixels($task->size, $task->quality);
 
-        $channel = AiChannel::where('api_key', $apiKey)
-            ->where('status', 'active')
-            ->first();
+        $channel = $this->currentChannelId ? AiChannel::find($this->currentChannelId) : null;
 
         $baseUrl = $channel?->base_url ?? 'https://api.openai.com';
+        $requestMode = $channel?->request_mode ?? 'sync';
         $endpoint = rtrim($baseUrl, '/') . $path;
 
-        if ($mode === 'image' && !empty($task->files)) {
+        if ($requestMode === 'async') {
+            $endpoint .= '?async=true';
+        }
+
+        if ($mode === 'image' && !empty($task->files) && $requestMode !== 'async') {
             return $this->callMultipartApi($endpoint, $apiKey, $task, $size);
         }
 
@@ -229,6 +277,13 @@ class ProcessGenerationTask implements ShouldQueue
             'quality' => $task->quality,
             'n' => 1,
         ];
+
+        if ($requestMode === 'async' && !empty($task->files)) {
+            $urls = array_filter(array_column($task->files, 'url'));
+            if (!empty($urls)) {
+                $body['image'] = count($urls) === 1 ? $urls[0] : array_values($urls);
+            }
+        }
 
         $response = Http::timeout(360)
             ->connectTimeout(15)
@@ -242,7 +297,56 @@ class ProcessGenerationTask implements ShouldQueue
             throw new RuntimeException("上游返回 {$response->status()}: " . mb_substr($response->body(), 0, 300));
         }
 
-        return $response->json() ?? [];
+        $json = $response->json() ?? [];
+
+        if ($requestMode === 'async') {
+            return $this->pollAsyncResult($baseUrl, $apiKey, $json['id'] ?? '');
+        }
+
+        return $json;
+    }
+
+    protected function pollAsyncResult(string $baseUrl, string $apiKey, string $asyncId): array
+    {
+        if (empty($asyncId)) {
+            throw new RuntimeException('异步接口未返回任务 ID');
+        }
+
+        $pollUrl = rtrim($baseUrl, '/') . '/v1/tasks/' . $asyncId;
+        $maxAttempts = 120;
+
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            sleep(5);
+
+            $response = Http::timeout(30)
+                ->connectTimeout(10)
+                ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
+                ->get($pollUrl);
+
+            if (!$response->successful()) {
+                if ($response->status() === 404) {
+                    continue;
+                }
+                throw new RuntimeException("轮询异步结果失败 HTTP {$response->status()}: " . mb_substr($response->body(), 0, 200));
+            }
+
+            $result = $response->json() ?? [];
+            $state = $result['state'] ?? '';
+
+            if ($state === 'failed' || $state === 'error') {
+                $errMsg = $result['data']['description'] ?? '异步任务失败';
+                throw new RuntimeException("上游异步任务失败: {$errMsg}");
+            }
+
+            if ($state === 'succeeded') {
+                $images = $result['data']['images'] ?? [];
+                return [
+                    'data' => array_map(fn($img) => ['url' => $img['url']], $images),
+                ];
+            }
+        }
+
+        throw new RuntimeException('异步任务超时：轮询 10 分钟未获得结果');
     }
 
     protected function callMultipartApi(string $endpoint, string $apiKey, GenerationTask $task, string $size): array
@@ -258,15 +362,23 @@ class ProcessGenerationTask implements ShouldQueue
             ->attach('n', '1');
 
         $files = $task->files ?? [];
+        $attachedCount = 0;
         foreach ($files as $i => $file) {
-            if (!empty($file['path']) && file_exists($file['path'])) {
-                $fieldName = $i === 0 ? 'image' : "image[]";
-                $pending = $pending->attach(
-                    $fieldName,
-                    file_get_contents($file['path']),
-                    $file['name'] ?? "image_{$i}.png"
-                );
-            }
+            if (empty($file['url'])) continue;
+            $ctx = stream_context_create(['http' => ['timeout' => 30]]);
+            $binary = @file_get_contents($file['url'], false, $ctx);
+            if (!$binary) continue;
+            $fieldName = count($files) === 1 ? 'image' : "image[]";
+            $pending = $pending->attach(
+                $fieldName,
+                $binary,
+                $file['name'] ?? "image_{$i}.png"
+            );
+            $attachedCount++;
+        }
+
+        if ($attachedCount === 0) {
+            throw new RuntimeException('无法获取参考图片，请重新上传后重试。');
         }
 
         $response = $pending->post($endpoint);
@@ -288,14 +400,16 @@ class ProcessGenerationTask implements ShouldQueue
 
     protected function storeItem(array $item, GenerationTask $task, int $index, ImageStorageService $storage): array
     {
+        $originUrl = $item['url'] ?? null;
+
         if (!empty($item['b64_json'])) {
             $binary = base64_decode($item['b64_json'], true);
             if ($binary === false) {
                 throw new RuntimeException('Failed to decode image data.');
             }
             $mimeType = $storage->detectMimeFromBinary($binary);
-        } elseif (!empty($item['url'])) {
-            [$binary, $mimeType] = $storage->fetchRemoteImage($item['url']);
+        } elseif (!empty($originUrl)) {
+            [$binary, $mimeType] = $storage->fetchRemoteImage($originUrl);
         } else {
             throw new RuntimeException('Missing image payload.');
         }
@@ -305,12 +419,18 @@ class ProcessGenerationTask implements ShouldQueue
 
         $key = $storage->store($binary, $mimeType);
 
-        return [
+        $result = [
             'key' => $key,
             'url' => $storage->url($key),
             'mime_type' => $mimeType,
             'size' => strlen($binary),
         ];
+
+        if ($originUrl) {
+            $result['origin_url'] = $originUrl;
+        }
+
+        return $result;
     }
 
     protected function enforceSize(string $binary, string $targetSize): string
@@ -349,33 +469,8 @@ class ProcessGenerationTask implements ShouldQueue
 
     protected function resolveSizeToPixels(string $size, string $quality): string
     {
-        if ($size === 'auto' || preg_match('/^\d+x\d+$/', $size)) {
-            return $size;
-        }
-
-        if (!preg_match('/^(\d+):(\d+)$/', $size, $m)) {
-            return $size;
-        }
-
-        $ratio = (int) $m[1] / (int) $m[2];
-        $maxDim = match ($quality) {
-            'high' => 3840,
-            'medium' => 2048,
-            default => 1024,
-        };
-
-        if ($ratio >= 1) {
-            $w = $maxDim;
-            $h = (int) round($maxDim / $ratio);
-        } else {
-            $h = $maxDim;
-            $w = (int) round($maxDim * $ratio);
-        }
-
-        $w = max(16, (int) (round($w / 16) * 16));
-        $h = max(16, (int) (round($h / 16) * 16));
-
-        return "{$w}x{$h}";
+        // 上游直接支持比例格式和任意像素尺寸，透传即可
+        return $size ?: 'auto';
     }
 
     protected function friendlyMessage(Throwable $e): string
@@ -409,10 +504,26 @@ class ProcessGenerationTask implements ShouldQueue
     protected function isNonRetryableError(Throwable $e): bool
     {
         $message = $e->getMessage();
-        if (preg_match('/上游返回 (400|401|403|422)/', $message)) {
+        if (str_contains($message, '余额不足') || str_contains($message, 'insufficient')) {
             return true;
         }
-        if (str_contains($message, '余额不足') || str_contains($message, 'insufficient')) {
+        if (str_contains($message, '暂无可用渠道')) {
+            return true;
+        }
+        if (str_contains($message, '无法获取参考图片')) {
+            return true;
+        }
+        // 400/401/403/422/5xx 都换渠道重试
+        return false;
+    }
+
+    protected function isChannelError(Throwable $e): bool
+    {
+        $msg = $e->getMessage();
+        if (str_contains($msg, 'timeout') || str_contains($msg, 'timed out') || str_contains($msg, 'cURL')) {
+            return true;
+        }
+        if (preg_match('/上游返回\s*(4\d{2}|5\d{2})/', $msg)) {
             return true;
         }
         return false;

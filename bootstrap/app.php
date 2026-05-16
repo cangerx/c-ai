@@ -37,9 +37,6 @@ return Application::configure(basePath: dirname(__DIR__))
             if (str_starts_with($request->path(), 'admin')) {
                 return '/admin/login';
             }
-            if (str_starts_with($request->path(), 'agent')) {
-                return '/agent/login';
-            }
             return '/login';
         });
     })

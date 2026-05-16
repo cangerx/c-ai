@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class GenerationTask extends Model
 {
@@ -32,6 +33,11 @@ class GenerationTask extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function usageLog(): HasOne
+    {
+        return $this->hasOne(UsageLog::class, 'task_id', 'task_id');
     }
 
     public function isPending(): bool

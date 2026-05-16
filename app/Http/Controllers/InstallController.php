@@ -31,54 +31,59 @@ class InstallController extends Controller
             'admin_password' => 'required|min:6',
         ]);
 
-        // 写 .env
-        $envPath = base_path('.env');
-        if (!file_exists($envPath)) {
-            copy(base_path('.env.example'), $envPath);
-        }
-
-        $this->setEnv('APP_NAME', $request->input('site_name'));
-        $this->setEnv('APP_URL', $request->input('site_url'));
-        $this->setEnv('APP_ENV', 'production');
-        $this->setEnv('APP_DEBUG', 'false');
-
-        // 确保 SQLite 文件存在
-        $dbPath = database_path('database.sqlite');
-        if (!file_exists($dbPath)) {
-            touch($dbPath);
-        }
-
-        // 生成 key
-        Artisan::call('key:generate', ['--force' => true]);
-
-        // 迁移
-        Artisan::call('migrate', ['--force' => true]);
-
-        // 创建存储链接
         try {
-            Artisan::call('storage:link');
-        } catch (\Throwable) {}
+            // 写 .env
+            $envPath = base_path('.env');
+            if (!file_exists($envPath)) {
+                copy(base_path('.env.example'), $envPath);
+            }
 
-        // 创建管理员
-        $user = User::create([
-            'name' => 'Admin',
-            'email' => $request->input('admin_email'),
-            'password' => Hash::make($request->input('admin_password')),
-            'is_admin' => true,
-            'credits' => 999,
-            'balance' => 0,
-        ]);
+            $this->setEnv('APP_NAME', $request->input('site_name'));
+            $this->setEnv('APP_URL', $request->input('site_url'));
+            $this->setEnv('APP_ENV', 'production');
+            $this->setEnv('APP_DEBUG', 'false');
 
-        // 保存站点名
-        SiteSetting::set('site_name', $request->input('site_name'), 'general');
+            // 确保 SQLite 文件存在
+            $dbPath = database_path('database.sqlite');
+            if (!file_exists($dbPath)) {
+                touch($dbPath);
+            }
 
-        // 标记已安装
-        file_put_contents(storage_path('installed'), date('Y-m-d H:i:s'));
+            // 生成 key
+            Artisan::call('key:generate', ['--force' => true]);
 
-        return view('install-done', [
-            'site_url' => $request->input('site_url'),
-            'admin_email' => $request->input('admin_email'),
-        ]);
+            // 迁移
+            Artisan::call('migrate', ['--force' => true]);
+
+            // 创建存储链接
+            try {
+                Artisan::call('storage:link');
+            } catch (\Throwable) {}
+
+            // 创建管理员
+            $user = User::create([
+                'name' => 'Admin',
+                'email' => $request->input('admin_email'),
+                'password' => Hash::make($request->input('admin_password')),
+                'role' => 'admin',
+                'status' => 'active',
+                'credits' => 999,
+                'balance' => 0,
+            ]);
+
+            // 保存站点名
+            SiteSetting::set('site_name', $request->input('site_name'), 'general');
+
+            // 标记已安装
+            file_put_contents(storage_path('installed'), date('Y-m-d H:i:s'));
+
+            return view('install-done', [
+                'site_url' => $request->input('site_url'),
+                'admin_email' => $request->input('admin_email'),
+            ]);
+        } catch (\Throwable $e) {
+            return back()->withInput()->withErrors(['install' => '安装失败：' . $e->getMessage()]);
+        }
     }
 
     private function isInstalled(): bool

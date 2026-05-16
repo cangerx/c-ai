@@ -13,8 +13,8 @@
         <button type="button" class="tab-btn" :class="tab === 'seo' && 'active'" @click="tab = 'seo'">SEO / 基础信息</button>
         <button type="button" class="tab-btn" :class="tab === 'model' && 'active'" @click="tab = 'model'">模型设置</button>
         <button type="button" class="tab-btn" :class="tab === 'billing' && 'active'" @click="tab = 'billing'">计费设置</button>
-        <button type="button" class="tab-btn" :class="tab === 'register' && 'active'" @click="tab = 'register'">注册与代理</button>
-        <button type="button" class="tab-btn" :class="tab === 'oauth' && 'active'" @click="tab = 'oauth'">第三方登录</button>
+        <button type="button" class="tab-btn" :class="tab === 'register' && 'active'" @click="tab = 'register'">注册与分销</button>
+        <button type="button" class="tab-btn" :class="tab === 'mail' && 'active'" @click="tab = 'mail'">邮件配置</button>
     </div>
 
     {{-- SEO / 基础信息 --}}
@@ -81,25 +81,14 @@
             <div class="card">
                 <div class="card-header"><span class="card-title">计费设置</span></div>
                 <div class="card-body">
-                    @php $fields = [
-                        ['key' => 'billing_low_credits', 'label' => '标清(low) 每次扣次数', 'placeholder' => '1'],
-                        ['key' => 'billing_low_balance', 'label' => '标清(low) 每次扣额度 (¥)', 'placeholder' => '0.10'],
-                        ['key' => 'billing_medium_credits', 'label' => '高清(medium) 每次扣次数', 'placeholder' => '2'],
-                        ['key' => 'billing_medium_balance', 'label' => '高清(medium) 每次扣额度 (¥)', 'placeholder' => '0.30'],
-                        ['key' => 'billing_high_credits', 'label' => '超清(high) 每次扣次数', 'placeholder' => '4'],
-                        ['key' => 'billing_high_balance', 'label' => '超清(high) 每次扣额度 (¥)', 'placeholder' => '1.00'],
-                    ]; @endphp
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                        @foreach($fields as $i => $field)
-                            <div class="form-group">
-                                <label class="form-label">{{ $field['label'] }}</label>
-                                <input class="form-input" type="text" name="settings[{{ $i }}][value]"
-                                       value="{{ \App\Models\SiteSetting::get($field['key'], '') }}"
-                                       placeholder="{{ $field['placeholder'] }}">
-                                <input type="hidden" name="settings[{{ $i }}][key]" value="{{ $field['key'] }}">
-                                <input type="hidden" name="settings[{{ $i }}][group]" value="billing">
-                            </div>
-                        @endforeach
+                    <div class="form-group" style="max-width:300px;">
+                        <label class="form-label">每次生成扣积分数</label>
+                        <input class="form-input" type="number" name="settings[0][value]"
+                               value="{{ \App\Models\SiteSetting::get('billing_per_generation', '1') }}"
+                               placeholder="1" min="1">
+                        <input type="hidden" name="settings[0][key]" value="billing_per_generation">
+                        <input type="hidden" name="settings[0][group]" value="billing">
+                        <div class="form-hint">不区分模型、尺寸、质量，统一扣固定积分</div>
                     </div>
                 </div>
             </div>
@@ -107,20 +96,18 @@
         </form>
     </div>
 
-    {{-- 注册与代理 --}}
+    {{-- 注册与分销 --}}
     <div x-show="tab === 'register'" x-cloak>
         <form method="POST" action="{{ route('admin.settings.update') }}">
             @csrf
             <input type="hidden" name="tab" value="register">
             <div class="card">
-                <div class="card-header"><span class="card-title">注册与代理</span></div>
+                <div class="card-header"><span class="card-title">注册与分销</span></div>
                 <div class="card-body">
                     @php $fields = [
-                        ['key' => 'register_gift_credits', 'label' => '注册赠送次数', 'placeholder' => '5', 'group' => 'billing'],
-                        ['key' => 'register_gift_balance', 'label' => '注册赠送余额 (¥)', 'placeholder' => '0', 'group' => 'billing'],
-                        ['key' => 'agent_commission_rate', 'label' => '代理佣金比例（0~1）', 'placeholder' => '0.10', 'group' => 'agent'],
-                        ['key' => 'agent_register_enabled', 'label' => '开放代理注册（1=开启 0=关闭）', 'placeholder' => '0', 'group' => 'agent'],
-                        ['key' => 'agent_register_url', 'label' => '代理注册地址（留空使用默认）', 'placeholder' => '/agent/register', 'group' => 'agent'],
+                        ['key' => 'register_gift_credits', 'label' => '注册赠送积分', 'placeholder' => '5', 'group' => 'billing'],
+                        ['key' => 'distributor_threshold', 'label' => '分销申请门槛（累计消费积分数）', 'placeholder' => '100', 'group' => 'distributor'],
+                        ['key' => 'distributor_commission_rate', 'label' => '分销返利比例（0~1，如0.1=10%）', 'placeholder' => '0.10', 'group' => 'distributor'],
                     ]; @endphp
                     @foreach($fields as $i => $field)
                         <div class="form-group">
@@ -137,38 +124,63 @@
             <button type="submit" class="btn btn-primary">保存</button>
         </form>
     </div>
-
-    {{-- 第三方登录 --}}
-    <div x-show="tab === 'oauth'" x-cloak>
+    {{-- 邮件配置 --}}
+    <div x-show="tab === 'mail'" x-cloak>
         <form method="POST" action="{{ route('admin.settings.update') }}">
             @csrf
-            <input type="hidden" name="tab" value="oauth">
+            <input type="hidden" name="tab" value="mail">
             <div class="card">
-                <div class="card-header"><span class="card-title">GitHub OAuth 登录</span></div>
+                <div class="card-header"><span class="card-title">SMTP 邮件配置</span></div>
                 <div class="card-body">
-                    <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">
-                        前往 <a href="https://github.com/settings/developers" target="_blank" style="color:var(--accent);">GitHub Developer Settings</a> 创建 OAuth App，回调地址填写：<code>{{ url('/api/auth/github/callback') }}</code>
-                    </p>
                     @php $fields = [
-                        ['key' => 'github_client_id', 'label' => 'Client ID', 'placeholder' => 'Ov23li...'],
-                        ['key' => 'github_client_secret', 'label' => 'Client Secret', 'placeholder' => 'secret...'],
+                        ['key' => 'mail_host', 'label' => 'SMTP 服务器', 'placeholder' => 'smtp.qq.com', 'type' => 'text'],
+                        ['key' => 'mail_port', 'label' => '端口', 'placeholder' => '465', 'type' => 'number'],
+                        ['key' => 'mail_username', 'label' => '用户名（邮箱地址）', 'placeholder' => 'noreply@example.com', 'type' => 'text'],
+                        ['key' => 'mail_password', 'label' => '密码 / 授权码', 'placeholder' => '', 'type' => 'password'],
+                        ['key' => 'mail_encryption', 'label' => '加密方式', 'placeholder' => 'ssl', 'type' => 'text'],
+                        ['key' => 'mail_from_address', 'label' => '发件人地址', 'placeholder' => 'noreply@example.com', 'type' => 'text'],
+                        ['key' => 'mail_from_name', 'label' => '发件人名称', 'placeholder' => 'CANG-AI', 'type' => 'text'],
                     ]; @endphp
                     @foreach($fields as $i => $field)
                         <div class="form-group">
                             <label class="form-label">{{ $field['label'] }}</label>
-                            <input class="form-input" type="text" name="settings[{{ $i }}][value]"
+                            <input class="form-input" type="{{ $field['type'] }}" name="settings[{{ $i }}][value]"
                                    value="{{ \App\Models\SiteSetting::get($field['key'], '') }}"
                                    placeholder="{{ $field['placeholder'] }}">
                             <input type="hidden" name="settings[{{ $i }}][key]" value="{{ $field['key'] }}">
-                            <input type="hidden" name="settings[{{ $i }}][group]" value="oauth">
+                            <input type="hidden" name="settings[{{ $i }}][group]" value="mail">
                         </div>
                     @endforeach
+                    <div class="form-hint" style="margin-top:12px;">
+                        常见配置：QQ邮箱(smtp.qq.com:465/ssl)、163邮箱(smtp.163.com:465/ssl)、阿里企业邮(smtp.mxhichina.com:465/ssl)
+                    </div>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">保存</button>
+            <div style="display:flex; gap:12px; align-items:center;">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" class="btn btn-secondary" onclick="testMail()">发送测试邮件</button>
+                <span id="testMailResult" style="font-size:13px;"></span>
+            </div>
         </form>
     </div>
 </div>
+
+<script>
+async function testMail() {
+    const el = document.getElementById('testMailResult');
+    el.textContent = '发送中...';
+    el.style.color = '#6b7280';
+    try {
+        const res = await fetch('{{ route("admin.settings.test-mail") }}', {
+            method: 'POST',
+            headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json', 'Content-Type': 'application/json'},
+        });
+        const data = await res.json();
+        el.textContent = data.message;
+        el.style.color = res.ok ? '#16a34a' : '#dc2626';
+    } catch { el.textContent = '请求失败'; el.style.color = '#dc2626'; }
+}
+</script>
 
 <style>
     .tab-btn { padding: 10px 18px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; margin-bottom: -1px; }

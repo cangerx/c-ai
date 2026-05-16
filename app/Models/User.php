@@ -24,11 +24,16 @@ class User extends Authenticatable
         'balance',
         'credits',
         'commission_balance',
+        'commission_credits',
+        'is_distributor',
+        'total_consumed_credits',
         'status',
         'invite_code',
         'parent_id',
         'github_id',
         'avatar',
+        'wechat_openid',
+        'wechat_unionid',
     ];
 
     protected $hidden = [
@@ -44,6 +49,9 @@ class User extends Authenticatable
             'balance' => 'decimal:2',
             'credits' => 'integer',
             'commission_balance' => 'decimal:2',
+            'commission_credits' => 'integer',
+            'total_consumed_credits' => 'integer',
+            'is_distributor' => 'boolean',
         ];
     }
 

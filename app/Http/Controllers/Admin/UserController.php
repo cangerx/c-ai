@@ -98,6 +98,7 @@ class UserController extends Controller
             'credits' => 'required|integer|min:0',
             'balance' => 'required|numeric|min:0',
             'password' => 'nullable|string|min:6',
+            'is_distributor' => 'nullable',
         ]);
 
         // 代理商不能修改角色
@@ -112,6 +113,17 @@ class UserController extends Controller
             'credits' => $data['credits'],
             'balance' => $data['balance'],
         ]);
+
+        if (!$isAgent) {
+            $becomingDistributor = (bool) ($data['is_distributor'] ?? false);
+            if ($becomingDistributor && !$user->is_distributor) {
+                $user->is_distributor = true;
+                $user->ensureInviteCode();
+                $user->save();
+            } elseif (!$becomingDistributor && $user->is_distributor) {
+                $user->update(['is_distributor' => false]);
+            }
+        }
 
         if (!empty($data['password'])) {
             $user->update(['password' => Hash::make($data['password'])]);
