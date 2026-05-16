@@ -1,58 +1,140 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CANG-AI 绘图
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+> AI 智能绘画平台 — 一键生成高质量图片
 
-## About Laravel
+基于 Laravel 13 + 纯前端单页构建的 AI 图像生成平台，支持多模型渠道、积分计费、分销推广、任务队列异步生成。
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 预览
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| 功能 | 说明 |
+|------|------|
+| 🎨 文生图 | 输入提示词，AI 生成高质量图片 |
+| ✏️ 图生图 | 上传参考图 + 提示词，编辑生成 |
+| 🔄 多渠道 | 支持 GPT-Image、DALL·E 等多个 AI 模型 |
+| 💰 积分系统 | 按尺寸/质量灵活计费，兑换码充值 |
+| 👥 分销推广 | 邀请注册返佣，多级分销 |
+| 📱 响应式 | PC / 平板 / 手机全适配 |
+| 🛡️ 内容安全 | 提示词过滤 + 图片审核 |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 技术栈
 
-## Learning Laravel
+- **后端**：PHP 8.3 + Laravel 13 + Sanctum 认证
+- **前端**：原生 HTML/CSS/JS 单页应用（零框架依赖）
+- **数据库**：MySQL 8.0 / SQLite
+- **队列**：Database Queue + Supervisor
+- **登录**：邮箱注册 / GitHub OAuth / 微信扫码
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## 快速开始
 
 ```bash
-composer require laravel/boost --dev
+# 克隆
+git clone https://github.com/cangerx/c-ai.git
+cd c-ai
 
-php artisan boost:install
+# 安装依赖
+composer install
+
+# 环境配置
+cp .env.example .env
+php artisan key:generate
+
+# 数据库
+php artisan migrate
+php artisan db:seed
+
+# 启动
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+访问 `http://localhost:8000`
 
-## Contributing
+默认管理员：`admin@cang-ai.com`（密码通过 `ADMIN_PASSWORD` 环境变量设置，默认 `ChangeMe!2024`）
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## 项目结构
 
-## Code of Conduct
+```
+├── app/
+│   ├── Apps/ImageGen/       # 图像生成模块（控制器、路由、视图）
+│   ├── Http/Controllers/
+│   │   ├── Admin/           # 管理后台
+│   │   └── Api/             # API 接口（认证、生成、用户）
+│   ├── Jobs/                # 异步任务（图片生成）
+│   ├── Models/              # 数据模型
+│   └── Services/            # 业务服务（计费、内容过滤）
+├── database/
+│   ├── migrations/          # 数据库迁移
+│   └── seeders/             # 数据填充
+├── deploy/                  # 部署配置（Nginx、Supervisor、脚本）
+├── public/
+│   └── index.html           # 前端单页应用
+├── resources/views/
+│   └── admin/               # 管理后台视图
+└── routes/
+    ├── api.php              # API 路由
+    ├── admin.php            # 后台路由
+    └── web.php              # Web 路由
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 核心功能
 
-## Security Vulnerabilities
+### AI 图像生成
+- 支持多渠道配置（API Key、模型、权重轮询）
+- 文生图 / 图生图两种模式
+- 多尺寸（1:1、16:9、9:16 等）
+- 异步队列处理，失败自动重试
+- 任务状态实时轮询
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 积分计费
+- 按图片尺寸 + 质量等级差异化定价
+- 兑换码批量生成与充值
+- 生成失败自动退款
+- 使用记录完整追溯
+
+### 分销系统
+- 邀请码注册绑定
+- 邀请人数统计
+- 佣金自动结算
+- 佣金明细查询
+
+### 管理后台
+- 用户管理（积分调整、状态控制）
+- AI 渠道管理（增删改查、启停）
+- 任务监控（状态、重试、详情）
+- 兑换码管理（批量生成、导出）
+- 系统设置（站点名称、公告、登录方式）
+- 佣金管理
+
+## 部署
+
+详见 [deploy/README.md](deploy/README.md)
+
+**环境要求：**
+- PHP 8.3+（含 mbstring, gd, curl, fileinfo 扩展）
+- MySQL 8.0+ 或 SQLite
+- Composer 2.x
+- Supervisor（队列进程管理）
+
+**生产环境关键配置：**
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.com
+QUEUE_CONNECTION=database
+```
+
+## API 接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/register` | 注册 |
+| POST | `/api/login` | 登录 |
+| GET | `/api/me` | 用户信息 |
+| POST | `/api/generate` | 提交生成任务 |
+| GET | `/api/tasks/{id}` | 查询任务状态 |
+| GET | `/api/usage-history` | 使用记录 |
+| POST | `/api/redeem` | 兑换码充值 |
+| GET | `/api/gallery` | 公开画廊 |
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+MIT
