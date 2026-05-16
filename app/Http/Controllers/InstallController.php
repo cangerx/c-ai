@@ -187,8 +187,9 @@ class InstallController extends Controller
         ];
     }
 
-    private function setEnv(string $key, string $value): void
+    private function setEnv(string $key, ?string $value): void
     {
+        $value = $value ?? '';
         $envPath = base_path('.env');
         $content = file_get_contents($envPath);
         $escaped = str_contains($value, ' ') ? "\"$value\"" : $value;
