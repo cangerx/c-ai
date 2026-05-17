@@ -816,6 +816,73 @@
             }
             .table-wrap.scrolled-end::after { display: none; }
         }
+
+        /* Pagination */
+        nav[role="navigation"] {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        nav[role="navigation"] p {
+            display: none;
+        }
+        nav[role="navigation"] > div {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        nav[role="navigation"] > div > div {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        nav[role="navigation"] span[aria-current="page"] span,
+        nav[role="navigation"] a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 8px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        nav[role="navigation"] span[aria-current="page"] span {
+            background: var(--accent);
+            color: #fff;
+        }
+        nav[role="navigation"] a {
+            color: var(--text-secondary);
+            background: var(--panel);
+            border: 1px solid var(--line);
+        }
+        nav[role="navigation"] a:hover {
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+        nav[role="navigation"] .hidden {
+            display: none;
+        }
+        nav[role="navigation"] span[aria-disabled="true"] span {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 32px;
+            height: 32px;
+            padding: 0 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
     </style>
     @stack('styles')
 </head>
@@ -870,6 +937,12 @@
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     分销管理
                 </a>
+                @if(auth()->user()->role === 'admin')
+                <a href="{{ route('admin.agent-sites.index') }}" class="sidebar-item {{ request()->routeIs('admin.agent-sites.*') ? 'active' : '' }}">
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    分站管理
+                </a>
+                @endif
             </div>
 
             {{-- App Sections from AppLoader --}}
