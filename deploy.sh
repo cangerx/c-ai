@@ -2,7 +2,8 @@
 # 宝塔一键部署脚本 - 放到服务器项目根目录执行
 set -e
 
-cd /www/wwwroot/vxvx.eu.cc
+APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+cd "$APP_DIR"
 
 echo ">>> 拉取最新代码"
 git pull origin main

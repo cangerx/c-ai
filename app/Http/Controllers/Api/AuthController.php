@@ -199,7 +199,7 @@ class AuthController extends Controller
         $appId = SiteSetting::get('wechat_appid', config('services.wechat.client_id'));
         $secret = SiteSetting::get('wechat_secret', config('services.wechat.client_secret'));
 
-        $tokenResp = \Illuminate\Support\Facades\Http::get('https://api.weixin.qq.com/sns/oauth2/access_token', [
+        $tokenResp = \Illuminate\Support\Facades\Http::withoutVerifying()->get('https://api.weixin.qq.com/sns/oauth2/access_token', [
             'appid' => $appId,
             'secret' => $secret,
             'code' => $code,
@@ -210,7 +210,7 @@ class AuthController extends Controller
             return redirect('/?auth_error=wechat_failed');
         }
 
-        $userInfo = \Illuminate\Support\Facades\Http::get('https://api.weixin.qq.com/sns/userinfo', [
+        $userInfo = \Illuminate\Support\Facades\Http::withoutVerifying()->get('https://api.weixin.qq.com/sns/userinfo', [
             'access_token' => $tokenResp['access_token'],
             'openid' => $tokenResp['openid'],
         ])->json();

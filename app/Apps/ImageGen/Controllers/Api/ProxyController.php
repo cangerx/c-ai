@@ -89,6 +89,8 @@ class ProxyController extends Controller
                 CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_POSTFIELDS => $body,
                 CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
             ]);
 
             $result = curl_exec($ch);
@@ -129,6 +131,8 @@ class ProxyController extends Controller
                 CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_POSTFIELDS => $body,
                 CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_WRITEFUNCTION => function ($ch, $data) {
                     echo $data;
                     if (ob_get_level() > 0) @ob_flush();
