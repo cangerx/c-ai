@@ -41,14 +41,48 @@ if [ -n "$MISSING_EXT" ]; then
 fi
 echo "✓ PHP 扩展完整"
 
-# Composer 检查
-if ! command -v composer &>/dev/null; then
-    echo "✗ Composer 未安装"; exit 1
+# 检查 PHP 禁用函数
+PHP_INI=$(php -r "echo php_ini_loaded_file();" 2>/dev/null)
+if [ -n "$PHP_INI" ]; then
+    DISABLED=$(php -r "echo ini_get('disable_functions');" 2>/dev/null)
+    NEED_FUNCS="putenv proc_open proc_get_status"
+    BLOCKED=""
+    for fn in $NEED_FUNCS; do
+        if echo "$DISABLED" | grep -qi "$fn"; then
+            BLOCKED="$BLOCKED $fn"
+        fi
+    done
+    if [ -n "$BLOCKED" ]; then
+        echo "⚠ PHP 禁用了必要函数:$BLOCKED"
+        echo "  自动解除中..."
+        for fn in $BLOCKED; do
+            sed -i "s/,$fn//g; s/$fn,//g; s/$fn//g" "$PHP_INI"
+        done
+        echo "  已解除，重启 PHP 生效"
+        # 尝试重启 PHP-FPM
+        if [ -f /etc/init.d/php-fpm-83 ]; then
+            /etc/init.d/php-fpm-83 restart
+        elif systemctl list-units --type=service | grep -q php; then
+            systemctl restart php-fpm-83 2>/dev/null || systemctl restart php8.3-fpm 2>/dev/null || true
+        fi
+        echo "✓ 禁用函数已解除"
+    fi
 fi
-COMPOSER_API=$(composer --no-ansi about 2>/dev/null | grep -oP 'version \K[0-9]+\.[0-9]+' | head -1)
-if composer --no-ansi about 2>/dev/null | grep -q "^Composer version 1\."; then
-    echo "✗ Composer 版本过低，请运行: composer self-update"
-    exit 1
+
+# Composer 检查及自动安装/升级
+if ! command -v composer &>/dev/null || ! composer --version &>/dev/null 2>&1; then
+    echo "⚠ Composer 不可用，自动安装最新版..."
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    if [ -f /usr/bin/composer ] && [ ! -L /usr/bin/composer ]; then
+        rm -f /usr/bin/composer
+    fi
+    ln -sf /usr/local/bin/composer /usr/bin/composer 2>/dev/null || true
+fi
+COMPOSER_VER=$(composer --version --no-ansi 2>/dev/null | grep -oP '[0-9]+' | head -1)
+if [ "${COMPOSER_VER:-0}" -lt 2 ]; then
+    echo "⚠ Composer 版本过低，自动升级..."
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    ln -sf /usr/local/bin/composer /usr/bin/composer 2>/dev/null || true
 fi
 echo "✓ Composer $(composer --version --no-ansi 2>/dev/null | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 
