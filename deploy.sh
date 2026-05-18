@@ -111,6 +111,7 @@ if [ ! -f .env ]; then
     # 修复权限（Web 安装向导需要）
     chown -R www:www storage bootstrap/cache database
     chmod -R 775 storage bootstrap/cache database
+    chown www:www "$APP_DIR" "$APP_DIR/.env" 2>/dev/null || true
 
     cp .env.example .env
     $PHP_BIN artisan key:generate --force
