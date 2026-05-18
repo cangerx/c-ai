@@ -157,7 +157,9 @@ class TaskWorkerCommand extends Command
 
         $hasImages = !empty($imageUrls);
         $path = ($hasImages && $requestMode !== 'async') ? '/v1/images/edits' : '/v1/images/generations';
-        $endpoint = rtrim($channel->base_url, '/') . $path;
+        $baseUrl = rtrim($channel->base_url, '/');
+        $baseUrl = preg_replace('#/v1$#', '', $baseUrl);
+        $endpoint = $baseUrl . $path;
 
         if ($requestMode === 'async') {
             $endpoint .= '?async=true';
@@ -195,7 +197,7 @@ class TaskWorkerCommand extends Command
             throw new RuntimeException('异步接口未返回任务 ID');
         }
 
-        $pollUrl = rtrim($channel->base_url, '/') . '/v1/tasks/' . $asyncId;
+        $pollUrl = $baseUrl . '/v1/tasks/' . $asyncId;
 
         for ($i = 0; $i < 120; $i++) {
             sleep(5);
