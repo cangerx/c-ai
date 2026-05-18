@@ -22,6 +22,34 @@ class PromptTemplate extends Model
         'is_featured' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $template) {
+            if (!$template->template_prompt) return;
+
+            preg_match_all('/\{\{(\w+)\}\}/', $template->template_prompt, $matches);
+            $promptVars = array_unique($matches[1]);
+
+            $existing = collect($template->variables ?? []);
+            $existingNames = $existing->pluck('name')->toArray();
+
+            foreach ($promptVars as $name) {
+                if (!in_array($name, $existingNames)) {
+                    $existing->push([
+                        'name' => $name,
+                        'type' => 'text',
+                        'label' => str_replace('_', ' ', ucfirst($name)),
+                        'default' => '',
+                        'description' => '',
+                        'alternatives' => [],
+                    ]);
+                }
+            }
+
+            $template->variables = $existing->values()->toArray();
+        });
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(TemplateCategory::class, 'category_id');
