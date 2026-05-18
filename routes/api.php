@@ -60,6 +60,7 @@ Route::get('/config', function () {
     $models = \App\Models\AiChannel::where('app_name', 'image-gen')
         ->where('status', 'active')
         ->whereNotNull('model')
+        ->orderByDesc('id')
         ->get()
         ->unique('model')
         ->map(fn($ch) => ['id' => $ch->model, 'name' => $ch->display_name ?: $ch->model])
