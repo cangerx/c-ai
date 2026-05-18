@@ -58,7 +58,7 @@
         .upload-zone .text { font-size: 13px; color: var(--muted); }
         .upload-preview { max-width: 200px; max-height: 150px; border-radius: 8px; margin-top: 10px; display: none; }
 
-        .prompt-preview { background: #f9f9f7; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.7; color: var(--text); margin: 16px 0; white-space: pre-wrap; word-break: break-all; min-height: 60px; }
+        .prompt-preview { background: #f9f9f7; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.7; color: var(--text); margin: 16px 0; white-space: pre-wrap; word-break: break-all; min-height: 60px; max-height: 200px; overflow-y: auto; }
 
         .btn-go {
             width: 100%; padding: 14px; border-radius: 12px; border: none;
@@ -208,8 +208,9 @@ document.getElementById('goBtn').addEventListener('click', () => {
     if (imageFiles.length) {
         sessionStorage.setItem('tpl_has_image', '1');
     }
-    let url = '/?prompt=' + encodeURIComponent(prompt);
-    if (hasImageVar) url += '&mode=image';
+    let url = '/';
+    sessionStorage.setItem('tpl_prompt', prompt);
+    if (hasImageVar) url += '?mode=image';
     window.location.href = url;
 });
 </script>

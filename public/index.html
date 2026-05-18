@@ -6052,10 +6052,11 @@
       clearPreview();
       loadSavedTaskId();
       setMode("text");
-      // 从 URL 读取 prompt 参数（灵感广场"使用"按钮）
+      // 从 URL 或 sessionStorage 读取 prompt 参数（模板/灵感广场）
       (function() {
         const params = new URLSearchParams(location.search);
-        const p = params.get('prompt');
+        let p = params.get('prompt') || sessionStorage.getItem('tpl_prompt');
+        sessionStorage.removeItem('tpl_prompt');
         if (p) { els.prompt.value = p; els.prompt.style.height = 'auto'; els.prompt.style.height = Math.min(els.prompt.scrollHeight, 120) + 'px'; els.prompt.dispatchEvent(new Event('input')); }
         const m = params.get('mode'); if (m === 'image') setMode('image');
         if (p || m) history.replaceState(null, '', '/');
