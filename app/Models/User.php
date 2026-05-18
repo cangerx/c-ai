@@ -30,6 +30,10 @@ class User extends Authenticatable implements FilamentUser
         'wechat_openid',
         'wechat_unionid',
         'agent_level_id',
+        'role',
+        'status',
+        'credits',
+        'balance',
     ];
 
     protected $hidden = [
