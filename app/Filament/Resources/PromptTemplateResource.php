@@ -47,7 +47,8 @@ class PromptTemplateResource extends Resource
                                 return;
                             }
                             try {
-                                $result = app(PromptAnalysisService::class)->extractVariables($prompt);
+                                $model = $get('parse_model') ?: null;
+                                $result = app(PromptAnalysisService::class)->extractVariables($prompt, null, $model);
                                 $set('template_prompt', $result['template_prompt'] ?? $prompt);
                                 $vars = array_map(fn ($v) => array_merge(['type' => 'text'], $v), $result['variables'] ?? []);
                                 $set('variables', $vars);
@@ -59,6 +60,13 @@ class PromptTemplateResource extends Resource
                             }
                         }),
                 ]),
+                Forms\Components\Select::make('parse_model')
+                    ->label('解析模型')
+                    ->placeholder('默认（自动）')
+                    ->options(fn () => \Illuminate\Support\Facades\DB::table('ai_models')
+                        ->where('type', 'chat')->where('is_active', true)
+                        ->pluck('display_name', 'model_id')->all())
+                    ->dehydrated(false),
                 Forms\Components\Textarea::make('template_prompt')->label('模板提示词（含变量）')
                     ->rows(5)->required()
                     ->helperText('变量格式: {{variable_name}}'),
