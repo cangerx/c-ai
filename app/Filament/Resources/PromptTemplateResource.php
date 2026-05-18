@@ -63,9 +63,17 @@ class PromptTemplateResource extends Resource
                 Forms\Components\Select::make('parse_model')
                     ->label('解析模型')
                     ->placeholder('默认（自动）')
-                    ->options(fn () => \Illuminate\Support\Facades\DB::table('ai_models')
-                        ->where('type', 'chat')->where('is_active', true)
-                        ->pluck('display_name', 'model_id')->all())
+                    ->options(function () {
+                        return \App\Models\AiChannel::where('is_active', true)
+                            ->whereNotNull('models')
+                            ->pluck('models')
+                            ->flatMap(fn ($m) => is_string($m) ? json_decode($m, true) : $m)
+                            ->unique()
+                            ->sort()
+                            ->mapWithKeys(fn ($m) => [$m => $m])
+                            ->all();
+                    })
+                    ->searchable()
                     ->dehydrated(false),
                 Forms\Components\Textarea::make('template_prompt')->label('模板提示词（含变量）')
                     ->rows(5)->required()
