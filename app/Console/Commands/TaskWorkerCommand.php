@@ -60,8 +60,8 @@ class TaskWorkerCommand extends Command
 
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             $released = false;
-            $channel = $dispatcher->acquire('image-gen', $lastExclude)
-                ?? $dispatcher->acquire('image-gen');
+            $channel = $dispatcher->acquire('image-gen', $lastExclude, null, $task->model)
+                ?? $dispatcher->acquire('image-gen', null, null, $task->model);
             if (!$channel) {
                 $lastException = new RuntimeException('无可用渠道');
                 if ($attempt < $maxRetries) {
@@ -387,6 +387,10 @@ class TaskWorkerCommand extends Command
             };
         }
 
+        if (str_contains($msg, 'model_not_found')) {
+            return '当前模型暂不可用，请联系管理员配置。';
+        }
+
         if (str_contains($msg, 'cURL') || str_contains($msg, 'timeout') || str_contains($msg, 'timed out')) {
             return '网络连接异常，请稍后重试。';
         }
@@ -399,6 +403,7 @@ class TaskWorkerCommand extends Command
         $msg = $e->getMessage();
         return str_contains($msg, '余额不足')
             || str_contains($msg, 'insufficient')
-            || str_contains($msg, '无法获取参考图片');
+            || str_contains($msg, '无法获取参考图片')
+            || str_contains($msg, 'model_not_found');
     }
 }

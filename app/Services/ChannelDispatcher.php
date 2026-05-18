@@ -11,9 +11,16 @@ class ChannelDispatcher
     /**
      * 组合方法：获取可用渠道 → 按权重选一个 → 原子加负载
      */
-    public function acquire(string $appName, ?int $excludeId = null, ?string $preferMode = null): ?AiChannel
+    public function acquire(string $appName, ?int $excludeId = null, ?string $preferMode = null, ?string $model = null): ?AiChannel
     {
         $channels = $this->getAvailableChannels($appName, $excludeId);
+
+        if ($model) {
+            $matched = $channels->filter(fn($ch) => in_array($model, $ch->models ?? []))->values();
+            if ($matched->isNotEmpty()) {
+                $channels = $matched;
+            }
+        }
 
         // 优先选指定 request_mode 的渠道
         if ($preferMode) {
@@ -51,7 +58,7 @@ class ChannelDispatcher
         AiChannel::where('status', 'active')
             ->where('app_name', $appName)
             ->whereNotNull('paused_at')
-            ->where('paused_at', '<', now()->subMinutes(10))
+            ->where('paused_at', '<', now()->subSeconds(30))
             ->update(['paused_at' => null, 'error_count' => 0]);
 
         $channels = AiChannel::where('status', 'active')
@@ -126,6 +133,7 @@ class ChannelDispatcher
         $channel->increment('error_count');
 
         if ($channel->fresh()->error_count >= $channel->max_errors) {
+            // 冷却 30 秒后自动恢复，不再永久暂停
             $channel->update(['paused_at' => now()]);
         }
     }
