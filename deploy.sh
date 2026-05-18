@@ -52,25 +52,11 @@ if composer --no-ansi about 2>/dev/null | grep -q "^Composer version 1\."; then
 fi
 echo "✓ Composer $(composer --version --no-ansi 2>/dev/null | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 
-# Node.js 检查
-if ! command -v node &>/dev/null; then
-    echo "✗ Node.js 未安装（需要 20+），请在宝塔 → 软件商店安装"
-    exit 1
-fi
-NODE_VER=$(node -v | grep -oP '[0-9]+' | head -1)
-if [ "$NODE_VER" -lt 20 ]; then
-    echo "✗ Node.js 版本过低 ($(node -v))，需要 20+"
-    exit 1
-fi
-echo "✓ Node.js $(node -v)"
-
 # 首次部署检查
 if [ ! -f .env ]; then
     echo ""
     echo ">>> 首次部署 - 初始化环境"
     composer install --no-dev --optimize-autoloader --no-interaction
-    npm ci --ignore-scripts
-    npm run build
     cp .env.example .env
     php artisan key:generate --force
     echo ""
@@ -90,35 +76,30 @@ echo ">>> [1/7] 拉取最新代码"
 git pull origin main
 
 echo ""
-echo ">>> [2/8] 安装 PHP 依赖"
+echo ">>> [2/7] 安装 PHP 依赖"
 composer install --no-dev --optimize-autoloader --no-interaction
 
 echo ""
-echo ">>> [3/8] 构建前端资源"
-npm ci --ignore-scripts
-npm run build
-
-echo ""
-echo ">>> [4/8] 执行数据库迁移"
+echo ">>> [3/7] 执行数据库迁移"
 php artisan migrate --force
 
 echo ""
-echo ">>> [5/8] 缓存配置"
+echo ">>> [4/7] 缓存配置"
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
 echo ""
-echo ">>> [6/8] 存储链接"
+echo ">>> [5/7] 存储链接"
 php artisan storage:link 2>/dev/null || true
 
 echo ""
-echo ">>> [7/8] 修复权限"
+echo ">>> [6/7] 修复权限"
 chown -R www:www storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
 echo ""
-echo ">>> [8/8] 重启队列 Worker"
+echo ">>> [7/7] 重启队列 Worker"
 pkill -f "task:worker" 2>/dev/null || true
 sleep 1
 nohup php artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
