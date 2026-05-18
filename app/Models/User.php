@@ -107,6 +107,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasOne(AgentSite::class);
     }
 
+    public function usageLogs(): HasMany
+    {
+        return $this->hasMany(UsageLog::class);
+    }
+
     public function ensureInviteCode(): string
     {
         if (!$this->invite_code) {
