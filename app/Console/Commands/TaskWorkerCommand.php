@@ -146,7 +146,7 @@ class TaskWorkerCommand extends Command
     protected function callApi(GenerationTask $task, AiChannel $channel): \Illuminate\Http\Client\Response
     {
         $mode = $task->mode;
-        $size = $task->size ?: 'auto';
+        $size = $this->normalizeSize($task->size ?: 'auto');
         $requestMode = $channel->request_mode ?? 'sync';
 
         // 判断是否有参考图
@@ -405,5 +405,21 @@ class TaskWorkerCommand extends Command
             || str_contains($msg, 'insufficient')
             || str_contains($msg, '无法获取参考图片')
             || str_contains($msg, 'model_not_found');
+    }
+
+    protected function normalizeSize(string $size): string
+    {
+        $map = [
+            '1:1' => '1024x1024',
+            '4:3' => '1024x768',
+            '3:4' => '768x1024',
+            '16:9' => '1536x864',
+            '9:16' => '864x1536',
+            '3:2' => '1536x1024',
+            '2:3' => '1024x1536',
+            '5:4' => '1280x1024',
+            '4:5' => '1024x1280',
+        ];
+        return $map[$size] ?? $size;
     }
 }
