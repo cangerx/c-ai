@@ -57,13 +57,11 @@ Route::get('/config', function () {
         ->map(fn($content, $url) => $url ? "{$content} · <a href='{$url}' target='_blank'>了解更多 →</a>" : $content)
         ->values()->all();
 
-    $models = \App\Models\AiChannel::where('app_name', 'image-gen')
-        ->where('status', 'active')
-        ->whereNotNull('model')
-        ->orderByDesc('id')
+    $models = \Illuminate\Support\Facades\DB::table('ai_models')
+        ->where('type', 'image')
+        ->where('is_active', true)
         ->get()
-        ->unique('model')
-        ->map(fn($ch) => ['id' => $ch->model, 'name' => $ch->display_name ?: $ch->model])
+        ->map(fn($m) => ['id' => $m->model_id, 'name' => $m->display_name])
         ->values()->all();
 
     return response()->json([
