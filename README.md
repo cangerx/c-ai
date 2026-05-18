@@ -34,85 +34,77 @@
 
 ---
 
-## 🚀 一键安装
+## 🚀 部署方式
 
-> 无需命令行，浏览器完成全部配置。
+### 方式一：全自动脚本（推荐）
+
+只需 3 条命令，脚本自动完成所有环境修复和配置：
+
+```bash
+git clone https://github.com/cangerx/c-ai.git /www/wwwroot/your-site
+cd /www/wwwroot/your-site
+bash deploy.sh
+```
+
+**脚本自动处理：**
+- ✅ 检测 PHP 版本，自动寻找宝塔 PHP 8.3 路径
+- ✅ 自动解除 PHP 禁用函数（putenv、proc_open、exec、symlink 等）
+- ✅ 自动安装/升级 Composer 到最新版
+- ✅ 检测并提示缺失的 PHP 扩展
+- ✅ 安装 PHP 依赖
+- ✅ 修复所有目录权限
+- ✅ 交互式选择安装方式（命令行 或 Web 向导）
+- ✅ 自动创建 MySQL 数据库和用户（命令行模式）
+- ✅ 数据库迁移、缓存配置、启动队列 Worker
+
+### 方式二：Web 安装向导
+
+运行 `bash deploy.sh` 时选择「Web 安装向导」，然后浏览器访问：
 
 ```
-1. 上传代码到服务器
-2. 浏览器访问 https://your-domain.com/install
-3. 完成 ✓
+https://your-domain.com/install
 ```
 
-**安装向导自动完成：**
-
+向导自动完成：
 - ✅ PHP 环境检测（8 项扩展 + 目录权限）
-- ✅ 生成应用密钥
-- ✅ 创建数据库 & 运行迁移
+- ✅ 数据库连接测试（支持 MySQL / SQLite）
+- ✅ 生成应用密钥 & 运行迁移
 - ✅ 创建管理员账号
 - ✅ 配置生产环境参数
 
-安装完成后，进入 **管理后台 → AI 渠道** 添加至少一个渠道的 API Key 即可开始使用。
-
 ---
 
-## 📦 宝塔面板部署
+## 📦 宝塔面板部署步骤
 
-<table>
-<tr><td>1</td><td>新建 PHP 站点，PHP 版本 <strong>8.3+</strong>，数据库选 MySQL</td></tr>
-<tr><td>2</td><td>上传代码：<code>git clone https://github.com/cangerx/c-ai.git .</code></td></tr>
-<tr><td>3</td><td>网站目录 → 运行目录设为 <code>/public</code></td></tr>
-<tr><td>4</td><td>伪静态 → 选择 <code>laravel5</code></td></tr>
-<tr><td>5</td><td>PHP 管理 → 安装扩展：<code>fileinfo</code></td></tr>
-<tr><td>6</td><td>PHP 管理 → 禁用函数 → 删除：<code>putenv</code> <code>proc_open</code> <code>proc_get_status</code> <code>proc_close</code> <code>symlink</code></td></tr>
-<tr><td>7</td><td>终端执行：<code>composer install --no-dev --optimize-autoloader</code></td></tr>
-<tr><td>8</td><td>浏览器访问 <code>/install</code> 完成安装向导</td></tr>
-<tr><td>9</td><td>宝塔 Supervisor → 添加守护进程：<code>php artisan queue:work --sleep=3 --tries=3</code></td></tr>
-<tr><td>10</td><td>SSL → Let's Encrypt 一键申请</td></tr>
-<tr><td>11</td><td>管理后台 → AI 渠道 → 添加 API Key</td></tr>
-</table>
+| 步骤 | 操作 |
+|:---:|------|
+| 1 | 新建 PHP 站点，PHP 版本 **8.3+** |
+| 2 | 终端执行：`git clone https://github.com/cangerx/c-ai.git .` |
+| 3 | 终端执行：`bash deploy.sh`（自动修复环境 + 安装） |
+| 4 | 网站目录 → 运行目录设为 `/public` |
+| 5 | 伪静态 → 选择 `laravel5` |
+| 6 | SSL → Let's Encrypt 一键申请 |
+| 7 | 管理后台 → AI 渠道 → 添加 API Key |
 
----
+> 💡 `deploy.sh` 会自动处理：Composer 安装、PHP 禁用函数解除、扩展检测、权限修复、数据库创建。无需手动操作。
 
-<details>
-<summary><strong>🛠 手动部署（开发环境 / 高级用户）</strong></summary>
+**队列 Worker（可选，提升性能）：**
 
-```bash
-git clone https://github.com/cangerx/c-ai.git
-cd c-ai
-composer install
-cp .env.example .env
-php artisan key:generate
-php artisan migrate
-php artisan db:seed
-php artisan serve
+宝塔 → Supervisor → 添加守护进程：
 ```
-
-访问 `http://localhost:8000`
-
-生产环境额外步骤：
-```bash
-# Nginx / Caddy 配置参考 deploy/ 目录
-# 队列进程管理参考 deploy/supervisor.conf
-php artisan config:cache
-php artisan route:cache
+php /www/wwwroot/your-site/artisan task:worker --max-retries=3
 ```
-
-详细部署文档：[deploy/README.md](deploy/README.md)
-
-</details>
+进程数设为 2。
 
 ---
 
 ## 🔄 日常更新
 
 ```bash
-# 方式一：一键更新脚本
-bash update.sh
-
-# 方式二：完整部署脚本（含权限修复）
 bash deploy.sh
 ```
+
+脚本自动执行：git pull → composer install → 数据库迁移 → 缓存刷新 → 重启 Worker。
 
 ---
 
@@ -156,6 +148,19 @@ resources/views/admin → 管理后台
 | POST | `/api/templates/{id}/build` | 构建模板提示词 |
 | GET | `/api/config` | 前端配置 |
 | GET | `/api/download` | 图片代理下载 |
+
+---
+
+## 🔧 环境要求
+
+| 组件 | 版本 | 说明 |
+|------|------|------|
+| PHP | 8.3+ | 扩展：mbstring, xml, ctype, intl, pdo_mysql, bcmath, gd, fileinfo, curl, openssl |
+| MySQL | 8.0+ | 或 SQLite |
+| Composer | 2.2+ | 脚本自动安装 |
+| Web 服务器 | Nginx / Caddy | 宝塔自带 |
+
+> ⚠️ 不需要 Node.js，前端构建产物已包含在仓库中。
 
 ---
 
