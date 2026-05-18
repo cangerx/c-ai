@@ -107,10 +107,34 @@ if [ ! -f .env ]; then
     echo ""
     echo ">>> 首次部署 - 初始化环境"
     composer install --no-dev --optimize-autoloader --no-interaction
+
+    # 修复权限（Web 安装向导需要）
+    chown -R www:www storage bootstrap/cache database
+    chmod -R 775 storage bootstrap/cache database
+
     cp .env.example .env
     $PHP_BIN artisan key:generate --force
 
-    # 交互式配置
+    echo ""
+    echo "请选择安装方式："
+    echo "  1) 命令行配置（当前终端交互）"
+    echo "  2) Web 安装向导（浏览器访问 /install）"
+    read -p "请选择 [1/2]: " INSTALL_MODE
+
+    if [ "$INSTALL_MODE" = "2" ]; then
+        # Web 向导模式：只需要知道域名来提示访问地址
+        read -p "请输入站点域名 (如 example.com): " SITE_DOMAIN
+        sed -i "s|APP_URL=.*|APP_URL=https://$SITE_DOMAIN|" .env
+        echo ""
+        echo "============================================"
+        echo "  请在浏览器访问: https://$SITE_DOMAIN/install"
+        echo "  通过 Web 向导完成安装配置"
+        echo "  完成后再运行: bash deploy.sh"
+        echo "============================================"
+        exit 0
+    fi
+
+    # 命令行模式
     echo ""
     read -p "请输入站点域名 (如 example.com): " SITE_DOMAIN
     read -p "请输入数据库密码 (留空则自动生成): " DB_PASS
@@ -170,8 +194,8 @@ $PHP_BIN artisan storage:link 2>/dev/null || true
 
 echo ""
 echo ">>> [6/7] 修复权限"
-chown -R www:www storage bootstrap/cache
-chmod -R 775 storage bootstrap/cache
+chown -R www:www storage bootstrap/cache database
+chmod -R 775 storage bootstrap/cache database
 
 echo ""
 echo ">>> [7/7] 重启队列 Worker"
