@@ -208,9 +208,9 @@ document.getElementById('goBtn').addEventListener('click', () => {
     if (imageFiles.length) {
         sessionStorage.setItem('tpl_has_image', '1');
     }
-    let url = '/';
+    let url = '/?_t=' + Date.now();
     sessionStorage.setItem('tpl_prompt', prompt);
-    if (hasImageVar) url += '?mode=image';
+    if (hasImageVar) url += '&mode=image';
     window.location.href = url;
 });
 </script>
