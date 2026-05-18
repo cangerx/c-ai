@@ -79,7 +79,7 @@ SYSTEM;
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 60,
+            CURLOPT_TIMEOUT => 180,
             CURLOPT_HTTPHEADER => [
                 'Authorization: Bearer ' . $channel->api_key,
                 'Content-Type: application/json',
@@ -89,10 +89,12 @@ SYSTEM;
 
         $result = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $err = curl_error($ch);
         curl_close($ch);
 
         if (!$result || $status !== 200) {
-            throw new \RuntimeException('AI 请求失败: HTTP ' . $status);
+            $msg = $status === 0 ? "连接超时: {$err}" : "HTTP {$status}";
+            throw new \RuntimeException('AI 请求失败: ' . $msg);
         }
 
         $data = json_decode($result, true);
