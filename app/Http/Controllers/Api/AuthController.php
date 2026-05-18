@@ -27,28 +27,32 @@ class AuthController extends Controller
 
         $parentId = null;
         if (!empty($data['invite_code'])) {
-            $agent = User::where('invite_code', $data['invite_code'])
-                ->whereIn('role', ['agent', 'admin'])
+            $inviter = User::where('invite_code', $data['invite_code'])
                 ->where('status', 'active')
+                ->where(function ($q) {
+                    $q->whereIn('role', ['agent', 'admin'])
+                      ->orWhere('is_distributor', true);
+                })
                 ->first();
-            if ($agent) {
-                $parentId = $agent->id;
+            if ($inviter) {
+                $parentId = $inviter->id;
             }
         }
 
         $initCredits = (int) SiteSetting::get('register_gift_credits', 5);
         $initBalance = (float) SiteSetting::get('register_gift_balance', 0);
 
-        $user = User::create([
+        $user = new User([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'role' => 'user',
-            'status' => 'active',
-            'balance' => $initBalance,
-            'credits' => $initCredits,
             'parent_id' => $parentId,
         ]);
+        $user->role = 'user';
+        $user->status = 'active';
+        $user->balance = $initBalance;
+        $user->credits = $initCredits;
+        $user->save();
 
         $token = $user->createToken('app')->plainTextToken;
 
@@ -147,16 +151,17 @@ class AuthController extends Controller
             $initCredits = (int) SiteSetting::get('register_gift_credits', 5);
             $initBalance = (float) SiteSetting::get('register_gift_balance', 0);
 
-            $user = User::create([
+            $user = new User([
                 'name' => $ghUser->getNickname() ?: $ghUser->getName() ?: 'GitHub User',
                 'email' => $ghUser->getEmail() ?: $ghUser->getId() . '@github.oauth',
                 'github_id' => $ghUser->getId(),
                 'avatar' => $ghUser->getAvatar(),
-                'role' => 'user',
-                'status' => 'active',
-                'credits' => $initCredits,
-                'balance' => $initBalance,
             ]);
+            $user->role = 'user';
+            $user->status = 'active';
+            $user->credits = $initCredits;
+            $user->balance = $initBalance;
+            $user->save();
         }
 
         if ($user->status !== 'active') {
@@ -165,7 +170,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('app')->plainTextToken;
 
-        return redirect('/?token=' . $token);
+        return redirect('/#token=' . $token);
     }
 
     public function wechatRedirect()
@@ -199,7 +204,7 @@ class AuthController extends Controller
         $appId = SiteSetting::get('wechat_appid', config('services.wechat.client_id'));
         $secret = SiteSetting::get('wechat_secret', config('services.wechat.client_secret'));
 
-        $tokenResp = \Illuminate\Support\Facades\Http::withoutVerifying()->get('https://api.weixin.qq.com/sns/oauth2/access_token', [
+        $tokenResp = \Illuminate\Support\Facades\Http::get('https://api.weixin.qq.com/sns/oauth2/access_token', [
             'appid' => $appId,
             'secret' => $secret,
             'code' => $code,
@@ -210,7 +215,7 @@ class AuthController extends Controller
             return redirect('/?auth_error=wechat_failed');
         }
 
-        $userInfo = \Illuminate\Support\Facades\Http::withoutVerifying()->get('https://api.weixin.qq.com/sns/userinfo', [
+        $userInfo = \Illuminate\Support\Facades\Http::get('https://api.weixin.qq.com/sns/userinfo', [
             'access_token' => $tokenResp['access_token'],
             'openid' => $tokenResp['openid'],
         ])->json();
@@ -230,17 +235,18 @@ class AuthController extends Controller
             $initCredits = (int) SiteSetting::get('register_gift_credits', 5);
             $initBalance = (float) SiteSetting::get('register_gift_balance', 0);
 
-            $user = User::create([
+            $user = new User([
                 'name' => $nickname,
                 'email' => $openid . '@wechat.oauth',
                 'wechat_openid' => $openid,
                 'wechat_unionid' => $unionid,
                 'avatar' => $avatar,
-                'role' => 'user',
-                'status' => 'active',
-                'credits' => $initCredits,
-                'balance' => $initBalance,
             ]);
+            $user->role = 'user';
+            $user->status = 'active';
+            $user->credits = $initCredits;
+            $user->balance = $initBalance;
+            $user->save();
         } else {
             $user->update(array_filter(['avatar' => $avatar, 'wechat_unionid' => $unionid]));
         }
@@ -251,7 +257,7 @@ class AuthController extends Controller
 
         $token = $user->createToken('app')->plainTextToken;
 
-        return redirect('/?token=' . $token);
+        return redirect('/#token=' . $token);
     }
 
     public function forgotPassword(Request $request)

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>定价套餐 - {{ isset($agentSite) ? $agentSite->site_name : config('app.name') }}</title>
-    <link href="https://fonts.googleapis.cn/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #f5f3f0;
@@ -23,7 +22,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             min-height: 100vh;
-            font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
             color: var(--text);
             background: var(--bg);
             -webkit-font-smoothing: antialiased;
@@ -51,7 +50,7 @@
             height: 56px;
         }
         .nav-logo {
-            font-family: "Space Grotesk", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
             font-size: 20px; font-weight: 700;
             color: var(--accent); text-decoration: none;
         }
@@ -115,7 +114,7 @@
         }
         .plan-name { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
         .plan-price {
-            font-family: "Space Grotesk", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
             font-size: 36px; font-weight: 700; margin-bottom: 4px;
         }
         .plan-price .unit { font-size: 16px; font-weight: 500; color: var(--text-secondary); }

@@ -3,14 +3,17 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
@@ -20,14 +23,6 @@ class User extends Authenticatable
         'email',
         'password',
         'nickname',
-        'role',
-        'balance',
-        'credits',
-        'commission_balance',
-        'commission_credits',
-        'is_distributor',
-        'total_consumed_credits',
-        'status',
         'invite_code',
         'parent_id',
         'github_id',
@@ -35,7 +30,6 @@ class User extends Authenticatable
         'wechat_openid',
         'wechat_unionid',
         'agent_level_id',
-        'total_recharged',
     ];
 
     protected $hidden = [
@@ -56,6 +50,17 @@ class User extends Authenticatable
             'is_distributor' => 'boolean',
             'total_recharged' => 'decimal:2',
         ];
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        if ($panel->getId() === 'admin') {
+            return $this->role === 'admin' && $this->status === 'active';
+        }
+        if ($panel->getId() === 'agent') {
+            return in_array($this->role, ['agent', 'admin']) && $this->status === 'active';
+        }
+        return false;
     }
 
     public function isAdmin(): bool
@@ -88,11 +93,21 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'parent_id');
     }
 
+    public function agentLevel(): BelongsTo
+    {
+        return $this->belongsTo(AgentLevel::class);
+    }
+
+    public function agentSite()
+    {
+        return $this->hasOne(AgentSite::class);
+    }
+
     public function ensureInviteCode(): string
     {
         if (!$this->invite_code) {
-            $this->invite_code = strtoupper(substr(md5($this->id . microtime(true)), 0, 8));
-            $this->save();
+            $this->invite_code = strtoupper(Str::random(8));
+            $this->saveQuietly();
         }
         return $this->invite_code;
     }

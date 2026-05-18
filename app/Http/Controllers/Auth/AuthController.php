@@ -59,12 +59,15 @@ class AuthController extends Controller
         $parentId = null;
         $inviteCode = $data['invite_code'] ?? session('invite_code');
         if (!empty($inviteCode)) {
-            $agent = User::where('invite_code', $inviteCode)
-                ->whereIn('role', ['agent', 'admin'])
+            $inviter = User::where('invite_code', $inviteCode)
                 ->where('status', 'active')
+                ->where(function ($q) {
+                    $q->whereIn('role', ['agent', 'admin'])
+                      ->orWhere('is_distributor', true);
+                })
                 ->first();
-            if ($agent) {
-                $parentId = $agent->id;
+            if ($inviter) {
+                $parentId = $inviter->id;
             }
         }
         session()->forget('invite_code');
@@ -72,16 +75,17 @@ class AuthController extends Controller
         $initCredits = (int) SiteSetting::get('register_gift_credits', 5);
         $initBalance = (float) SiteSetting::get('register_gift_balance', 0);
 
-        $user = User::create([
+        $user = new User([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'role' => 'user',
-            'status' => 'active',
-            'balance' => $initBalance,
-            'credits' => $initCredits,
             'parent_id' => $parentId,
         ]);
+        $user->role = 'user';
+        $user->status = 'active';
+        $user->balance = $initBalance;
+        $user->credits = $initCredits;
+        $user->save();
 
         Auth::login($user);
         $request->session()->regenerate();

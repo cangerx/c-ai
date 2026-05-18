@@ -286,8 +286,7 @@ class ProcessGenerationTask implements ShouldQueue
             }
         }
 
-        $response = Http::withoutVerifying()
-            ->timeout(300)
+        $response = Http::timeout(300)
             ->connectTimeout(15)
             ->withHeaders([
                 'Authorization' => "Bearer {$apiKey}",
@@ -320,8 +319,7 @@ class ProcessGenerationTask implements ShouldQueue
         for ($i = 0; $i < $maxAttempts; $i++) {
             sleep(5);
 
-            $response = Http::withoutVerifying()
-                ->timeout(30)
+            $response = Http::timeout(30)
                 ->connectTimeout(10)
                 ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
                 ->get($pollUrl);
@@ -354,8 +352,7 @@ class ProcessGenerationTask implements ShouldQueue
 
     protected function callMultipartApi(string $endpoint, string $apiKey, GenerationTask $task, string $size): array
     {
-        $pending = Http::withoutVerifying()
-            ->timeout(300)
+        $pending = Http::timeout(300)
             ->connectTimeout(15)
             ->withHeaders(['Authorization' => "Bearer {$apiKey}"])
             ->asMultipart()

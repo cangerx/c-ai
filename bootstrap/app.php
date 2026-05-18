@@ -18,10 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::post('/install/test-db', [\App\Http\Controllers\InstallController::class, 'testDb']);
             Route::post('/install', [\App\Http\Controllers\InstallController::class, 'run']);
 
-            Route::middleware('web')
-                ->prefix('admin')
-                ->name('admin.')
-                ->group(base_path('routes/admin.php'));
+            // Admin routes disabled — Filament handles /admin
+            // Route::middleware('web')
+            //     ->prefix('admin')
+            //     ->name('admin.')
+            //     ->group(base_path('routes/admin.php'));
 
             Route::middleware('web')
                 ->prefix('agent')

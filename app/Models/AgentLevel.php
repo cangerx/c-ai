@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AgentLevel extends Model
 {
@@ -14,6 +15,11 @@ class AgentLevel extends Model
             'min_recharge' => 'decimal:2',
             'price_per_credit' => 'decimal:4',
         ];
+    }
+
+    public function agents(): HasMany
+    {
+        return $this->hasMany(User::class, 'agent_level_id');
     }
 
     public function scopeOrdered($query)

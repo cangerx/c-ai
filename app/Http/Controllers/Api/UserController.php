@@ -25,6 +25,8 @@ class UserController extends Controller
                 return response()->json(['message' => '当前密码错误'], 422);
             }
             $user->password = Hash::make($data['password']);
+            $user->save();
+            $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();
         }
 
         if (array_key_exists('nickname', $data)) {

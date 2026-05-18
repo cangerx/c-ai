@@ -1,5 +1,5 @@
 @if ($paginator->hasPages())
-<nav role="navigation" aria-label="分页" style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:20px; flex-wrap:wrap;">
+<nav role="navigation" aria-label="分页" style="display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:20px; flex-wrap:wrap;">
     {{-- Previous --}}
     @if ($paginator->onFirstPage())
         <span style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; color:var(--text-muted,#a1a1aa); opacity:0.4; cursor:not-allowed;">

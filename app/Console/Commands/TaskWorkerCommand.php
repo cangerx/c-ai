@@ -179,8 +179,7 @@ class TaskWorkerCommand extends Command
             }
         }
 
-        return Http::withoutVerifying()
-            ->timeout(300)
+        return Http::timeout(300)
             ->connectTimeout(15)
             ->withHeaders([
                 'Authorization' => "Bearer {$channel->api_key}",
@@ -201,8 +200,7 @@ class TaskWorkerCommand extends Command
         for ($i = 0; $i < 120; $i++) {
             sleep(5);
 
-            $response = Http::withoutVerifying()
-                ->timeout(30)
+            $response = Http::timeout(30)
                 ->connectTimeout(10)
                 ->withHeaders(['Authorization' => "Bearer {$channel->api_key}"])
                 ->get($pollUrl);

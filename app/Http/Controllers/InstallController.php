@@ -138,15 +138,16 @@ class InstallController extends Controller
             } catch (\Throwable) {}
 
             // 创建管理员
-            User::create([
+            $admin = new User([
                 'name' => 'Admin',
                 'email' => $request->input('admin_email'),
                 'password' => Hash::make($request->input('admin_password')),
-                'role' => 'admin',
-                'status' => 'active',
-                'credits' => 999,
-                'balance' => 0,
             ]);
+            $admin->role = 'admin';
+            $admin->status = 'active';
+            $admin->credits = 999;
+            $admin->balance = 0;
+            $admin->save();
 
             // 保存站点名
             SiteSetting::set('site_name', $request->input('site_name'), 'general');
@@ -189,10 +190,10 @@ class InstallController extends Controller
 
     private function setEnv(string $key, ?string $value): void
     {
-        $value = $value ?? '';
+        $value = str_replace(["\n", "\r", '"'], '', $value ?? '');
         $envPath = base_path('.env');
         $content = file_get_contents($envPath);
-        $escaped = str_contains($value, ' ') ? "\"$value\"" : $value;
+        $escaped = str_contains($value, ' ') || str_contains($value, '#') ? "\"$value\"" : $value;
 
         if (preg_match("/^{$key}=.*/m", $content)) {
             $content = preg_replace("/^{$key}=.*/m", "{$key}={$escaped}", $content);

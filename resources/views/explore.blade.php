@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>灵感广场 — {{ config('app.name', 'CANG-AI') }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.cn">
-    <link href="https://fonts.googleapis.cn/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #f5f3f0;
@@ -26,7 +24,7 @@
         *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.5;
@@ -71,8 +69,8 @@
         }
 
         .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
-        .brand-icon { width: 32px; height: 32px; border-radius: 10px; background: var(--black); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; font-family: "Space Grotesk", sans-serif; }
-        .brand-name { font-family: "Space Grotesk", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+        .brand-icon { width: 32px; height: 32px; border-radius: 10px; background: var(--black); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+        .brand-name { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
 
         .nav-links { display: flex; align-items: center; gap: 6px; }
         .nav-links a { padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; transition: all 0.2s; }

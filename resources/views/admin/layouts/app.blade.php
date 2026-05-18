@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', '管理后台') — {{ config('app.name', 'CANG-AI') }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.cn">
-    <link href="https://fonts.googleapis.cn/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --accent: #2d5bf0;
@@ -75,7 +73,7 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: "DM Sans", "Noto Sans SC", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
@@ -464,6 +462,18 @@
             color: var(--text-muted);
             margin-top: 4px;
         }
+
+        /* ── Toggle Switch ── */
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .toggle-switch input[type="checkbox"] { opacity: 0; width: 0; height: 0; position: absolute; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--line-strong); border-radius: 24px; transition: .2s; }
+        .toggle-slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+        .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
+
+        /* ── Card Spacing ── */
+        .card + .card { margin-top: 20px; }
+        .card + .btn, .card + .form-actions { margin-top: 20px; }
 
         /* ── Table ── */
         .table-wrap {
@@ -901,44 +911,48 @@
             {{-- Platform Section --}}
             <div class="sidebar-section">
                 <div class="sidebar-section-title">平台</div>
-                <a href="{{ route('admin.dashboard') }}" class="sidebar-item {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+                <a href="/admin" class="sidebar-item {{ request()->is('admin') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
                     仪表盘
                 </a>
-                <a href="{{ route('admin.users.index') }}" class="sidebar-item {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                <a href="/admin/users" class="sidebar-item {{ request()->is('admin/users*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     用户管理
                 </a>
-                <a href="{{ route('admin.redeem-codes.index') }}" class="sidebar-item {{ request()->routeIs('admin.redeem-codes.*') ? 'active' : '' }}">
+                <a href="/admin/redeem-codes" class="sidebar-item {{ request()->is('admin/redeem-codes*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 5H3l2.5 7L3 19h18l-2.5-7L21 5z"/><line x1="12" y1="5" x2="12" y2="19"/></svg>
                     兑换码
                 </a>
-                <a href="{{ route('admin.settings.index') }}" class="sidebar-item {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}">
+                <a href="/admin/settings" class="sidebar-item {{ request()->is('admin/settings*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                     站点设置
                 </a>
-                <a href="{{ route('admin.storage.index') }}" class="sidebar-item {{ request()->routeIs('admin.storage.*') ? 'active' : '' }}">
+                <a href="/admin/storage" class="sidebar-item {{ request()->is('admin/storage*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     云存储
                 </a>
-                <a href="{{ route('admin.announcements.index') }}" class="sidebar-item {{ request()->routeIs('admin.announcements.*') ? 'active' : '' }}">
+                <a href="/admin/announcements" class="sidebar-item {{ request()->is('admin/announcements*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     广告横幅
                 </a>
-                <a href="{{ route('admin.login-settings.index') }}" class="sidebar-item {{ request()->routeIs('admin.login-settings.*') ? 'active' : '' }}">
+                <a href="/admin/login-settings" class="sidebar-item {{ request()->is('admin/login-settings*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
                     登录设置
                 </a>
-                <a href="{{ route('admin.plans.index') }}" class="sidebar-item {{ request()->routeIs('admin.plans.*') ? 'active' : '' }}">
+                <a href="/admin/mail-settings" class="sidebar-item {{ request()->is('admin/mail-settings*') ? 'active' : '' }}">
+                    <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    邮件配置
+                </a>
+                <a href="/admin/plans" class="sidebar-item {{ request()->is('admin/plans*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3h-8l-2 4h12l-2-4z"/></svg>
                     套餐管理
                 </a>
-                <a href="{{ route('admin.commissions.index') }}" class="sidebar-item {{ request()->routeIs('admin.commissions.*') ? 'active' : '' }}">
+                <a href="/admin/commissions" class="sidebar-item {{ request()->is('admin/commissions*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     分销管理
                 </a>
                 @if(auth()->user()->role === 'admin')
-                <a href="{{ route('admin.agent-sites.index') }}" class="sidebar-item {{ request()->routeIs('admin.agent-sites.*') ? 'active' : '' }}">
+                <a href="/admin/agent-sites" class="sidebar-item {{ request()->is('admin/agent-sites*') ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                     分站管理
                 </a>
@@ -950,7 +964,16 @@
             <div class="sidebar-section">
                 <div class="sidebar-section-title">{{ $group['title'] }}</div>
                 @foreach($group['items'] as $item)
-                <a href="{{ route($item['route'] ?? '#') }}" class="sidebar-item {{ request()->routeIs($item['route'] . '*') ? 'active' : '' }}">
+                @php
+                    $itemUrl = '#';
+                    if (!empty($item['url'])) {
+                        $itemUrl = url($item['url']);
+                    } elseif (!empty($item['route']) && \Illuminate\Support\Facades\Route::has($item['route'])) {
+                        $itemUrl = route($item['route']);
+                    }
+                    $itemActive = !empty($item['route']) && request()->routeIs($item['route'] . '*');
+                @endphp
+                <a href="{{ $itemUrl }}" class="sidebar-item {{ $itemActive ? 'active' : '' }}">
                     <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
                     {{ $item['label'] }}
                 </a>

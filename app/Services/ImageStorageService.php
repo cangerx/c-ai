@@ -35,7 +35,7 @@ class ImageStorageService
 
     public function fetchRemoteImage(string $url): array
     {
-        $response = Http::withoutVerifying()->timeout(120)->connectTimeout(15)->withHeaders(['Accept' => 'image/*'])->get($url);
+        $response = Http::timeout(120)->connectTimeout(15)->withHeaders(['Accept' => 'image/*'])->get($url);
 
         if (!$response->successful()) {
             throw new RuntimeException("Failed to fetch image: HTTP {$response->status()}");

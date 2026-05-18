@@ -19,10 +19,11 @@ class UserController extends Controller
         }
 
         if ($search = $request->get('q')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('email', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%")
-                  ->orWhere('nickname', 'like', "%{$search}%");
+            $s = str_replace(['%', '_'], ['\%', '\_'], $search);
+            $query->where(function ($q) use ($s) {
+                $q->where('email', 'like', "%{$s}%")
+                  ->orWhere('name', 'like', "%{$s}%")
+                  ->orWhere('nickname', 'like', "%{$s}%");
             });
         }
         if ($role = $request->get('role')) {
@@ -57,17 +58,18 @@ class UserController extends Controller
             $data['role'] = 'user';
         }
 
-        User::create([
+        $user = new User([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'nickname' => $data['nickname'] ?? null,
-            'role' => $data['role'],
-            'credits' => $data['credits'] ?? 0,
-            'balance' => $data['balance'] ?? 0,
-            'status' => 'active',
             'parent_id' => $isAgent ? auth()->id() : null,
         ]);
+        $user->role = $data['role'];
+        $user->credits = $data['credits'] ?? 0;
+        $user->balance = $data['balance'] ?? 0;
+        $user->status = 'active';
+        $user->save();
 
         return redirect()->route('admin.users.index')->with('success', '用户已创建');
     }
@@ -106,13 +108,12 @@ class UserController extends Controller
             $data['role'] = 'user';
         }
 
-        $user->update([
-            'name' => $data['name'],
-            'nickname' => $data['nickname'],
-            'role' => $data['role'],
-            'credits' => $data['credits'],
-            'balance' => $data['balance'],
-        ]);
+        $user->name = $data['name'];
+        $user->nickname = $data['nickname'];
+        $user->role = $data['role'];
+        $user->credits = $data['credits'];
+        $user->balance = $data['balance'];
+        $user->save();
 
         if (!$isAgent) {
             $becomingDistributor = (bool) ($data['is_distributor'] ?? false);
@@ -121,12 +122,14 @@ class UserController extends Controller
                 $user->ensureInviteCode();
                 $user->save();
             } elseif (!$becomingDistributor && $user->is_distributor) {
-                $user->update(['is_distributor' => false]);
+                $user->is_distributor = false;
+                $user->save();
             }
         }
 
         if (!empty($data['password'])) {
-            $user->update(['password' => Hash::make($data['password'])]);
+            $user->password = Hash::make($data['password']);
+            $user->save();
         }
 
         return redirect()->route('admin.users.index')->with('success', '用户已更新');
@@ -138,9 +141,8 @@ class UserController extends Controller
             abort(403);
         }
 
-        $user->update([
-            'status' => $user->status === 'active' ? 'disabled' : 'active',
-        ]);
+        $user->status = $user->status === 'active' ? 'disabled' : 'active';
+        $user->save();
 
         return back()->with('success', $user->status === 'active' ? '用户已启用' : '用户已禁用');
     }

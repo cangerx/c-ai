@@ -40,6 +40,3 @@ Route::get('/register', [AuthController::class, 'showRegister'])->name('register
 Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// 分站路径访问
-Route::get('/s/{slug}', [SubSiteController::class, 'index']);
-Route::get('/s/{slug}/pricing', [SubSiteController::class, 'pricing']);

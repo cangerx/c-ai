@@ -13,8 +13,8 @@
     @php $idx = 0; @endphp
 
     {{-- GitHub --}}
-    <div class="card" style="margin-bottom:20px;">
-        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
+    <div class="card">
+        <div class="card-header">
             <span class="card-title">GitHub 登录</span>
             <label class="toggle-switch">
                 <input type="hidden" name="settings[{{ $idx }}][key]" value="login_github_enabled">
@@ -53,8 +53,8 @@
     </div>
 
     {{-- WeChat --}}
-    <div class="card" style="margin-bottom:20px;">
-        <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
+    <div class="card">
+        <div class="card-header">
             <span class="card-title">微信扫码登录</span>
             <label class="toggle-switch">
                 @php $idx++; @endphp
@@ -86,17 +86,10 @@
 </form>
 
 <style>
-.toggle-switch { position:relative; display:inline-block; width:44px; height:24px; }
-.toggle-switch input[type="checkbox"] { opacity:0; width:0; height:0; position:absolute; }
-.toggle-slider { position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:24px; transition:.2s; }
-.toggle-slider:before { content:""; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
-.toggle-switch input:checked + .toggle-slider { background:#2d5bf0; }
-.toggle-switch input:checked + .toggle-slider:before { transform:translateX(20px); }
-
-.help-details { background:rgba(45,91,240,0.04); border:1px solid rgba(45,91,240,0.1); border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; line-height:1.8; color:#374151; }
-.help-details summary { cursor:pointer; font-weight:600; user-select:none; }
-.help-details ol { margin:8px 0 0 16px; padding:0; }
-.help-details code { background:rgba(0,0,0,0.05); padding:2px 6px; border-radius:4px; font-size:12px; }
-.help-details a { color:#2d5bf0; }
+.help-details { background: var(--accent-soft); border: 1px solid rgba(45,91,240,0.1); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.8; color: var(--text-secondary); }
+.help-details summary { cursor: pointer; font-weight: 600; color: var(--text); user-select: none; }
+.help-details ol { margin: 8px 0 0 16px; padding: 0; }
+.help-details code { background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+.help-details a { color: var(--accent); }
 </style>
 @endsection

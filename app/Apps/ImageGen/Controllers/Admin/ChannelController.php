@@ -122,8 +122,7 @@ class ChannelController extends Controller
                 $endpoint .= '?async=true';
             }
 
-            $response = Http::withoutVerifying()
-                ->timeout(15)
+            $response = Http::timeout(15)
                 ->connectTimeout(5)
                 ->withHeaders([
                     'Authorization' => "Bearer {$channel->api_key}",

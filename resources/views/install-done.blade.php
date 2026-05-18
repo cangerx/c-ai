@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>安装完成 - CANG-AI</title>
-    <link href="https://fonts.googleapis.cn/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #f5f3f0;
@@ -19,7 +18,7 @@
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
@@ -54,7 +53,7 @@
             margin: 0 auto 20px;
             font-size: 28px;
         }
-        h1 { font-family: "Space Grotesk", sans-serif; font-size: 22px; font-weight: 700; color: var(--success); }
+        h1 { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 22px; font-weight: 700; color: var(--success); }
         .subtitle { color: var(--muted); font-size: 13px; margin-top: 6px; margin-bottom: 28px; }
         .info {
             text-align: left;

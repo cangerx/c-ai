@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AgentSiteController;
 use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BillingRuleController;
@@ -15,7 +16,7 @@ use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('login', [AuthController::class, 'login'])->name('login.submit');
+Route::post('login', [AuthController::class, 'login'])->name('login.submit')->middleware('throttle:5,1');
 
 Route::middleware(['auth', 'role:admin,agent'])->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
@@ -28,6 +29,15 @@ Route::middleware(['auth', 'role:admin,agent'])->group(function () {
     Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 
+    Route::get('commissions', [CommissionController::class, 'index'])->name('commissions.index');
+
+    Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
+    Route::get('withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');
+    Route::post('withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
+});
+
+// 仅 admin 可访问的路由
+Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('redeem-codes', [RedeemCodeController::class, 'index'])->name('redeem-codes.index');
     Route::get('redeem-codes/generate', [RedeemCodeController::class, 'showGenerate'])->name('redeem-codes.generate');
     Route::post('redeem-codes/generate', [RedeemCodeController::class, 'generate'])->name('redeem-codes.generate.submit');
@@ -58,16 +68,25 @@ Route::middleware(['auth', 'role:admin,agent'])->group(function () {
     Route::delete('announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
     Route::post('announcements/{announcement}/toggle', [AnnouncementController::class, 'toggle'])->name('announcements.toggle');
 
-    Route::get('commissions', [CommissionController::class, 'index'])->name('commissions.index');
-
     Route::get('plans', [PlanController::class, 'index'])->name('plans.index');
     Route::post('plans', [PlanController::class, 'store'])->name('plans.store');
     Route::put('plans/{plan}', [PlanController::class, 'update'])->name('plans.update');
     Route::delete('plans/{plan}', [PlanController::class, 'destroy'])->name('plans.destroy');
 
-    Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
-    Route::get('withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');
-    Route::post('withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
-    Route::post('withdrawals/{withdrawalRequest}/approve', [WithdrawalController::class, 'approve'])->name('withdrawals.approve')->middleware('role:admin');
-    Route::post('withdrawals/{withdrawalRequest}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject')->middleware('role:admin');
+    Route::post('withdrawals/{withdrawalRequest}/approve', [WithdrawalController::class, 'approve'])->name('withdrawals.approve');
+    Route::post('withdrawals/{withdrawalRequest}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject');
+
+    Route::get('agent-sites', [AgentSiteController::class, 'index'])->name('agent-sites.index');
+    Route::get('agent-sites/levels', [AgentSiteController::class, 'levels'])->name('agent-sites.levels');
+    Route::post('agent-sites/levels', [AgentSiteController::class, 'levelStore'])->name('agent-sites.levels.store');
+    Route::put('agent-sites/levels/{agentLevel}', [AgentSiteController::class, 'levelUpdate'])->name('agent-sites.levels.update');
+    Route::delete('agent-sites/levels/{agentLevel}', [AgentSiteController::class, 'levelDestroy'])->name('agent-sites.levels.destroy');
+    Route::post('agent-sites/batch', [AgentSiteController::class, 'batch'])->name('agent-sites.batch');
+    Route::get('agent-sites/{agentSite}', [AgentSiteController::class, 'show'])->name('agent-sites.show');
+    Route::get('agent-sites/{agentSite}/edit', [AgentSiteController::class, 'edit'])->name('agent-sites.edit');
+    Route::put('agent-sites/{agentSite}', [AgentSiteController::class, 'update'])->name('agent-sites.update');
+    Route::post('agent-sites/{agentSite}/toggle', [AgentSiteController::class, 'toggle'])->name('agent-sites.toggle');
+    Route::post('agent-sites/{agentSite}/approve', [AgentSiteController::class, 'approve'])->name('agent-sites.approve');
+    Route::post('agent-sites/{agentSite}/reject', [AgentSiteController::class, 'reject'])->name('agent-sites.reject');
+    Route::delete('agent-sites/{agentSite}', [AgentSiteController::class, 'destroy'])->name('agent-sites.destroy');
 });

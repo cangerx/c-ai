@@ -45,7 +45,10 @@ class SiteSettingController extends Controller
             Cache::forget("agent_site:domain:{$site->custom_domain}");
             Cache::forget("agent_site:sub:{$site->subdomain}");
         } else {
+            $data['status'] = 'pending';
+            $data['is_active'] = false;
             AgentSite::create($data);
+            return back()->with('success', '分站申请已提交，等待管理员审核');
         }
 
         return back()->with('success', '分站设置已保存');

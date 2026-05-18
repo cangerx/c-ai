@@ -12,6 +12,8 @@ class AiChannel extends Model
         'current_load', 'error_count', 'max_errors', 'paused_at',
     ];
 
+    protected $hidden = ['api_key'];
+
     protected function casts(): array
     {
         return [

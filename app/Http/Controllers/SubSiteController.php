@@ -7,15 +7,14 @@ use App\Models\AgentSite;
 
 class SubSiteController extends Controller
 {
-    public function index($slug = null)
+    public function index()
     {
-        $site = $this->resolveSite($slug);
+        $site = app('agent_site') ?? abort(404);
         $site->loadMissing('agent');
         $inviteCode = $site->agent?->ensureInviteCode();
 
         $html = file_get_contents(public_path('index.html'));
         $inject = '<script>window.__AGENT_SITE__=' . json_encode([
-            'slug' => $site->slug,
             'name' => $site->site_name,
             'color' => $site->theme_color,
             'logo' => $site->logo_url,
@@ -30,18 +29,10 @@ class SubSiteController extends Controller
         return response($html);
     }
 
-    public function pricing($slug = null)
+    public function pricing()
     {
-        $site = $this->resolveSite($slug);
+        $site = app('agent_site') ?? abort(404);
         $plans = AgentPlan::where('agent_id', $site->user_id)->active()->ordered()->get();
         return view('pricing', ['plans' => $plans, 'agentSite' => $site]);
-    }
-
-    private function resolveSite($slug): AgentSite
-    {
-        if ($slug) {
-            return AgentSite::where('slug', $slug)->where('is_active', true)->firstOrFail();
-        }
-        return app('agent_site') ?? abort(404);
     }
 }

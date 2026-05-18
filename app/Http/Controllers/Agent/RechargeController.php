@@ -12,7 +12,7 @@ class RechargeController extends Controller
 {
     public function redeem(Request $request)
     {
-        $request->validate(['code' => 'required|string|size:32']);
+        $request->validate(['code' => 'required|string|max:32']);
 
         $user = auth()->user();
         $code = $request->input('code');

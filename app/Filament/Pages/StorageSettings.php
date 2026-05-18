@@ -1,0 +1,454 @@
+<?php
+
+namespace App\Filament\Pages;
+
+use BackedEnum;
+use UnitEnum;
+use App\Models\SiteSetting;
+use Filament\Actions\Action;
+use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Notifications\Notification;
+use Filament\Pages\Page;
+use Filament\Schemas\Components\Wizard;
+use Filament\Schemas\Components\Wizard\Step;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Storage;
+
+class StorageSettings extends Page implements HasForms
+{
+    use InteractsWithForms;
+
+    protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-cloud';
+    protected static ?string $navigationLabel = '云存储';
+    protected static ?string $title = '云存储配置';
+    protected static string | UnitEnum | null $navigationGroup = '系统';
+    protected static ?int $navigationSort = 3;
+    protected string $view = 'filament.pages.storage-settings';
+
+    private const FIELDS = [
+        'storage_driver',
+        'storage_access_key',
+        'storage_secret_key',
+        'storage_bucket',
+        'storage_endpoint',
+        'storage_region',
+        'storage_url',
+    ];
+
+    public const DRIVERS = [
+        'local' => [
+            'label'    => '本地存储',
+            'desc'     => '存到 storage/app/public，无需任何外部服务，适合开发和小流量站点。',
+            'icon'     => 'heroicon-o-server-stack',
+            'doc'      => 'https://laravel.com/docs/filesystem',
+            'doc_text' => 'Laravel Filesystem 文档',
+        ],
+        'oss' => [
+            'label'    => '阿里云 OSS',
+            'desc'     => '阿里云对象存储，适合中国大陆用户，速度快、价格低。',
+            'icon'     => 'heroicon-o-cloud',
+            'doc'      => 'https://help.aliyun.com/zh/oss/getting-started/',
+            'doc_text' => '阿里云 OSS 入门指南',
+        ],
+        'r2' => [
+            'label'    => 'Cloudflare R2',
+            'desc'     => '免出口流量费、S3 兼容，适合海外或走 Cloudflare CDN 的场景。',
+            'icon'     => 'heroicon-o-globe-alt',
+            'doc'      => 'https://developers.cloudflare.com/r2/api/s3/tokens/',
+            'doc_text' => 'R2 API Token 文档',
+        ],
+    ];
+
+    private const SAMPLES = [
+        'oss' => [
+            'storage_endpoint' => 'https://oss-cn-hangzhou.aliyuncs.com',
+            'storage_region'   => 'oss-cn-hangzhou',
+            'storage_bucket'   => 'my-bucket',
+            'storage_url'      => 'https://cdn.example.com',
+        ],
+        'r2' => [
+            'storage_endpoint' => 'https://<account_id>.r2.cloudflarestorage.com',
+            'storage_region'   => 'auto',
+            'storage_bucket'   => 'my-bucket',
+            'storage_url'      => 'https://cdn.example.com',
+        ],
+    ];
+
+    public ?array $data = [];
+    public array $summary = [];
+
+    public function mount(): void
+    {
+        $settings = [];
+        foreach (self::FIELDS as $key) {
+            if ($key === 'storage_secret_key') {
+                $settings[$key] = '';
+                continue;
+            }
+            $settings[$key] = SiteSetting::get($key);
+        }
+        if (!$settings['storage_driver']) {
+            $settings['storage_driver'] = 'local';
+        }
+        $this->form->fill($settings);
+        $this->refreshSummary();
+    }
+
+    private function refreshSummary(): void
+    {
+        $driver = SiteSetting::get('storage_driver', 'local');
+        $meta   = self::DRIVERS[$driver] ?? self::DRIVERS['local'];
+        $this->summary = [
+            'driver'        => $driver,
+            'driver_label'  => $meta['label'],
+            'driver_icon'   => $meta['icon'],
+            'bucket'        => SiteSetting::get('storage_bucket', '') ?: '—',
+            'endpoint'      => SiteSetting::get('storage_endpoint', '') ?: '—',
+            'has_secret'    => filled(SiteSetting::get('storage_secret_key', '')),
+            'last_test_at'  => SiteSetting::get('storage_last_test_at', ''),
+            'last_test_ok'  => SiteSetting::get('storage_last_test_ok', '') === '1',
+            'last_test_msg' => SiteSetting::get('storage_last_test_msg', ''),
+        ];
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema->schema([$this->buildWizard()])->statePath('data');
+    }
+
+    private function buildWizard(): Wizard
+    {
+        return Wizard::make([
+            $this->stepDriver(),
+            $this->stepCredentials(),
+            $this->stepReview(),
+        ])
+            ->skippable()
+            ->persistStepInQueryString('step');
+    }
+
+    private function stepDriver(): Step
+    {
+        return Step::make('选择驱动')
+            ->description('挑一个对象存储服务')
+            ->icon('heroicon-o-cloud')
+            ->schema([
+                Forms\Components\Radio::make('storage_driver')
+                    ->label('')
+                    ->options(collect(self::DRIVERS)->mapWithKeys(fn ($v, $k) => [$k => $v['label']])->all())
+                    ->descriptions(collect(self::DRIVERS)->mapWithKeys(fn ($v, $k) => [$k => $v['desc']])->all())
+                    ->required()
+                    ->live()
+                    ->default('local')
+                    ->extraAttributes(['class' => 'storage-driver-radio'])
+                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                        if (!isset(self::SAMPLES[$state])) {
+                            return;
+                        }
+                        foreach (self::SAMPLES[$state] as $k => $v) {
+                            if (!filled($get($k))) {
+                                $set($k, $v);
+                            }
+                        }
+                    }),
+
+                Forms\Components\Placeholder::make('driver_doc')
+                    ->label('')
+                    ->content(function (Get $get) {
+                        $d = $get('storage_driver');
+                        if (!isset(self::DRIVERS[$d])) {
+                            return '';
+                        }
+                        $m = self::DRIVERS[$d];
+                        $tipMap = [
+                            'local' => '适合开发环境和小流量站点，无需任何外部服务',
+                            'oss'   => '中国大陆访问最快，按用量付费，需在阿里云创建 RAM 子账号',
+                            'r2'    => '免出口流量费，适合海外或走 Cloudflare CDN 的场景',
+                        ];
+                        $bulb = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1rem;height:1rem;flex-shrink:0;margin-top:.125rem"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg>';
+                        $book = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:.875rem;height:.875rem;flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>';
+                        $arrow = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:.75rem;height:.75rem;flex-shrink:0;display:inline-block;vertical-align:middle"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>';
+                        $boxStyle = 'border-radius:.5rem;border:1px solid #bfdbfe;background:rgba(239,246,255,.6);padding:.625rem 1rem;font-size:.875rem;color:#1e3a8a;';
+                        $rowStyle = 'display:flex;align-items:flex-start;gap:.5rem;';
+                        $linkRowStyle = 'margin-top:.375rem;';
+                        $linkStyle = 'display:inline-flex;align-items:center;gap:.25rem;font-size:.75rem;font-weight:500;color:#2563eb;text-decoration:none;';
+                        $html = '<div style="' . $boxStyle . '">'
+                              . '<div style="' . $rowStyle . '">' . $bulb . '<span>' . e($tipMap[$d] ?? '') . '</span></div>'
+                              . '<div style="' . $linkRowStyle . '"><a href="' . e($m['doc']) . '" target="_blank" rel="noopener" style="' . $linkStyle . '">' . $book . '<span>' . e($m['doc_text']) . '</span>' . $arrow . '</a></div>'
+                              . '</div>';
+                        return new \Illuminate\Support\HtmlString($html);
+                    }),
+            ]);
+    }
+
+    private function stepCredentials(): Step
+    {
+        return Step::make('填写凭证')
+            ->description('输入 Access Key、Bucket 等')
+            ->icon('heroicon-o-key')
+            ->schema([
+                Forms\Components\Placeholder::make('local_notice')
+                    ->label('')
+                    ->visible(fn (Get $get) => $get('storage_driver') === 'local')
+                    ->content('本地存储无需任何凭证，直接进入下一步即可。'),
+
+                Grid::make(2)
+                    ->visible(fn (Get $get) => in_array($get('storage_driver'), ['oss', 'r2']))
+                    ->schema([
+                        Forms\Components\TextInput::make('storage_access_key')
+                            ->label('Access Key ID')
+                            ->required()
+                            ->placeholder('输入 Access Key')
+                            ->prefixIcon('heroicon-o-key')
+                            ->helperText('OSS 控制台 → AccessKey 管理；R2 → API Tokens'),
+
+                        Forms\Components\TextInput::make('storage_secret_key')
+                            ->label('Secret Access Key')
+                            ->password()
+                            ->revealable()
+                            ->placeholder('留空则不修改')
+                            ->prefixIcon('heroicon-o-lock-closed')
+                            ->dehydrated(fn ($state) => filled($state))
+                            ->helperText('已配置则留空保留原值'),
+
+                        Forms\Components\TextInput::make('storage_bucket')
+                            ->label('Bucket 名称')
+                            ->required()
+                            ->placeholder('my-bucket')
+                            ->prefixIcon('heroicon-o-archive-box'),
+
+                        Forms\Components\TextInput::make('storage_region')
+                            ->label('Region')
+                            ->required()
+                            ->placeholder('oss-cn-hangzhou / auto')
+                            ->prefixIcon('heroicon-o-map-pin')
+                            ->helperText('OSS 写区域 ID；R2 固定写 auto'),
+
+                        Forms\Components\TextInput::make('storage_endpoint')
+                            ->label('Endpoint')
+                            ->required()
+                            ->url()
+                            ->placeholder('https://oss-cn-hangzhou.aliyuncs.com')
+                            ->prefixIcon('heroicon-o-link')
+                            ->helperText('必须以 https:// 开头')
+                            ->columnSpanFull(),
+
+                        Forms\Components\TextInput::make('storage_url')
+                            ->label('自定义域名（CDN）')
+                            ->placeholder('https://cdn.example.com')
+                            ->prefixIcon('heroicon-o-globe-alt')
+                            ->url()
+                            ->helperText('可选，配置后生成的文件 URL 会用此域名')
+                            ->columnSpanFull(),
+                    ]),
+            ]);
+    }
+
+    private function stepReview(): Step
+    {
+        return Step::make('确认并测试')
+            ->description('检查配置并测试连通性')
+            ->icon('heroicon-o-check-badge')
+            ->schema([
+                Forms\Components\Placeholder::make('review')
+                    ->label('')
+                    ->content(function (Get $get) {
+                        $d = $get('storage_driver') ?: 'local';
+                        $m = self::DRIVERS[$d] ?? self::DRIVERS['local'];
+
+                        $iconStyle = 'width:1.25rem;height:1.25rem;flex-shrink:0';
+                        $rowIconStyle = 'width:1rem;height:1rem;flex-shrink:0;color:rgb(107 114 128)';
+
+                        $headIcon = svg($m['icon'], '', ['style' => 'width:1.5rem;height:1.5rem;color:rgb(59 130 246)'])->toHtml();
+                        $headOuter = 'margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;border-radius:.75rem;border:1px solid #e5e7eb;background:linear-gradient(to right,#eff6ff,#ffffff);padding:1rem;';
+                        $headIconBox = 'display:flex;flex-shrink:0;align-items:center;justify-content:center;width:2.75rem;height:2.75rem;border-radius:.5rem;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04);border:1px solid #e5e7eb;';
+                        $head = '<div style="' . $headOuter . '">'
+                              . '<div style="' . $headIconBox . '">' . $headIcon . '</div>'
+                              . '<div><div style="font-size:1rem;font-weight:600;color:#111827;">' . e($m['label']) . '</div>'
+                              . '<div style="font-size:.75rem;color:#6b7280;">' . e($m['desc']) . '</div></div>'
+                              . '</div>';
+
+                        // 字段对比表
+                        $rows = [];
+                        $warn = svg('heroicon-m-exclamation-triangle', '', ['style' => 'width:.875rem;height:.875rem;color:rgb(245 158 11);display:inline-block;vertical-align:middle;margin-right:.25rem'])->toHtml();
+                        $missing = '<span style="color:#d97706;">' . $warn . '未填写</span>';
+
+                        if ($d === 'local') {
+                            $rows[] = ['icon' => 'heroicon-o-folder', 'k' => '存储位置', 'v' => 'storage/app/public', 'mono' => true, 'raw' => false];
+                            $rows[] = ['icon' => 'heroicon-o-globe-alt', 'k' => '访问路径', 'v' => '/storage/*', 'mono' => true, 'raw' => false];
+                        } else {
+                            $rows[] = ['icon' => 'heroicon-o-key', 'k' => 'Access Key', 'v' => filled($get('storage_access_key')) ? '已填写' : $missing, 'mono' => false, 'raw' => !filled($get('storage_access_key'))];
+                            $rows[] = ['icon' => 'heroicon-o-lock-closed', 'k' => 'Secret', 'v' => filled($get('storage_secret_key')) ? '已新填' : '保留原值', 'mono' => false, 'raw' => false];
+                            $rows[] = ['icon' => 'heroicon-o-archive-box', 'k' => 'Bucket', 'v' => $get('storage_bucket') ?: $missing, 'mono' => true, 'raw' => !filled($get('storage_bucket'))];
+                            $rows[] = ['icon' => 'heroicon-o-map-pin', 'k' => 'Region', 'v' => $get('storage_region') ?: $missing, 'mono' => true, 'raw' => !filled($get('storage_region'))];
+                            $rows[] = ['icon' => 'heroicon-o-link', 'k' => 'Endpoint', 'v' => $get('storage_endpoint') ?: $missing, 'mono' => true, 'raw' => !filled($get('storage_endpoint'))];
+                            $rows[] = ['icon' => 'heroicon-o-globe-alt', 'k' => 'CDN 域名', 'v' => $get('storage_url') ?: '（未配置）', 'mono' => true, 'raw' => false];
+                        }
+
+                        $tableOuter = 'overflow:hidden;border-radius:.75rem;border:1px solid #e5e7eb;background:#fff;';
+                        $table = '<div style="' . $tableOuter . '">';
+                        foreach ($rows as $i => $r) {
+                            $rowStyle = 'display:flex;align-items:center;padding:.625rem 1rem;'
+                                . ($i === 0 ? '' : 'border-top:1px solid #f3f4f6;');
+                            $monoCss = $r['mono'] ? 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace;' : '';
+                            $valStyle = $monoCss . 'font-size:.875rem;color:#111827;margin-left:.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;';
+                            $rowIcon = svg($r['icon'], '', ['style' => $rowIconStyle])->toHtml();
+                            $valHtml = $r['raw'] ? $r['v'] : e($r['v']);
+                            $table .= '<div style="' . $rowStyle . '">'
+                                   . '<span style="margin-right:.5rem;">' . $rowIcon . '</span>'
+                                   . '<span style="font-size:.75rem;font-weight:500;text-transform:uppercase;letter-spacing:.025em;color:#6b7280;min-width:6.5rem;">' . e($r['k']) . '</span>'
+                                   . '<span style="' . $valStyle . '">' . $valHtml . '</span>'
+                                   . '</div>';
+                        }
+                        $table .= '</div>';
+
+                        // 风险提示
+                        $tipIconWarn = svg('heroicon-o-exclamation-triangle', '', ['style' => $iconStyle])->toHtml();
+                        $tipIconInfo = svg('heroicon-o-information-circle', '', ['style' => $iconStyle])->toHtml();
+                        $tipBaseStyle = 'margin-top:.75rem;display:flex;align-items:flex-start;gap:.5rem;border-radius:.5rem;padding:.5rem .75rem;font-size:.75rem;border-width:1px;border-style:solid;';
+                        $tipWarnStyle = $tipBaseStyle . 'border-color:#fde68a;background:#fffbeb;color:#78350f;';
+                        $tipInfoStyle = $tipBaseStyle . 'border-color:#bfdbfe;background:#eff6ff;color:#1e3a8a;';
+                        $tip = $d === 'local'
+                            ? '<div style="' . $tipWarnStyle . '">' . $tipIconWarn . '<span>本地存储不适合多机部署或大流量站点，生产环境建议切换到对象存储</span></div>'
+                            : '<div style="' . $tipInfoStyle . '">' . $tipIconInfo . '<span>保存只写配置，请到下方点击 <b>连接测试</b> 验证服务可达，再用 <b>上传测试图片</b> 验证读写权限</span></div>';
+
+                        return new \Illuminate\Support\HtmlString($head . $table . $tip);
+                    }),
+            ]);
+    }
+
+    public function save(): void
+    {
+        $data = $this->form->getState();
+
+        foreach (self::FIELDS as $key) {
+            if (!array_key_exists($key, $data)) {
+                continue;
+            }
+            $value = $data[$key];
+            if ($key === 'storage_secret_key' && !filled($value)) {
+                continue;
+            }
+            SiteSetting::set($key, (string) ($value ?? ''), 'storage');
+        }
+
+        $this->refreshSummary();
+
+        Notification::make()
+            ->title('配置已保存')
+            ->body('请点击"连接测试"验证服务可用性。')
+            ->success()
+            ->send();
+    }
+
+    public function testConnectionAction(): Action
+    {
+        return Action::make('testConnection')
+            ->label('连接测试')
+            ->icon('heroicon-o-signal')
+            ->color('info')
+            ->action(function () {
+                $driver = SiteSetting::get('storage_driver', 'local');
+                if (!in_array($driver, ['oss', 'r2'])) {
+                    Notification::make()
+                        ->title('当前驱动无需测试')
+                        ->body('本地存储不需要连接测试。')
+                        ->warning()
+                        ->send();
+                    return;
+                }
+                try {
+                    $disk = $this->buildDynamicDisk($driver);
+                    $key = 'test/' . bin2hex(random_bytes(4)) . '.txt';
+                    $disk->put($key, 'connection-test');
+                    $disk->delete($key);
+                    SiteSetting::set('storage_last_test_at', now()->toDateTimeString(), 'storage');
+                    SiteSetting::set('storage_last_test_ok', '1', 'storage');
+                    SiteSetting::set('storage_last_test_msg', '连接正常', 'storage');
+                    $this->refreshSummary();
+                    Notification::make()->title('连接测试成功')->body('存储服务可用。')->success()->send();
+                } catch (\Throwable $e) {
+                    SiteSetting::set('storage_last_test_at', now()->toDateTimeString(), 'storage');
+                    SiteSetting::set('storage_last_test_ok', '0', 'storage');
+                    SiteSetting::set('storage_last_test_msg', $e->getMessage(), 'storage');
+                    $this->refreshSummary();
+                    Notification::make()->title('连接测试失败')->body($e->getMessage())->danger()->send();
+                }
+            });
+    }
+
+    public function uploadProbeAction(): Action
+    {
+        return Action::make('uploadProbe')
+            ->label('上传测试图片')
+            ->icon('heroicon-o-photo')
+            ->color('gray')
+            ->action(function () {
+                $driver = SiteSetting::get('storage_driver', 'local');
+                try {
+                    // 生成一张 1×1 的 PNG（base64 解出）
+                    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+                    $key = 'probe/probe-' . date('YmdHis') . '-' . bin2hex(random_bytes(3)) . '.png';
+
+                    if ($driver === 'local') {
+                        Storage::disk('public')->put($key, $png);
+                        $url = Storage::disk('public')->url($key);
+                    } else {
+                        $disk = $this->buildDynamicDisk($driver);
+                        $disk->put($key, $png);
+                        $base = rtrim(SiteSetting::get('storage_url', '') ?: SiteSetting::get('storage_endpoint', ''), '/');
+                        $url = $base ? ($base . '/' . ltrim($key, '/')) : $key;
+                    }
+
+                    Notification::make()
+                        ->title('测试图片已上传')
+                        ->body($url)
+                        ->success()
+                        ->persistent()
+                        ->send();
+                } catch (\Throwable $e) {
+                    Notification::make()
+                        ->title('上传失败')
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->send();
+                }
+            });
+    }
+
+    private function buildDynamicDisk(string $driver)
+    {
+        $key      = SiteSetting::get('storage_access_key', '');
+        $secret   = SiteSetting::get('storage_secret_key', '');
+        $bucket   = SiteSetting::get('storage_bucket', '');
+        $endpoint = SiteSetting::get('storage_endpoint', '');
+
+        $missing = [];
+        if (!filled($key)) $missing[] = 'Access Key';
+        if (!filled($secret)) $missing[] = 'Secret';
+        if (!filled($bucket)) $missing[] = 'Bucket';
+        if (!filled($endpoint)) $missing[] = 'Endpoint';
+        if ($missing) {
+            throw new \RuntimeException('凭证不完整，缺少：' . implode('、', $missing));
+        }
+
+        $config = [
+            'driver' => 's3',
+            'key' => $key,
+            'secret' => $secret,
+            'region' => SiteSetting::get('storage_region', 'auto') ?: 'auto',
+            'bucket' => $bucket,
+            'endpoint' => $endpoint,
+            'url' => SiteSetting::get('storage_url', ''),
+            'use_path_style_endpoint' => $driver === 'oss',
+            'throw' => true,
+        ];
+        config(['filesystems.disks.dynamic_s3_test' => $config]);
+        return Storage::disk('dynamic_s3_test');
+    }
+}

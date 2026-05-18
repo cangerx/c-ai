@@ -17,7 +17,8 @@ class GalleryController extends Controller
             ->with('user:id,name,nickname');
 
         if ($search = $request->input('q')) {
-            $query->where('prompt', 'like', "%{$search}%");
+            $s = str_replace(['%', '_'], ['\%', '\_'], $search);
+            $query->where('prompt', 'like', "%{$s}%");
         }
 
         if ($model = $request->input('model')) {

@@ -7,11 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CommissionLog extends Model
 {
-    protected $fillable = ['user_id', 'from_user_id', 'usage_log_id', 'credits'];
+    protected $fillable = ['user_id', 'agent_id', 'from_user_id', 'usage_log_id', 'credits'];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function agent(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'agent_id');
     }
 
     public function fromUser(): BelongsTo

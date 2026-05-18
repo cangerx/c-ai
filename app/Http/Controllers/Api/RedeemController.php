@@ -12,7 +12,7 @@ class RedeemController extends Controller
     public function redeem(Request $request)
     {
         $data = $request->validate([
-            'code' => 'required|string|size:32',
+            'code' => 'required|string|max:32',
         ]);
 
         $user = $request->user();

@@ -4,16 +4,26 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RedeemController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\TemplateController;
+use App\Http\Controllers\Api\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['ok' => true]));
 
-Route::get('/download', function (\Illuminate\Http\Request $request) {
+Route::middleware('throttle:30,1')->get('/download', function (\Illuminate\Http\Request $request) {
     $url = $request->query('url', '');
     if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
         abort(400, 'Invalid URL');
     }
+    $scheme = parse_url($url, PHP_URL_SCHEME);
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        abort(400, 'Invalid URL');
+    }
     $host = parse_url($url, PHP_URL_HOST) ?: '';
+    $ip = gethostbyname($host);
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+        abort(400, 'Invalid URL');
+    }
     $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?: '';
     $storageUrl = \App\Models\SiteSetting::get('storage_url', '');
     $storageHost = $storageUrl ? (parse_url($storageUrl, PHP_URL_HOST) ?: '') : '';
@@ -26,13 +36,17 @@ Route::get('/download', function (\Illuminate\Http\Request $request) {
     $response = \Illuminate\Support\Facades\Http::timeout(30)->get($url);
     if (!$response->successful()) abort(502);
     $contentType = $response->header('Content-Type') ?: 'image/png';
-    $filename = basename(parse_url($url, PHP_URL_PATH)) ?: 'image.png';
+    $filename = preg_replace('/[^\w.\-]/', '_', basename(parse_url($url, PHP_URL_PATH)) ?: 'image.png');
     return response($response->body(), 200, [
         'Content-Type' => $contentType,
         'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         'Cache-Control' => 'public, max-age=86400',
     ]);
 });
+
+Route::get('/templates', [TemplateController::class, 'index']);
+Route::get('/templates/{template}', [TemplateController::class, 'show']);
+Route::post('/templates/{template}/build', [TemplateController::class, 'build']);
 
 Route::get('/config', function () {
     $announcements = \App\Models\Announcement::where('enabled', true)
@@ -74,7 +88,7 @@ Route::get('/auth/wechat/callback', [AuthController::class, 'wechatCallback']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
-    Route::post('/redeem', [RedeemController::class, 'redeem']);
+    Route::post('/redeem', [RedeemController::class, 'redeem'])->middleware('throttle:10,1');
 
     Route::post('/distributor/apply', function (\Illuminate\Http\Request $request) {
         $user = $request->user();
@@ -132,4 +146,46 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+
+    Route::get('/withdrawals', [WithdrawalController::class, 'index']);
+    Route::post('/withdrawals', [WithdrawalController::class, 'store']);
+
+    Route::post('/agent/apply', function (\Illuminate\Http\Request $request) {
+        $enabled = filter_var(\App\Models\SiteSetting::get('agent_apply_enabled', false), FILTER_VALIDATE_BOOLEAN);
+        if (!$enabled) {
+            return response()->json(['message' => '代理申请暂未开放'], 403);
+        }
+        $user = $request->user();
+        if ($user->role === 'agent' || $user->role === 'admin') {
+            return response()->json(['message' => '您已是代理商']);
+        }
+        if (\App\Models\AgentSite::where('user_id', $user->id)->exists()) {
+            return response()->json(['message' => '您已提交过申请，请等待审核']);
+        }
+        $request->validate(['site_name' => 'required|string|max:100']);
+
+        $user->ensureInviteCode();
+
+        \App\Models\AgentSite::create([
+            'user_id' => $user->id,
+            'site_name' => $request->input('site_name'),
+            'slug' => $user->invite_code,
+            'subdomain' => $user->invite_code,
+            'status' => 'pending',
+            'is_active' => false,
+        ]);
+
+        return response()->json(['message' => '代理申请已提交，等待管理员审核']);
+    });
+
+    Route::get('/agent/apply-status', function (\Illuminate\Http\Request $request) {
+        $enabled = filter_var(\App\Models\SiteSetting::get('agent_apply_enabled', false), FILTER_VALIDATE_BOOLEAN);
+        $user = $request->user();
+        $site = \App\Models\AgentSite::where('user_id', $user->id)->first();
+        return response()->json([
+            'apply_enabled' => $enabled,
+            'is_agent' => in_array($user->role, ['agent', 'admin']),
+            'site_status' => $site?->status,
+        ]);
+    });
 });

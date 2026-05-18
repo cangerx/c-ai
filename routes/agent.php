@@ -1,5 +1,9 @@
 <?php
 
+// Legacy agent routes — replaced by Filament Agent panel at /agent
+// Kept commented for reference during migration.
+
+/*
 use App\Http\Controllers\Agent\AuthController;
 use App\Http\Controllers\Agent\DashboardController;
 use App\Http\Controllers\Agent\PlanController;
@@ -45,3 +49,4 @@ Route::middleware(['auth', 'role:agent,admin'])->group(function () {
 
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 });
+*/

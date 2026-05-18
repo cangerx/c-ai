@@ -6,7 +6,7 @@
     <title>页面不存在 - CANG-AI</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:"Noto Sans SC",-apple-system,BlinkMacSystemFont,sans-serif;background:#f5f3f0;color:#1a1a1a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;-webkit-font-smoothing:antialiased}
+        body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f3f0;color:#1a1a1a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;-webkit-font-smoothing:antialiased}
         .card{background:rgba(255,255,255,0.92);backdrop-filter:saturate(1.8) blur(20px);border:1px solid rgba(0,0,0,0.06);border-radius:20px;padding:48px 36px;box-shadow:0 24px 48px -12px rgba(0,0,0,0.12);text-align:center;max-width:420px;width:100%}
         .code{font-size:72px;font-weight:700;color:#2d5bf0;opacity:0.15;line-height:1}
         h1{font-size:20px;font-weight:700;margin:12px 0 8px}
