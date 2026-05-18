@@ -44,15 +44,18 @@ fi
 # 自动解除 PHP 禁用函数
 PHP_INI=$($PHP_BIN -r "echo php_ini_loaded_file();" 2>/dev/null)
 CLI_INI="${PHP_INI/php.ini/php-cli.ini}"
-[ -f "$CLI_INI" ] && PHP_INI="$CLI_INI"
-if [ -f "$PHP_INI" ]; then
-    NEED_FUNCS="putenv proc_open proc_get_status proc_close"
+PHP_INI_DIR=$(dirname "$PHP_INI")
+if [ -d "$PHP_INI_DIR" ]; then
+    NEED_FUNCS="putenv proc_open proc_get_status proc_close exec symlink"
     CHANGED=0
-    for fn in $NEED_FUNCS; do
-        if grep -q "$fn" "$PHP_INI" 2>/dev/null; then
-            sed -i "s/,$fn//g; s/$fn,//g; s/$fn//g" "$PHP_INI"
-            CHANGED=1
-        fi
+    for ini_file in "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php-cli.ini"; do
+        [ -f "$ini_file" ] || continue
+        for fn in $NEED_FUNCS; do
+            if grep -q "$fn" "$ini_file" 2>/dev/null; then
+                sed -i "s/,$fn//g; s/$fn,//g; s/$fn//g" "$ini_file"
+                CHANGED=1
+            fi
+        done
     done
     if [ $CHANGED -eq 1 ]; then
         echo "✓ 已自动解除 PHP 禁用函数"
