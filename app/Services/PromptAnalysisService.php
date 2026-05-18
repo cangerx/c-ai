@@ -100,6 +100,8 @@ SYSTEM;
         $data = json_decode($result, true);
         $content = $data['choices'][0]['message']['content'] ?? '';
 
+        // 去掉 <think>...</think> 思考标签
+        $content = preg_replace('/<think>.*?<\/think>/s', '', $content);
         $content = preg_replace('/^```(?:json)?\s*|\s*```$/s', '', trim($content));
 
         $parsed = json_decode($content, true);
