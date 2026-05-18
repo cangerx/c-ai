@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AgentSite;
+use App\Models\BillingRule;
 use App\Models\CommissionLog;
 use App\Models\SiteSetting;
 use App\Models\UsageLog;
@@ -12,21 +13,69 @@ use RuntimeException;
 
 class BillingService
 {
-    public function getCost(): int
+    /**
+     * 获取扣费积分：优先匹配 billing_rules 表，未命中则用全局默认
+     */
+    public function getCost(string $model = '', string $quality = '', string $appName = 'image-gen'): int
     {
+        $rule = $this->matchRule($appName, $model, $quality);
+        if ($rule) {
+            return $rule->cost_credits;
+        }
         return (int) SiteSetting::get('billing_per_generation', 1);
     }
 
-    public function canAfford(User $user): bool
+    /**
+     * 匹配计费规则：精确 > 通配符，quality 精确 > 不限
+     */
+    protected function matchRule(string $appName, string $model, string $quality): ?BillingRule
     {
-        return $user->credits >= $this->getCost();
+        $rules = BillingRule::where('app_name', $appName)->get();
+        if ($rules->isEmpty()) return null;
+
+        $best = null;
+        $bestScore = -1;
+
+        foreach ($rules as $rule) {
+            // 模型匹配
+            if (!$this->wildcardMatch($rule->model_pattern, $model)) continue;
+
+            // quality 匹配
+            if ($rule->quality && $rule->quality !== $quality) continue;
+
+            // 计算优先级分数：精确模型 > 通配符，有quality > 无quality
+            $score = 0;
+            if (!str_contains($rule->model_pattern, '*')) $score += 10;
+            if ($rule->quality) $score += 1;
+
+            if ($score > $bestScore) {
+                $best = $rule;
+                $bestScore = $score;
+            }
+        }
+
+        return $best;
+    }
+
+    protected function wildcardMatch(string $pattern, string $value): bool
+    {
+        if ($pattern === '*') return true;
+        $regex = '/^' . str_replace('\*', '.*', preg_quote($pattern, '/')) . '$/i';
+        return (bool) preg_match($regex, $value);
+    }
+
+    public function canAfford(User $user, string $model = '', string $quality = '', string $appName = 'image-gen'): bool
+    {
+        return $user->credits >= $this->getCost($model, $quality, $appName);
     }
 
     public function charge(User $user, string $quality, array $meta = []): UsageLog
     {
-        $cost = $this->getCost();
+        $model = $meta['model'] ?? '';
+        $appName = $meta['app_name'] ?? 'image-gen';
+        $cost = $this->getCost($model, $quality, $appName);
 
-        return DB::transaction(function () use ($user, $cost, $quality, $meta) {
+        return DB::transaction(function () use ($user, $cost, $quality, $meta, $appName) {
             $user = User::lockForUpdate()->find($user->id);
 
             if ($user->credits < $cost) {
@@ -38,7 +87,7 @@ class BillingService
 
             $log = UsageLog::create([
                 'user_id' => $user->id,
-                'app_name' => $meta['app_name'] ?? 'image-gen',
+                'app_name' => $appName,
                 'task_id' => $meta['task_id'] ?? null,
                 'channel_id' => $meta['channel_id'] ?? null,
                 'model' => $meta['model'] ?? null,

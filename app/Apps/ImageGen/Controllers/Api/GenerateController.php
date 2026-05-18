@@ -42,8 +42,9 @@ class GenerateController extends Controller
         }
 
         $count = max(1, min(4, (int) $request->input('count', 1)));
+        $model = $request->input('model', 'gpt-image-2');
 
-        if (!$billing->canAfford($user)) {
+        if (!$billing->canAfford($user, $model, $quality)) {
             return response()->json(['error' => '积分不足，请先充值'], 402);
         }
 

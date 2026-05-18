@@ -1733,6 +1733,35 @@
       @keyframes lightboxIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+      .gallery-lb { display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.88); backdrop-filter: blur(4px); }
+      .gallery-lb.open { display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease; }
+      .gallery-lb-inner { display: flex; width: auto; max-width: 880px; max-height: 80vh; background: #1a1a1a; border-radius: 14px; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,0.5); }
+      .gallery-lb-img { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; min-width: 0; background: #111; }
+      .gallery-lb-img img { max-width: 100%; max-height: 80vh; object-fit: contain; animation: lightboxIn 0.25s cubic-bezier(0.22,1,0.36,1); }
+      .gallery-lb-info { width: 250px; padding: 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; color: #e5e5e5; font-size: 13px; }
+      .gallery-lb-close { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.15); border: none; color: #fff; width: 28px; height: 28px; border-radius: 50%; font-size: 15px; cursor: pointer; z-index: 10; }
+      .gallery-lb-close:hover { background: rgba(255,255,255,0.3); }
+      .gallery-lb-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.12); border: none; color: #fff; width: 30px; height: 30px; border-radius: 50%; font-size: 16px; cursor: pointer; display: none; }
+      .gallery-lb-nav:hover { background: rgba(255,255,255,0.25); }
+      .gallery-lb-nav.prev { left: 8px; }
+      .gallery-lb-nav.next { right: 8px; }
+      .gallery-lb-prompt { background: rgba(255,255,255,0.06); border-radius: 6px; padding: 10px 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow-y: auto; font-size: 12px; }
+      .gallery-lb-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+      .gallery-lb-meta span { padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.08); font-size: 10px; }
+      .gallery-lb-actions { display: flex; gap: 6px; margin-top: auto; }
+      .gallery-lb-actions button { flex: 1; padding: 7px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: transparent; color: #fff; font-size: 12px; cursor: pointer; }
+      .gallery-lb-actions button:hover { background: rgba(255,255,255,0.1); }
+      .gallery-lb-actions button.primary { background: #2d5bf0; border-color: #2d5bf0; }
+      .gallery-lb-actions button.primary:hover { background: #1d4ed8; }
+      .gallery-lb-dots { display: flex; justify-content: center; gap: 5px; padding: 6px 0; }
+      .gallery-lb-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); cursor: pointer; }
+      .gallery-lb-dots span.active { background: #fff; }
+      @media (max-width: 768px) {
+        .gallery-lb-inner { flex-direction: column; width: 88vw; max-width: none; max-height: 80vh; }
+        .gallery-lb-img { max-height: 45vh; }
+        .gallery-lb-info { width: 100%; max-height: 32vh; padding: 12px; }
+      }
+
       .preview-item.loading {
         background:
           radial-gradient(circle at 50% 16%, rgba(114, 155, 255, 0.58), transparent 36%),
@@ -2201,6 +2230,7 @@
         aspect-ratio: 1 / 1;
         box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
       }
 
       .gallery-item:hover {
@@ -3532,6 +3562,28 @@
 
         <div id="galleryGrid" class="gallery-grid"></div>
 
+        <!-- Gallery Lightbox -->
+        <div class="gallery-lb" id="galleryLb">
+          <div class="gallery-lb-inner">
+            <div class="gallery-lb-img">
+              <button class="gallery-lb-close" onclick="closeGalleryLb()">✕</button>
+              <button class="gallery-lb-nav prev" onclick="galleryLbPrev()">‹</button>
+              <img id="glb-img" src="" alt="">
+              <button class="gallery-lb-nav next" onclick="galleryLbNext()">›</button>
+              <div class="gallery-lb-dots" id="glb-dots"></div>
+            </div>
+            <div class="gallery-lb-info">
+              <div class="gallery-lb-prompt" id="glb-prompt"></div>
+              <div class="gallery-lb-meta" id="glb-meta"></div>
+              <div class="gallery-lb-actions">
+                <button onclick="glbCopy()">📋 复制</button>
+                <button onclick="glbDownload()">⬇ 下载</button>
+                <button class="primary" onclick="glbUse()">✨ 使用</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 我的作品 Modal -->
         <div id="myWorksModal" class="myworks-modal" hidden>
           <div class="myworks-overlay" id="myWorksOverlay"></div>
@@ -3880,6 +3932,7 @@
         pollConsecutiveErrors: 0,
         taskDelayNoticeLevel: "",
         publicGallery: true,
+        galleryItems: [],
       };
 
       const FIXED_BASE_URL = "/api/apps/image-gen/proxy?path=";
@@ -3892,6 +3945,7 @@
       let REVERSE_PROMPT_MODEL = "gpt-5.4-mini";
       let LOGIN_METHODS = { github: false, wechat: false };
       let COST_PER_GENERATION = 1;
+      let BILLING_RULES = [];
       (async () => {
         try {
           const r = await fetch("/api/config");
@@ -3900,6 +3954,7 @@
           if (d.prompt_tool_model) PROMPT_TOOL_MODEL = d.prompt_tool_model;
           if (d.reverse_prompt_model) REVERSE_PROMPT_MODEL = d.reverse_prompt_model;
           if (d.cost_per_generation) { COST_PER_GENERATION = d.cost_per_generation; updateGenerateBtn(); }
+          if (d.billing_rules) { BILLING_RULES = d.billing_rules; updateGenerateBtn(); }
           if (d.login_methods) {
             LOGIN_METHODS = d.login_methods;
             const oauthWrap = document.getElementById("oauthMethodsWrap");
@@ -4051,9 +4106,29 @@
         }, 700);
       }
 
+      function getUnitCost() {
+        if (!BILLING_RULES.length) return COST_PER_GENERATION;
+        let best = null, bestScore = -1;
+        for (const r of BILLING_RULES) {
+          if (r.app !== 'image-gen') continue;
+          // model match
+          if (r.model !== '*') {
+            const re = new RegExp('^' + r.model.replace(/\*/g, '.*') + '$', 'i');
+            if (!re.test(state.model)) continue;
+          }
+          // quality match
+          if (r.quality !== '*' && r.quality !== state.quality) continue;
+          let score = 0;
+          if (!r.model.includes('*')) score += 10;
+          if (r.quality !== '*') score += 1;
+          if (score > bestScore) { best = r; bestScore = score; }
+        }
+        return best ? best.credits : COST_PER_GENERATION;
+      }
+
       function updateGenerateBtn() {
         if (state.mode === "reverse") { els.generateBtn.textContent = "反推"; return; }
-        const total = COST_PER_GENERATION * state.count;
+        const total = getUnitCost() * state.count;
         els.generateBtn.textContent = `生成 (${total}积分)`;
       }
 
@@ -5009,15 +5084,16 @@
             return;
           }
 
+          state.galleryItems = items;
           els.galleryGrid.innerHTML = items
             .map((item, index) => {
               const imgUrl = item.thumb || item.url || (item.images && item.images[0]);
               if (!imgUrl) return "";
               const label = item.created_at ? new Date(item.created_at).toLocaleString() : `图片 ${index + 1}`;
               return `
-                <a class="gallery-item" href="${escapeHtml(imgUrl)}" target="_blank" rel="noreferrer" title="${escapeHtml(label)}">
+                <div class="gallery-item" onclick="openGalleryLb(${index})" title="${escapeHtml(label)}">
                   <img data-src="${escapeHtml(imgUrl)}" alt="最新图片 ${index + 1}" loading="lazy" decoding="async" />
-                </a>
+                </div>
               `;
             })
             .join("");
@@ -5692,6 +5768,7 @@
         state.quality = button.dataset.value;
         setActiveButton(els.qualityOptions, state.quality);
         updateConfigButton();
+        updateGenerateBtn();
       });
 
       els.modelOptions.addEventListener("click", (event) => {
@@ -5700,6 +5777,7 @@
         state.model = button.dataset.value;
         setActiveButton(els.modelOptions, state.model);
         updateConfigButton();
+        updateGenerateBtn();
       });
 
       els.sizeOptions.addEventListener("click", (event) => {
@@ -5916,6 +5994,84 @@
         document.body.appendChild(overlay);
       });
 
+      // Gallery wall lightbox
+      let glbIdx = -1, glbImgIdx = 0;
+      function openGalleryLb(idx) {
+        glbIdx = idx; glbImgIdx = 0;
+        updateGalleryLb();
+        document.getElementById('galleryLb').classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+      function closeGalleryLb() {
+        document.getElementById('galleryLb').classList.remove('open');
+        document.body.style.overflow = '';
+        glbIdx = -1;
+      }
+      function updateGalleryLb() {
+        const item = (state.galleryItems || [])[glbIdx];
+        if (!item) return;
+        const images = item.images || [item.thumb];
+        document.getElementById('glb-img').src = images[glbImgIdx] || item.thumb;
+        document.getElementById('glb-prompt').textContent = item.prompt || '无提示词';
+        document.getElementById('glb-meta').innerHTML =
+          `<span>${escapeHtml(item.model || '')}</span><span>${escapeHtml(item.quality || '')}</span><span>${escapeHtml(item.size || '')}</span>`;
+        const dotsEl = document.getElementById('glb-dots');
+        const prevBtn = document.querySelector('.gallery-lb-nav.prev');
+        const nextBtn = document.querySelector('.gallery-lb-nav.next');
+        if (images.length > 1) {
+          dotsEl.innerHTML = images.map((_, i) => `<span class="${i === glbImgIdx ? 'active' : ''}" onclick="glbGoImg(${i})"></span>`).join('');
+          dotsEl.style.display = 'flex';
+          prevBtn.style.display = 'grid';
+          nextBtn.style.display = 'grid';
+        } else {
+          dotsEl.style.display = 'none';
+          prevBtn.style.display = 'none';
+          nextBtn.style.display = 'none';
+        }
+      }
+      function glbGoImg(i) { glbImgIdx = i; updateGalleryLb(); }
+      function galleryLbPrev() {
+        const images = (state.galleryItems || [])[glbIdx]?.images || [];
+        if (images.length > 1) { glbImgIdx = (glbImgIdx - 1 + images.length) % images.length; }
+        else if (glbIdx > 0) { glbIdx--; glbImgIdx = 0; }
+        updateGalleryLb();
+      }
+      function galleryLbNext() {
+        const images = (state.galleryItems || [])[glbIdx]?.images || [];
+        if (images.length > 1) { glbImgIdx = (glbImgIdx + 1) % images.length; }
+        else if (glbIdx < (state.galleryItems || []).length - 1) { glbIdx++; glbImgIdx = 0; }
+        updateGalleryLb();
+      }
+      function glbCopy() {
+        const item = (state.galleryItems || [])[glbIdx];
+        if (!item) return;
+        navigator.clipboard.writeText(item.prompt || '').catch(() => {});
+      }
+      function glbDownload() {
+        const item = (state.galleryItems || [])[glbIdx];
+        if (!item) return;
+        const images = item.images || [item.thumb];
+        const url = images[glbImgIdx] || item.thumb;
+        if (!url) return;
+        const a = document.createElement('a');
+        a.href = url; a.download = `cang-ai-${glbIdx}-${glbImgIdx}.png`; a.target = '_blank'; a.click();
+      }
+      function glbUse() {
+        const item = (state.galleryItems || [])[glbIdx];
+        if (!item || !item.prompt) return;
+        closeGalleryLb();
+        els.prompt.value = item.prompt;
+        els.prompt.dispatchEvent(new Event('input'));
+        els.prompt.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      document.getElementById('galleryLb').addEventListener('click', function(e) { if (e.target === this) closeGalleryLb(); });
+      document.addEventListener('keydown', function(e) {
+        if (!document.getElementById('galleryLb').classList.contains('open')) return;
+        if (e.key === 'Escape') closeGalleryLb();
+        if (e.key === 'ArrowLeft') galleryLbPrev();
+        if (e.key === 'ArrowRight') galleryLbNext();
+      });
+
       els.queryTaskBtn.addEventListener("click", async () => {
         try {
           const taskId = els.taskQueryInput.value.trim();
@@ -6101,5 +6257,6 @@
       }
     })();
     </script>
+
   </body>
 </html>

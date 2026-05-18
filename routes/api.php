@@ -64,10 +64,18 @@ Route::get('/config', function () {
         ->map(fn($m) => ['id' => $m->model_id, 'name' => $m->display_name])
         ->values()->all();
 
+    $billingRules = \App\Models\BillingRule::all()->map(fn($r) => [
+        'app' => $r->app_name,
+        'model' => $r->model_pattern,
+        'quality' => $r->quality ?: '*',
+        'credits' => $r->cost_credits,
+    ])->values()->all();
+
     return response()->json([
         'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
         'reverse_prompt_model' => \App\Models\SiteSetting::get('reverse_prompt_model', 'gpt-5.4-mini'),
         'cost_per_generation' => (int) \App\Models\SiteSetting::get('billing_per_generation', 1),
+        'billing_rules' => $billingRules,
         'announcements' => $announcements,
         'models' => $models,
         'login_methods' => [

@@ -106,7 +106,7 @@ class PromptTemplateResource extends Resource
                         Forms\Components\TagsInput::make('alternatives')->label('备选项')
                             ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => $get('type') !== 'image'),
                     ])
-                    ->columns(3)
+                    ->grid(3)
                     ->defaultItems(0)
                     ->collapsible()
                     ->cloneable()
