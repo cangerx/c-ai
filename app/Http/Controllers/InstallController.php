@@ -183,6 +183,7 @@ class InstallController extends Controller
             ['name' => 'Mbstring', 'ok' => extension_loaded('mbstring')],
             ['name' => 'OpenSSL', 'ok' => extension_loaded('openssl')],
             ['name' => 'JSON', 'ok' => extension_loaded('json')],
+            ['name' => 'Redis', 'ok' => extension_loaded('redis')],
             ['name' => 'pcntl（队列必需）', 'ok' => extension_loaded('pcntl')],
             ['name' => 'storage/ 可写', 'ok' => is_writable(storage_path())],
             ['name' => 'database/ 可写', 'ok' => is_writable(database_path())],

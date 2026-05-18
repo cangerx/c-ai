@@ -114,6 +114,13 @@
             ⚠️ 请前往后台「AI 渠道」添加至少一个渠道，配置 API Key 后方可使用生成功能。
         </div>
 
+        <div class="tip" style="margin-top: 12px; background: rgba(45,91,240,0.06); border-color: rgba(45,91,240,0.12); color: #1e40af;">
+            🚀 <strong>必须配置任务队列</strong>，否则生成任务会一直排队：<br>
+            宝塔 Supervisor 添加守护进程，命令：<br>
+            <code style="display:block;margin-top:6px;padding:8px;background:rgba(0,0,0,0.04);border-radius:6px;word-break:break-all;">php {{ base_path('artisan') }} task:worker</code>
+            <span style="display:block;margin-top:6px;">进程数建议 2-4 个。需确保 Redis 已启动。</span>
+        </div>
+
         <div class="links">
             <a href="/" class="secondary">访问首页</a>
             <a href="/admin" class="primary">进入后台</a>
