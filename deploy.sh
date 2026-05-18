@@ -110,22 +110,39 @@ if [ ! -f .env ]; then
     cp .env.example .env
     $PHP_BIN artisan key:generate --force
 
-    # 自动创建 MySQL 数据库（如果 mysql 可用）
+    # 交互式配置
+    echo ""
+    read -p "请输入站点域名 (如 example.com): " SITE_DOMAIN
+    read -p "请输入数据库密码 (留空则自动生成): " DB_PASS
+    [ -z "$DB_PASS" ] && DB_PASS=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 16)
+
+    # 写入 .env
+    sed -i "s|APP_URL=.*|APP_URL=https://$SITE_DOMAIN|" .env
+    sed -i "s|APP_ENV=.*|APP_ENV=production|" .env
+    sed -i "s|APP_DEBUG=.*|APP_DEBUG=false|" .env
+    sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
+    sed -i "s|DB_DATABASE=.*|DB_DATABASE=cang_ai|" .env
+    sed -i "s|DB_USERNAME=.*|DB_USERNAME=cang_ai|" .env
+    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$DB_PASS|" .env
+
+    # 自动创建 MySQL 数据库和用户
     if command -v mysql &>/dev/null; then
-        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS cang_ai DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null && \
-            echo "✓ 已自动创建数据库 cang_ai" || true
+        mysql -uroot -e "CREATE DATABASE IF NOT EXISTS cang_ai DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null
+        mysql -uroot -e "CREATE USER IF NOT EXISTS 'cang_ai'@'localhost' IDENTIFIED BY '$DB_PASS';" 2>/dev/null
+        mysql -uroot -e "GRANT ALL PRIVILEGES ON cang_ai.* TO 'cang_ai'@'localhost'; FLUSH PRIVILEGES;" 2>/dev/null
+        echo "✓ 已自动创建数据库和用户 cang_ai"
     fi
 
     echo ""
     echo "┌─────────────────────────────────────────┐"
-    echo "│  .env 已创建，请编辑以下配置后重新运行:  │"
-    echo "│  - APP_URL                              │"
-    echo "│  - DB_HOST / DB_DATABASE / DB_PASSWORD  │"
-    echo "│  - 其他 API 密钥                        │"
+    echo "│  环境配置完成！                          │"
+    echo "│  域名: https://$SITE_DOMAIN             │"
+    echo "│  数据库: cang_ai / 密码: $DB_PASS       │"
+    echo "│  如需配置 API 密钥请编辑 .env           │"
     echo "└─────────────────────────────────────────┘"
     echo ""
-    echo "编辑完成后运行: bash deploy.sh"
-    exit 0
+    read -p "是否继续部署？(Y/n): " CONTINUE
+    [ "$CONTINUE" = "n" ] && exit 0
 fi
 
 # ========== 更新部署 ==========
