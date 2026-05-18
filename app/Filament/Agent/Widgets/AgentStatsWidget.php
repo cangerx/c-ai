@@ -9,6 +9,7 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 class AgentStatsWidget extends BaseWidget
 {
     protected static ?int $sort = 1;
+    protected ?string $pollingInterval = null;
 
     protected function getStats(): array
     {

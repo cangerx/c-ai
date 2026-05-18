@@ -10,6 +10,7 @@ class CommissionTrendChart extends ChartWidget
     protected ?string $heading = '佣金收入趋势 (30天)';
     protected static ?int $sort = 6;
     protected ?string $maxHeight = '240px';
+    protected ?string $pollingInterval = null;
 
     protected function getData(): array
     {

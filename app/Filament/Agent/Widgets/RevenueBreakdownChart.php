@@ -12,6 +12,7 @@ class RevenueBreakdownChart extends ChartWidget
     protected static ?int $sort = 4;
     protected ?string $maxHeight = '260px';
     protected int|string|array $columnSpan = 1;
+    protected ?string $pollingInterval = null;
 
     protected function getData(): array
     {

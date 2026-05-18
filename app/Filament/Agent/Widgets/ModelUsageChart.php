@@ -11,6 +11,7 @@ class ModelUsageChart extends ChartWidget
     protected static ?int $sort = 5;
     protected ?string $maxHeight = '260px';
     protected int|string|array $columnSpan = 1;
+    protected ?string $pollingInterval = null;
 
     protected function getData(): array
     {

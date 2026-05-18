@@ -10,6 +10,7 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 class RevenueStatsWidget extends BaseWidget
 {
     protected static ?int $sort = 2;
+    protected ?string $pollingInterval = null;
 
     protected function getStats(): array
     {

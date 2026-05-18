@@ -10,6 +10,7 @@ class ConsumptionTrendChart extends ChartWidget
     protected ?string $heading = '消耗与增长趋势';
     protected static ?int $sort = 3;
     protected ?string $maxHeight = '280px';
+    protected ?string $pollingInterval = null;
 
     public ?string $filter = '30';
 
