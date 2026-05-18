@@ -118,6 +118,37 @@ class SiteSettings extends Page
                             ->maxLength(300),
                     ]),
 
+                Section::make('页脚设置')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\TextInput::make('footer_text')
+                            ->label('页脚文本')
+                            ->placeholder('例：© 2025 我的AI平台')
+                            ->maxLength(300),
+                        Forms\Components\TextInput::make('footer_icp')
+                            ->label('备案号')
+                            ->placeholder('例：京ICP备XXXXXXXX号')
+                            ->maxLength(100),
+                        Forms\Components\Repeater::make('footer_links')
+                            ->label('页脚链接')
+                            ->schema([
+                                Forms\Components\TextInput::make('text')
+                                    ->label('文字')
+                                    ->required()
+                                    ->maxLength(50),
+                                Forms\Components\TextInput::make('url')
+                                    ->label('链接')
+                                    ->required()
+                                    ->url()
+                                    ->maxLength(300),
+                            ])
+                            ->columns(2)
+                            ->defaultItems(0)
+                            ->maxItems(5)
+                            ->columnSpanFull(),
+                    ])->columns(2),
+
                 Section::make('计费与佣金')
                     ->description('设置用户使用扣费及你的分成比例')
                     ->schema([

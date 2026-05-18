@@ -9,6 +9,7 @@ class AgentSite extends Model
     protected $fillable = [
         'user_id', 'slug', 'subdomain', 'subdomain_domain', 'custom_domain', 'site_name', 'logo_url',
         'theme_color', 'seo_title', 'seo_description', 'seo_keywords',
+        'footer_text', 'footer_icp', 'footer_links',
         'announcement', 'cost_per_generation', 'commission_rate', 'is_active',
         'status', 'reject_reason', 'approved_at',
     ];
@@ -18,6 +19,7 @@ class AgentSite extends Model
         return [
             'is_active' => 'boolean',
             'approved_at' => 'datetime',
+            'footer_links' => 'array',
         ];
     }
 
