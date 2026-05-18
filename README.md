@@ -30,6 +30,7 @@
 | 💰 **积分计费** — 按尺寸质量定价，兑换码充值 | 👥 **分销推广** — 邀请注册返佣，佣金自动结算 |
 | 📱 **全端适配** — PC / 平板 / 手机响应式设计 | 🛡️ **内容安全** — 提示词过滤 + 图片审核 |
 | ⚡ **异步队列** — 任务后台处理，失败自动重试 | 🔐 **多种登录** — 邮箱 / GitHub / 微信扫码 |
+| 📝 **提示词模板** — 分类管理，变量填充，一键生成 | 🖼️ **公开画廊** — 作品展示，社区浏览 |
 
 ---
 
@@ -103,6 +104,18 @@ php artisan route:cache
 
 ---
 
+## 🔄 日常更新
+
+```bash
+# 方式一：一键更新脚本
+bash update.sh
+
+# 方式二：完整部署脚本（含权限修复）
+bash deploy.sh
+```
+
+---
+
 ## 📐 技术架构
 
 ```
@@ -135,11 +148,14 @@ resources/views/admin → 管理后台
 |:----:|------|------|
 | POST | `/api/register` | 注册 |
 | POST | `/api/login` | 登录 |
-| GET | `/api/me` | 用户信息 |
-| POST | `/api/generate` | 提交生成任务 |
-| GET | `/api/tasks/{id}` | 查询任务状态 |
-| POST | `/api/redeem` | 兑换码充值 |
-| GET | `/api/gallery` | 公开画廊 |
+| GET | `/api/me` | 用户信息（需认证） |
+| POST | `/api/generate` | 提交生成任务（需认证） |
+| GET | `/api/status` | 查询任务状态（需认证） |
+| POST | `/api/redeem` | 兑换码充值（需认证） |
+| GET | `/api/templates` | 提示词模板列表 |
+| POST | `/api/templates/{id}/build` | 构建模板提示词 |
+| GET | `/api/config` | 前端配置 |
+| GET | `/api/download` | 图片代理下载 |
 
 ---
 
