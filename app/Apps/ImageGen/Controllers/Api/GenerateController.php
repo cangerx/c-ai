@@ -44,7 +44,7 @@ class GenerateController extends Controller
         $count = max(1, min(4, (int) $request->input('count', 1)));
         $model = $request->input('model', 'gpt-image-2');
 
-        if (!$billing->canAfford($user, $model, $quality)) {
+        if (!$billing->canAfford($user, $model, $quality, 'image-gen', $count)) {
             return response()->json(['error' => '积分不足，请先充值'], 402);
         }
 
@@ -63,6 +63,7 @@ class GenerateController extends Controller
                 'app_name' => 'image-gen',
                 'model' => $request->input('model', 'gpt-image-2'),
                 'channel_id' => $channel->id,
+                'count' => $count,
             ]);
         } catch (\RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 402);

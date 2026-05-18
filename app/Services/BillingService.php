@@ -64,16 +64,17 @@ class BillingService
         return (bool) preg_match($regex, $value);
     }
 
-    public function canAfford(User $user, string $model = '', string $quality = '', string $appName = 'image-gen'): bool
+    public function canAfford(User $user, string $model = '', string $quality = '', string $appName = 'image-gen', int $count = 1): bool
     {
-        return $user->credits >= $this->getCost($model, $quality, $appName);
+        return $user->credits >= $this->getCost($model, $quality, $appName) * $count;
     }
 
     public function charge(User $user, string $quality, array $meta = []): UsageLog
     {
         $model = $meta['model'] ?? '';
         $appName = $meta['app_name'] ?? 'image-gen';
-        $cost = $this->getCost($model, $quality, $appName);
+        $count = $meta['count'] ?? 1;
+        $cost = $this->getCost($model, $quality, $appName) * $count;
 
         return DB::transaction(function () use ($user, $cost, $quality, $meta, $appName) {
             $user = User::lockForUpdate()->find($user->id);
