@@ -73,7 +73,7 @@ fi
 
 echo ""
 echo ">>> [1/7] 拉取最新代码"
-git pull origin main
+timeout 30 git pull origin main || echo "⚠ git pull 超时或失败，跳过（请确认代码已是最新）"
 
 echo ""
 echo ">>> [2/7] 安装 PHP 依赖"
