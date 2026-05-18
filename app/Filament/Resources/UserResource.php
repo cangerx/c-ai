@@ -129,6 +129,7 @@ class UserResource extends Resource
                         AgentSite::create([
                             'user_id' => $record->id,
                             'site_name' => $data['site_name'],
+                            'slug' => $record->invite_code,
                             'subdomain' => $record->invite_code,
                             'status' => 'approved',
                             'is_active' => true,
