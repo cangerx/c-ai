@@ -9,8 +9,6 @@ class PromptAnalysisService
 {
     public function extractVariables(string $prompt, ?int $channelId = null, ?string $model = null): array
     {
-        $model = $model ?: SiteSetting::get('prompt_tool_model', 'gpt-4o-mini');
-
         if ($channelId) {
             $channel = AiChannel::find($channelId);
         } else {
@@ -30,16 +28,26 @@ class PromptAnalysisService
             throw new \RuntimeException('没有可用的 AI 渠道');
         }
 
-        $systemPrompt = <<<'SYSTEM'
-你是一个 prompt 模板分析专家。用户会给你一段图片生成的 prompt，你需要识别其中可以被用户自定义替换的关键变量部分。
+        $model = $model ?: SiteSetting::get('prompt_tool_model') ?: null;
+        if (!$model || (!empty($channel->models) && !in_array($model, $channel->models))) {
+            $model = $channel->model;
+        }
 
-规则：
-1. 识别 3-8 个最重要的可替换变量（如主题、风格、颜色、场景、材质等）
-2. 变量应该是用户最可能想要修改的部分
-3. 不要把整段描述作为一个变量，要拆分成具体的可替换片段
+        $systemPrompt = <<<'SYSTEM'
+你是一个 prompt 模板分析专家。用户会给你一段图片生成的 prompt，你需要：
+1. 为这个 prompt 生成一个简短的中文标题（不超过20字）
+2. 推荐 1-3 个分类标签（如：人像、风景、插画、3D、动漫、产品、建筑等）
+3. 识别其中可以被用户自定义替换的关键变量部分
+
+变量提取规则：
+- 识别 3-8 个最重要的可替换变量（如主题、风格、颜色、场景、材质等）
+- 变量应该是用户最可能想要修改的部分
+- 不要把整段描述作为一个变量，要拆分成具体的可替换片段
 
 返回严格的 JSON 格式（不要 markdown 代码块）：
 {
+  "title": "简短中文标题",
+  "tags": "标签1,标签2",
   "template_prompt": "原始prompt中变量部分替换为 {{variable_name}} 的版本",
   "variables": [
     {
@@ -87,7 +95,6 @@ SYSTEM;
         $data = json_decode($result, true);
         $content = $data['choices'][0]['message']['content'] ?? '';
 
-        // 清理可能的 markdown 代码块包裹
         $content = preg_replace('/^```(?:json)?\s*|\s*```$/s', '', trim($content));
 
         $parsed = json_decode($content, true);

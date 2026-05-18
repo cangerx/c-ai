@@ -8,14 +8,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PromptTemplate extends Model
 {
     protected $fillable = [
-        'task_id', 'title', 'original_prompt', 'template_prompt',
+        'category_id', 'task_id', 'title', 'original_prompt', 'template_prompt',
         'variables', 'tags', 'preview_url', 'is_featured', 'sort_order', 'status',
+    ];
+
+    protected $attributes = [
+        'sort_order' => 0,
+        'status' => 'draft',
     ];
 
     protected $casts = [
         'variables' => 'array',
         'is_featured' => 'boolean',
     ];
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(TemplateCategory::class, 'category_id');
+    }
 
     public function task(): BelongsTo
     {

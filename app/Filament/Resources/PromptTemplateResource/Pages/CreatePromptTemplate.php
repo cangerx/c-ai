@@ -15,13 +15,21 @@ class CreatePromptTemplate extends CreateRecord
         parent::mount();
 
         $taskId = request()->query('task_id');
-        if ($taskId && $task = GenerationTask::find($taskId)) {
+        if ($taskId && $task = GenerationTask::where('task_id', $taskId)->first()) {
+            $image = collect($task->items ?? [])->firstWhere('url');
             $this->form->fill([
                 'task_id' => $task->task_id,
                 'original_prompt' => $task->prompt,
                 'template_prompt' => $task->prompt,
-                'preview_url' => collect($task->items ?? [])->pluck('url')->first(),
+                'preview_url' => $image['url'] ?? null,
             ]);
         }
+    }
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $data['sort_order'] = $data['sort_order'] ?? 0;
+        $data['status'] = $data['status'] ?? 'draft';
+        return $data;
     }
 }

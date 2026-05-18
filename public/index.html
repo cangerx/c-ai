@@ -4158,7 +4158,7 @@
           if (!items.length) { list.textContent = "暂无记录"; return; }
           list.innerHTML = items.map(i => {
             const t = new Date(i.created_at).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-            return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--line)"><span>${t} · ${MODEL_LABELS[i.model] || i.model || "—"}${i.task_id ? ' · <code style="font-size:10px;color:var(--text-tertiary)">' + i.task_id.slice(0,8) + '</code>' : ''}</span><span>-${i.cost_credits}积分</span></div>`;
+            return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--line)"><span>${escapeHtml(t)} · ${escapeHtml(MODEL_LABELS[i.model] || i.model || "—")}${i.task_id ? ' · <code style="font-size:10px;color:var(--text-tertiary)">' + escapeHtml(String(i.task_id).slice(0,8)) + '</code>' : ''}</span><span>-${parseInt(i.cost_credits)}积分</span></div>`;
           }).join("");
         } catch { list.textContent = "加载失败"; }
       }
@@ -4185,7 +4185,8 @@
           if (!items.length) { invitesEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">暂无邀请记录</div>'; }
           else { invitesEl.innerHTML = items.map(u => {
             const t = new Date(u.created_at).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line);gap:8px"><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--border-color);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:11px;font-weight:700;">${(u.nickname||u.name||u.email||'?')[0].toUpperCase()}</div><div><div style="font-size:12px;font-weight:500;color:var(--text-primary)">${u.nickname||u.name||u.email}</div><div style="font-size:10px;color:var(--text-tertiary)">${t}</div></div></div><div style="font-size:11px;color:var(--text-secondary)">消费 ${u.total_consumed_credits||0}</div></div>`;
+            const uname = escapeHtml(u.nickname||u.name||u.email||'?');
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line);gap:8px"><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:50%;background:var(--border-color);display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:11px;font-weight:700;">${uname[0]}</div><div><div style="font-size:12px;font-weight:500;color:var(--text-primary)">${uname}</div><div style="font-size:10px;color:var(--text-tertiary)">${escapeHtml(t)}</div></div></div><div style="font-size:11px;color:var(--text-secondary)">消费 ${parseInt(u.total_consumed_credits)||0}</div></div>`;
           }).join(""); }
         } catch { invitesEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">加载失败</div>'; }
 
@@ -4196,8 +4197,8 @@
           if (!items.length) { commissionsEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">暂无返利记录</div>'; }
           else { commissionsEl.innerHTML = items.map(c => {
             const t = new Date(c.created_at).toLocaleString("zh-CN", {month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-            const from = c.from_user ? (c.from_user.nickname||c.from_user.name||c.from_user.email) : "用户";
-            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line)"><div style="font-size:12px;color:var(--text-primary)">来自 ${from}<div style="font-size:10px;color:var(--text-tertiary)">${t}</div></div><div style="font-size:13px;color:#16a34a;font-weight:700;">+${c.credits}</div></div>`;
+            const from = c.from_user ? escapeHtml(c.from_user.nickname||c.from_user.name||c.from_user.email) : "用户";
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 6px;border-bottom:1px solid var(--line)"><div style="font-size:12px;color:var(--text-primary)">来自 ${from}<div style="font-size:10px;color:var(--text-tertiary)">${escapeHtml(t)}</div></div><div style="font-size:13px;color:#16a34a;font-weight:700;">+${parseInt(c.credits)}</div></div>`;
           }).join(""); }
         } catch { commissionsEl.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-tertiary);">加载失败</div>'; }
       }
@@ -4480,47 +4481,47 @@
       ];
 
       const LOADING_STATUS_MSGS = [
-        "✏️ 正在打草稿，用简单的线条勾勒出画面的大致轮廓和构图关系",
-        "🧠 正在解读提示词语义，理解“你想要什么”背后的每一层含义",
-        "💭 构思中……想象画面的整体氛围，确定色调和情绪基调",
-        "📀 正在调用数十亿参数的神经网络，让 AI “看见”你要的画面",
-        "🎨 正在从上万种色彩中挑选配色方案，让画面和谐而不单调",
-        "🖌️ 开始描绘主体，从最重要的视觉焦点开始落笔",
-        "🌈 光线师到场——正在设计光源方向、强度和色温",
-        "✨ 为物体表面添加纹理，让布料像布料、金属像金属",
-        "📐 调整构图的黄金比例，让视觉重心落在最舒服的位置",
-        "🎭 正在统一风格调性，确保每个元素都属于同一个视觉世界",
-        "🔍 放大到像素级别，精修边缘的每一个过渡和抗锯齿",
-        "💎 启动超分辨率算法，让画面每个角落都细腔满满",
-        "🌟 进入最终润色阶段，像给照片加了一层精致的滤镜",
-        "🎪 渲染背景的层次和景深，让远近关系更立体",
-        "🪄 处理反射、折射和迟来反射，让光影真实可信",
-        "🎯 校准每一个像素的色彩准确度，避免色偏和失真",
-        "🌿 在画面中添加环境细节，让场景更加丰富自然",
-        "🔮 融合风格化效果，让整体画面有独特的艺术气息",
-        "⚡ 模型的数十亿个参数正在高速协同运算，全力以赴",
-        "🎶 微调画面的视觉节奏，让元素之间的空间感更舞空气",
-        "🏔️ 构建空间透视关系，让画面有纵深感而不是一张平面",
-        "🌊 生成流畅的曲线和有机的形体，避免生硬的边界",
-        "🍃 打磨每一个颜色的自然过渡，不留任何突兀的色带",
-        "💫 进入尾声阶段，给每个元素做最后一遍质量检查",
-        "🧩 将所有图层合并为一张完整的画，磨平接缝痕迹",
-        "🎬 最终渲染开始，将内部表示转换为可见的像素矩阵",
-        "📸 执行后期处理：降噪、锐化、对比度微调，让画面干净透亮",
-        "🪞 全局检查对称性和结构一致性，确保没有视觉缺陷",
-        "🎁 打包最终结果，压缩优化后准备交付给你",
-        "🧪 正在运行质量评分算法，确保输出达到预期标准",
-        "🌐 正在同步全局风格一致性，让画面每个角落都和谐",
-        "🛠️ 正在修复微小的视觉缺陷，保证输出完美无瑕",
-        "🌌 为画面注入最后一丝灵气，让它从“好看”变为“惊艳”",
-        "🤖 AI 正在反复审视自己的作品，像画家退后一步审视画布",
-        "🕰️ 耐心等待……好的图片值得多等一会儿",
-        "🌈 正在将随机噪声变成有意义的图像，这是扩散模型的魔法",
-        "🧲 神经网络的注意力机制正在聚焦每一个关键细节",
-        "🎭 正在将你的文字描述变成可见的视觉语言",
-        "📚 模型正在回忆它在数十亿张图片上学到的经验",
-        "🌟 将想象力转化为像素，每个像素都经过精心计算",
-        "🎨 像一位耿耿业业的画师，一笔一笔认真绘制",
+        "正在打草稿，用简单的线条勾勒出画面的大致轮廓和构图关系",
+        "正在解读提示词语义，理解你想要什么背后的每一层含义",
+        "构思中……想象画面的整体氛围，确定色调和情绪基调",
+        "正在调用数十亿参数的神经网络，让 AI 看见你要的画面",
+        "正在从上万种色彩中挑选配色方案，让画面和谐而不单调",
+        "开始描绘主体，从最重要的视觉焦点开始落笔",
+        "光线师到场——正在设计光源方向、强度和色温",
+        "为物体表面添加纹理，让布料像布料、金属像金属",
+        "调整构图的黄金比例，让视觉重心落在最舒服的位置",
+        "正在统一风格调性，确保每个元素都属于同一个视觉世界",
+        "放大到像素级别，精修边缘的每一个过渡和抗锯齿",
+        "启动超分辨率算法，让画面每个角落都细腻满满",
+        "进入最终润色阶段，像给照片加了一层精致的滤镜",
+        "渲染背景的层次和景深，让远近关系更立体",
+        "处理反射、折射和漫反射，让光影真实可信",
+        "校准每一个像素的色彩准确度，避免色偏和失真",
+        "在画面中添加环境细节，让场景更加丰富自然",
+        "融合风格化效果，让整体画面有独特的艺术气息",
+        "模型的数十亿个参数正在高速协同运算，全力以赴",
+        "微调画面的视觉节奏，让元素之间的空间感更舒适",
+        "构建空间透视关系，让画面有纵深感而不是一张平面",
+        "生成流畅的曲线和有机的形体，避免生硬的边界",
+        "打磨每一个颜色的自然过渡，不留任何突兀的色带",
+        "进入尾声阶段，给每个元素做最后一遍质量检查",
+        "将所有图层合并为一张完整的画，磨平接缝痕迹",
+        "最终渲染开始，将内部表示转换为可见的像素矩阵",
+        "执行后期处理：降噪、锐化、对比度微调，让画面干净透亮",
+        "全局检查对称性和结构一致性，确保没有视觉缺陷",
+        "打包最终结果，压缩优化后准备交付给你",
+        "正在运行质量评分算法，确保输出达到预期标准",
+        "正在同步全局风格一致性，让画面每个角落都和谐",
+        "正在修复微小的视觉缺陷，保证输出完美无瑕",
+        "为画面注入最后一丝灵气，让它从好看变为惊艳",
+        "AI 正在反复审视自己的作品，像画家退后一步审视画布",
+        "耐心等待……好的图片值得多等一会儿",
+        "正在将随机噪声变成有意义的图像，这是扩散模型的魔法",
+        "神经网络的注意力机制正在聚焦每一个关键细节",
+        "正在将你的文字描述变成可见的视觉语言",
+        "模型正在回忆它在数十亿张图片上学到的经验",
+        "将想象力转化为像素，每个像素都经过精心计算",
+        "像一位兢兢业业的画师，一笔一笔认真绘制",
       ];
 
       let _loadingTimers = [];
@@ -4860,7 +4861,7 @@
         els.prompt.value = finalText;
         flashPromptField();
         els.resultInfo.textContent = "提示词反推完成，结果已写回输入框。";
-        els.resultUrl.innerHTML = `<span>使用模型: ${PROMPT_TOOL_MODEL}</span>`;
+        els.resultUrl.innerHTML = `<span>使用模型: ${escapeHtml(PROMPT_TOOL_MODEL)}</span>`;
         log("提示词反推完成，结果已写回输入框。");
       }
 
@@ -4895,7 +4896,7 @@
             const dlUrl = escapeHtml(item.downloadUrl || item.download_url || item.url);
             let html = `<a class="dl" href="${dlUrl}" download="image_${n}.png" onclick="event.preventDefault();blobDownload('${dlUrl}','image_${n}.png')">⬇ 下载 ${n}</a>`;
             if (item.origin_url) {
-              html += `<a class="dl" href="${escapeHtml(item.origin_url)}" download="image_${n}.png" onclick="event.preventDefault();blobDownload('${escapeHtml(item.origin_url)}','image_${n}.png')">⚡ 加速下载 ${n}</a>`;
+              html += `<a class="dl" href="${escapeHtml(item.origin_url)}" download="image_${n}.png" onclick="event.preventDefault();blobDownload('${escapeHtml(item.origin_url)}','image_${n}.png')">加速下载 ${n}</a>`;
             }
             return html;
           })
@@ -5014,8 +5015,8 @@
               if (!imgUrl) return "";
               const label = item.created_at ? new Date(item.created_at).toLocaleString() : `图片 ${index + 1}`;
               return `
-                <a class="gallery-item" href="${imgUrl}" target="_blank" rel="noreferrer" title="${label}">
-                  <img data-src="${imgUrl}" alt="最新图片 ${index + 1}" loading="lazy" decoding="async" />
+                <a class="gallery-item" href="${escapeHtml(imgUrl)}" target="_blank" rel="noreferrer" title="${escapeHtml(label)}">
+                  <img data-src="${escapeHtml(imgUrl)}" alt="最新图片 ${index + 1}" loading="lazy" decoding="async" />
                 </a>
               `;
             })
@@ -5035,7 +5036,7 @@
 
           els.galleryGrid.querySelectorAll("img[data-src]").forEach(img => observer.observe(img));
         } catch (err) {
-          els.galleryGrid.innerHTML = `<div class="gallery-empty">${err && err.message ? err.message : String(err)}</div>`;
+          els.galleryGrid.innerHTML = `<div class="gallery-empty">${escapeHtml(err && err.message ? err.message : String(err))}</div>`;
         }
       }
 
@@ -5068,14 +5069,14 @@
           grid.innerHTML = tasks.map(t => {
             const img = t.items[0];
             const url = img?.url || '';
-            const prompt = (t.prompt || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const prompt = escapeHtml(t.prompt || '');
             const displayPrompt = prompt.length > 60 ? prompt.slice(0,60)+'…' : prompt;
             const time = t.created_at ? new Date(t.created_at).toLocaleDateString('zh-CN') : '';
-            return `<div class="myworks-card" data-task-id="${t.task_id}">
-              <img src="${url.replace(/"/g,'&quot;')}" alt="" loading="lazy" />
+            return `<div class="myworks-card" data-task-id="${escapeHtml(t.task_id)}">
+              <img src="${escapeHtml(url)}" alt="" loading="lazy" />
               <div class="myworks-card-body">
                 <div class="myworks-card-prompt">${displayPrompt}</div>
-                <div class="myworks-card-time">${time}${t.items.length > 1 ? ' · '+t.items.length+'张' : ''}</div>
+                <div class="myworks-card-time">${escapeHtml(time)}${t.items.length > 1 ? ' · '+parseInt(t.items.length)+'张' : ''}</div>
               </div>
             </div>`;
           }).join('');
@@ -5218,22 +5219,21 @@
         const statusLabels = { queued: "排队", processing: "处理中", completed: "完成", failed: "失败", pending: "排队" };
         els.taskBallList.innerHTML = tasks.map(t => {
           const st = t.status || "queued";
-          const rawPrompt = t.prompt || '';
-          const prompt = rawPrompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const prompt = escapeHtml(t.prompt || '');
           const displayPrompt = prompt.length > 28 ? prompt.slice(0, 28) + '…' : prompt;
           const time = t.created_at ? new Date(t.created_at).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
-          const safePrompt = rawPrompt.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+          const safePrompt = escapeHtml(t.prompt || '');
           let actionHtml = '';
           if (st === 'failed') {
             actionHtml = `<span class="task-ball-action retry" data-action="retry" data-prompt="${safePrompt}">重试</span>`;
           } else if (st === 'completed') {
             actionHtml = `<span class="task-ball-action view" data-action="view">查看</span>`;
           }
-          return `<button class="task-ball-item" data-task-id="${t.task_id}" title="${t.task_id}">
-            <span class="task-ball-dot ${st}"></span>
+          return `<button class="task-ball-item" data-task-id="${escapeHtml(t.task_id)}" title="${escapeHtml(t.task_id)}">
+            <span class="task-ball-dot ${escapeHtml(st)}"></span>
             <div class="task-ball-info">
               <div class="task-ball-info-prompt">${displayPrompt || '(无提示词)'}</div>
-              <div class="task-ball-info-meta">${time} · ${MODEL_LABELS[t.model] || t.model || ''} · ${statusLabels[st] || st}</div>
+              <div class="task-ball-info-meta">${escapeHtml(time)} · ${escapeHtml(MODEL_LABELS[t.model] || t.model || '')} · ${escapeHtml(statusLabels[st] || st)}</div>
             </div>
             ${actionHtml}
           </button>`;
@@ -5348,7 +5348,7 @@
           els.resultInfo.textContent = `生成完成，共 ${items.length} 张图片。`;
           showRetryBar(false);
           state._galleryStale = true;
-          showToast("🎨 图片生成完成！");
+          showToast("图片生成完成！");
           return task;
         }
 
@@ -5358,7 +5358,7 @@
           els.previewGrid.innerHTML = "";
           setStatus("bad", "生成失败");
           showRetryBar(true);
-          showToast("⚠ 生成失败，请重试");
+          showToast("生成失败，请重试");
           if (!silent) {
             log(task.error === "timeout" ? "任务处理超时，请重新提交。" : (task.message || "任务失败。"));
           }
@@ -5560,8 +5560,9 @@
 
       // Handle OAuth callback token
       (function handleOAuthToken() {
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get("token");
+        const hash = window.location.hash;
+        const match = hash.match(/^#token=(.+)$/);
+        const token = match ? match[1] : null;
         if (token) {
           window.history.replaceState({}, "", "/");
           state.savedKey = token;
@@ -5573,7 +5574,7 @@
             log("GitHub 登录成功");
           }).catch(() => {});
         }
-        const authError = params.get("auth_error");
+        const authError = new URLSearchParams(location.search).get("auth_error");
         if (authError) {
           window.history.replaceState({}, "", "/");
           log("登录失败: " + authError);
@@ -5828,15 +5829,10 @@
       els.generateBtn.addEventListener("click", async () => {
         try {
           const prompt = els.prompt.value.trim();
-          if (!state.savedKey && !prompt) {
+          if (!state.savedKey || !authUser) {
             setSettingsOpen(true);
-            log("请先输入 API Key，然后填写提示词后再生成。", { flash: true });
-            shakeElement(els.generateBtn);
-            return;
-          }
-          if (!state.savedKey) {
-            setSettingsOpen(true);
-            log("请先输入 API Key。", { flash: true });
+            showAuthPanel("login");
+            log("请先登录后再生成。", { flash: true });
             shakeElement(els.generateBtn);
             return;
           }
@@ -6030,8 +6026,9 @@
         clearPreview();
         state.files = [];
         if (els.imageInput) els.imageInput.value = "";
+        els.prompt.value = "";
         renderThumbs();
-        log("结果已清空。");
+        log("已重置。");
         setStatus("", state.mode === "text" ? "图片生成模式" : state.mode === "image" ? "参考图生成模式" : "提示词反推模式");
       });
 
@@ -6059,7 +6056,9 @@
       (function() {
         const params = new URLSearchParams(location.search);
         const p = params.get('prompt');
-        if (p) { els.prompt.value = p; els.prompt.style.height = Math.min(els.prompt.scrollHeight, 120) + 'px'; history.replaceState(null, '', '/'); }
+        if (p) { els.prompt.value = p; els.prompt.style.height = 'auto'; els.prompt.style.height = Math.min(els.prompt.scrollHeight, 120) + 'px'; els.prompt.dispatchEvent(new Event('input')); }
+        const m = params.get('mode'); if (m === 'image') setMode('image');
+        if (p || m) history.replaceState(null, '', '/');
         if (params.get('profile')) { setSettingsOpen(true); history.replaceState(null, '', '/'); }
       })();
       loadGalleryWall();

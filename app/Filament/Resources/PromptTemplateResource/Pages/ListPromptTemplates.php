@@ -3,9 +3,17 @@
 namespace App\Filament\Resources\PromptTemplateResource\Pages;
 
 use App\Filament\Resources\PromptTemplateResource;
+use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPromptTemplates extends ListRecords
 {
     protected static string $resource = PromptTemplateResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\CreateAction::make()->label('新建模板'),
+        ];
+    }
 }

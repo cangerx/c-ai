@@ -79,7 +79,7 @@ Route::get('/config', function () {
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:login');
-Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 Route::get('/auth/github', [AuthController::class, 'githubRedirect']);
 Route::get('/auth/github/callback', [AuthController::class, 'githubCallback']);
 Route::get('/auth/wechat', [AuthController::class, 'wechatRedirect']);

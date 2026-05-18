@@ -4,6 +4,8 @@ namespace App\Apps\ImageGen\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\GenerationTask;
+use App\Models\PromptTemplate;
+use App\Models\TemplateCategory;
 use Illuminate\Http\Request;
 
 class GalleryController extends Controller
@@ -68,6 +70,60 @@ class GalleryController extends Controller
             'page' => $tasks->currentPage(),
             'totalPages' => $tasks->lastPage(),
             'total' => $tasks->total(),
+        ]);
+    }
+
+    public function templates(Request $request)
+    {
+        $categories = TemplateCategory::where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        $query = PromptTemplate::where('status', 'published')->with('category');
+
+        if ($categoryId = $request->input('category')) {
+            $query->where('category_id', $categoryId);
+        }
+
+        if ($search = $request->input('q')) {
+            $s = str_replace(['%', '_'], ['\%', '\_'], $search);
+            $query->where(fn ($q) => $q->where('title', 'like', "%{$s}%")->orWhere('tags', 'like', "%{$s}%"));
+        }
+
+        $templates = $query->orderByDesc('is_featured')->orderByDesc('sort_order')->get();
+
+        $templateItems = $templates->map(fn ($t) => [
+            'id' => $t->id,
+            'title' => $t->title,
+            'tags' => $t->tags,
+            'preview_url' => $t->preview_url,
+            'is_featured' => $t->is_featured,
+            'category' => $t->category?->name,
+            'variables_count' => is_array($t->variables) ? count($t->variables) : 0,
+            'has_image_var' => collect($t->variables ?? [])->contains('type', 'image'),
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'categories' => $categories,
+                'templates' => $templateItems,
+            ]);
+        }
+
+        return view('explore-templates', [
+            'categories' => $categories,
+            'templates' => $templateItems,
+            'currentCategory' => $categoryId,
+        ]);
+    }
+
+    public function useTemplate(int $id)
+    {
+        $template = PromptTemplate::where('status', 'published')->findOrFail($id);
+
+        return view('explore-template-use', [
+            'template' => $template,
         ]);
     }
 }

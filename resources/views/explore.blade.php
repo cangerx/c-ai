@@ -504,6 +504,7 @@
             <nav class="nav-links">
                 <a href="/">创作</a>
                 <a href="/explore" class="active">灵感广场</a>
+                <a href="/explore/templates">模板</a>
                 <a href="/" class="btn-create">+ 开始创作</a>
             </nav>
         </header>
@@ -586,27 +587,27 @@
                 const globalIdx = append ? allItems.indexOf(item) : idx;
                 const lazy = (append || idx >= 4) ? ' loading="lazy"' : '';
                 const avatar = item.author.avatar
-                    ? `<img src="${item.author.avatar}" alt="">`
-                    : item.author.name.charAt(0);
+                    ? `<img src="${escAttr(item.author.avatar)}" alt="">`
+                    : escHtml(item.author.name.charAt(0));
                 const badge = item.image_count > 1
-                    ? `<div class="card-badge">🖼 ${item.image_count}</div>`
+                    ? `<div class="card-badge">🖼 ${parseInt(item.image_count)}</div>`
                     : '';
 
                 return `<div class="card" data-idx="${globalIdx}" onclick="openLightbox(${globalIdx})">
                     <div class="card-img-wrap">
-                        <img src="${item.thumb}" alt=""${lazy} onload="this.classList.add('loaded');this.parentElement.classList.add('loaded');">
+                        <img src="${escAttr(item.thumb)}" alt=""${lazy} onload="this.classList.add('loaded');this.parentElement.classList.add('loaded');">
                         ${badge}
                     </div>
                     <div class="card-body">
                         <div class="card-author">
                             <div class="card-avatar">${avatar}</div>
-                            <span class="card-author-name">${item.author.name}</span>
-                            <span class="card-time">${item.time_ago || ''}</span>
+                            <span class="card-author-name">${escHtml(item.author.name)}</span>
+                            <span class="card-time">${escHtml(item.time_ago || '')}</span>
                         </div>
                         <div class="card-prompt">${escHtml(item.prompt || '')}</div>
                         <div class="card-meta">
-                            <span class="tag">${item.model}</span>
-                            <span>${item.quality} · ${item.size}</span>
+                            <span class="tag">${escHtml(item.model)}</span>
+                            <span>${escHtml(item.quality)} · ${escHtml(item.size)}</span>
                         </div>
                     </div>
                 </div>`;
@@ -623,6 +624,10 @@
             const d = document.createElement('div');
             d.textContent = s;
             return d.innerHTML;
+        }
+
+        function escAttr(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         }
 
         // Initial render
@@ -694,14 +699,14 @@
             // Author
             const avatarEl = document.getElementById('lb-avatar');
             avatarEl.innerHTML = item.author.avatar
-                ? `<img src="${item.author.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
-                : item.author.name.charAt(0);
+                ? `<img src="${escAttr(item.author.avatar)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
+                : escHtml(item.author.name.charAt(0));
             document.getElementById('lb-author-name').textContent = item.author.name;
             document.getElementById('lb-author-time').textContent = item.time_ago || '';
 
             document.getElementById('lb-prompt').textContent = item.prompt || '无提示词';
             document.getElementById('lb-tags').innerHTML =
-                `<span>${item.model}</span><span>${item.quality}</span><span>${item.size}</span>`;
+                `<span>${escHtml(item.model)}</span><span>${escHtml(item.quality)}</span><span>${escHtml(item.size)}</span>`;
 
             // Dots
             const dotsEl = document.getElementById('lb-dots');
@@ -780,8 +785,9 @@
             const item = allItems[currentIndex];
             const images = item.images || [item.thumb];
             const url = images[currentImgIdx] || item.thumb;
+            if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) return;
             const a = document.createElement('a');
-            a.href = url; a.download = `cang-ai-${item.task_id}-${currentImgIdx}.png`;
+            a.href = url; a.download = `cang-ai-${parseInt(item.task_id)}-${currentImgIdx}.png`;
             a.target = '_blank'; a.click();
         }
 
