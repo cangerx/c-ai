@@ -187,7 +187,7 @@ function buildPrompt() {
     document.querySelectorAll('.var-group[data-var]').forEach(group => {
         const name = group.dataset.var;
         const val = getVarValue(group);
-        prompt = prompt.replaceAll('{{' + name + '}}', val || '[未填写]');
+        prompt = prompt.replaceAll('@{{' + name + '}}', val || '[未填写]');
     });
     return prompt;
 }
