@@ -6,6 +6,7 @@ set -e
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 cd "$APP_DIR"
+git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 
 echo "============================================"
 echo "  CANG-AI 部署脚本"
