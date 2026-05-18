@@ -42,15 +42,18 @@ class AiChannelResource extends Resource
                     ->placeholder('https://api.openai.com/v1')
                     ->live(onBlur: true),
                 Forms\Components\TextInput::make('api_key')->label('API Key')->password()->revealable()
+                    ->dehydrated(fn ($state) => filled($state))
+                    ->required(fn (string $operation) => $operation === 'create')
                     ->live(onBlur: true),
                 Forms\Components\TextInput::make('model')->label('默认模型')
                     ->placeholder('gpt-4o'),
                 Forms\Components\CheckboxList::make('models')->label('绑定模型名称')
-                    ->options(function ($record) {
-                        if (!$record || empty($record->models)) {
+                    ->options(function ($record, \Filament\Schemas\Components\Utilities\Get $get) {
+                        $models = $record?->models ?? $get('models') ?? [];
+                        if (empty($models)) {
                             return [];
                         }
-                        return collect($record->models)->sort()->mapWithKeys(fn ($m) => [$m => $m])->toArray();
+                        return collect($models)->sort()->mapWithKeys(fn ($m) => [$m => $m])->toArray();
                     })
                     ->columns(3)
                     ->searchable()
