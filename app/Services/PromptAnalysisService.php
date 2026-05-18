@@ -72,7 +72,8 @@ SYSTEM;
             'temperature' => 0.3,
         ], JSON_UNESCAPED_UNICODE);
 
-        $url = rtrim($channel->base_url, '/') . '/v1/chat/completions';
+        $baseUrl = rtrim($channel->base_url, '/');
+        $url = str_ends_with($baseUrl, '/v1') ? $baseUrl . '/chat/completions' : $baseUrl . '/v1/chat/completions';
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
