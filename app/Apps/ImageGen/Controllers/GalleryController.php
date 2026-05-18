@@ -90,7 +90,7 @@ class GalleryController extends Controller
             $query->where(fn ($q) => $q->where('title', 'like', "%{$s}%")->orWhere('tags', 'like', "%{$s}%"));
         }
 
-        $templates = $query->orderByDesc('is_featured')->orderByDesc('sort_order')->get();
+        $templates = $query->orderByDesc('is_featured')->orderByDesc('sort_order')->limit(200)->get();
 
         $templateItems = $templates->map(fn ($t) => [
             'id' => $t->id,

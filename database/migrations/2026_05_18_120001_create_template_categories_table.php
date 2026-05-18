@@ -19,13 +19,14 @@ return new class extends Migration
 
         Schema::table('prompt_templates', function (Blueprint $table) {
             $table->unsignedBigInteger('category_id')->nullable()->after('id');
-            $table->index('category_id');
+            $table->foreign('category_id')->references('id')->on('template_categories')->nullOnDelete();
         });
     }
 
     public function down(): void
     {
         Schema::table('prompt_templates', function (Blueprint $table) {
+            $table->dropForeign(['category_id']);
             $table->dropColumn('category_id');
         });
         Schema::dropIfExists('template_categories');

@@ -44,9 +44,11 @@ Route::middleware('throttle:30,1')->get('/download', function (\Illuminate\Http\
     ]);
 });
 
-Route::get('/templates', [TemplateController::class, 'index']);
-Route::get('/templates/{template}', [TemplateController::class, 'show']);
-Route::post('/templates/{template}/build', [TemplateController::class, 'build']);
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/templates', [TemplateController::class, 'index']);
+    Route::get('/templates/{template}', [TemplateController::class, 'show']);
+    Route::post('/templates/{template}/build', [TemplateController::class, 'build']);
+});
 
 Route::get('/config', function () {
     $announcements = \App\Models\Announcement::where('enabled', true)

@@ -12,11 +12,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
-            // 安装向导 — 无中间件，不依赖数据库
-            Route::get('/install', [\App\Http\Controllers\InstallController::class, 'index']);
-            Route::get('/install/step2', [\App\Http\Controllers\InstallController::class, 'step2']);
-            Route::post('/install/test-db', [\App\Http\Controllers\InstallController::class, 'testDb']);
-            Route::post('/install', [\App\Http\Controllers\InstallController::class, 'run']);
+            // 安装向导 — 仅在未安装时可访问
+            Route::middleware('throttle:6,1')->group(function () {
+                Route::get('/install', [\App\Http\Controllers\InstallController::class, 'index']);
+                Route::get('/install/step2', [\App\Http\Controllers\InstallController::class, 'step2']);
+                Route::post('/install/test-db', [\App\Http\Controllers\InstallController::class, 'testDb']);
+                Route::post('/install', [\App\Http\Controllers\InstallController::class, 'run']);
+            });
 
             // Admin routes disabled — Filament handles /admin
             // Route::middleware('web')
@@ -34,9 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
-        $middleware->append(\App\Http\Middleware\SecurityHeadersMiddleware::class);
         $middleware->web(append: [
             \App\Http\Middleware\ResolveAgentSite::class,
+            \App\Http\Middleware\SecurityHeadersMiddleware::class,
         ]);
         $middleware->api(prepend: [
             \App\Http\Middleware\CorsMiddleware::class,

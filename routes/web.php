@@ -27,7 +27,7 @@ Route::get('/reset-password', fn () => view('auth.reset-password'));
 
 Route::get('/explore', [\App\Apps\ImageGen\Controllers\GalleryController::class, 'index'])->name('explore');
 Route::get('/explore/templates', [\App\Apps\ImageGen\Controllers\GalleryController::class, 'templates'])->name('explore.templates');
-Route::get('/explore/templates/{id}/use', [\App\Apps\ImageGen\Controllers\GalleryController::class, 'useTemplate'])->name('explore.templates.use');
+Route::get('/explore/templates/{id}/use', [\App\Apps\ImageGen\Controllers\GalleryController::class, 'useTemplate'])->whereNumber('id')->name('explore.templates.use');
 Route::get('/pricing', function () {
     if (app()->bound('agent_site')) {
         return app(SubSiteController::class)->pricing();
