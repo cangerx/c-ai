@@ -9,18 +9,21 @@ class PromptAnalysisService
 {
     public function extractVariables(string $prompt, ?int $channelId = null, ?string $model = null): array
     {
+        $model = $model ?: SiteSetting::get('prompt_tool_model') ?: null;
+
         if ($channelId) {
             $channel = AiChannel::find($channelId);
-        } else {
-            $channel = AiChannel::where('status', 'active')
-                ->where('app_name', 'chat')
-                ->orderBy('priority', 'desc')
+        } elseif ($model) {
+            // 根据模型名找到包含它的渠道
+            $channel = AiChannel::where('is_active', true)
+                ->where('models', 'like', '%"' . $model . '"%')
+                ->orderByDesc('priority')
                 ->first();
         }
 
-        if (!$channel) {
-            $channel = AiChannel::where('status', 'active')
-                ->orderBy('priority', 'desc')
+        if (!isset($channel) || !$channel) {
+            $channel = AiChannel::where('is_active', true)
+                ->orderByDesc('priority')
                 ->first();
         }
 
@@ -28,7 +31,6 @@ class PromptAnalysisService
             throw new \RuntimeException('没有可用的 AI 渠道');
         }
 
-        $model = $model ?: SiteSetting::get('prompt_tool_model') ?: null;
         if (!$model || (!empty($channel->models) && !in_array($model, $channel->models))) {
             $model = $channel->model;
         }
