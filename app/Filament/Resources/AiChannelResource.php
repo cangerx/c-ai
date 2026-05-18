@@ -87,6 +87,37 @@ class AiChannelResource extends Resource
                                 $livewire->redirect(request()->header('Referer'));
                             }
                         }),
+                    Actions\Action::make('testModel')
+                        ->label('检测模型')
+                        ->icon('heroicon-o-bolt')
+                        ->color('warning')
+                        ->form([
+                            Forms\Components\Select::make('test_model')
+                                ->label('选择模型')
+                                ->options(function ($record, \Filament\Schemas\Components\Utilities\Get $get) {
+                                    $models = $record?->models ?? $get('models') ?? [];
+                                    return collect($models)->sort()->mapWithKeys(fn ($m) => [$m => $m])->toArray();
+                                })
+                                ->searchable()
+                                ->required(),
+                        ])
+                        ->action(function (array $data, $record, \Filament\Schemas\Components\Utilities\Get $get) {
+                            $baseUrl = $record?->base_url ?? $get('base_url');
+                            $apiKey = $record?->api_key ?? $get('api_key');
+                            $model = $data['test_model'];
+                            $result = static::testModelAvailability($baseUrl, $apiKey, $model);
+                            if ($result['success']) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title("✅ {$model} 可用")
+                                    ->body("响应时间: {$result['time']}ms")
+                                    ->success()->send();
+                            } else {
+                                \Filament\Notifications\Notification::make()
+                                    ->title("❌ {$model} 不可用")
+                                    ->body($result['error'])
+                                    ->danger()->send();
+                            }
+                        }),
                 ])->columnSpanFull(),
             ])->columns(2),
             Section::make('调度参数')->description('控制渠道的负载、错误容忍和工作模式')->schema([
@@ -199,6 +230,48 @@ class AiChannelResource extends Resource
                 ->toArray();
         } catch (\Throwable) {
             return [];
+        }
+    }
+
+    protected static function testModelAvailability(?string $baseUrl, ?string $apiKey, string $model): array
+    {
+        if (!$baseUrl || !$apiKey) {
+            return ['success' => false, 'error' => '缺少 API 地址或 Key'];
+        }
+        try {
+            $baseUrl = rtrim($baseUrl, '/');
+            $baseUrl = preg_replace('#/v1$#', '', $baseUrl);
+            $url = $baseUrl . '/v1/images/generations';
+            $start = microtime(true);
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_POST => true,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . $apiKey,
+                    'Content-Type: application/json',
+                ],
+                CURLOPT_POSTFIELDS => json_encode([
+                    'model' => $model,
+                    'prompt' => 'a simple red circle on white background',
+                    'size' => '1024x1024',
+                    'n' => 1,
+                ]),
+            ]);
+            $result = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            curl_close($ch);
+            $time = round((microtime(true) - $start) * 1000);
+
+            if ($status === 200) {
+                return ['success' => true, 'time' => $time];
+            }
+            $body = json_decode($result, true);
+            $error = $body['error']['message'] ?? "HTTP {$status}";
+            return ['success' => false, 'error' => $error];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
