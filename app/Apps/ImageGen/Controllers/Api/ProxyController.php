@@ -11,8 +11,6 @@ class ProxyController extends Controller
 {
     private const ALLOWED_PATHS = [
         '/v1/chat/completions',
-        '/v1/images/generations',
-        '/v1/images/edits',
     ];
 
     public function handle(Request $request): Response|\Symfony\Component\HttpFoundation\StreamedResponse

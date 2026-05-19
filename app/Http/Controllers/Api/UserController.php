@@ -26,7 +26,10 @@ class UserController extends Controller
             }
             $user->password = Hash::make($data['password']);
             $user->save();
-            $user->tokens()->where('id', '!=', $user->currentAccessToken()->id)->delete();
+            $currentToken = $user->currentAccessToken();
+            if ($currentToken) {
+                $user->tokens()->where('id', '!=', $currentToken->id)->delete();
+            }
         }
 
         if (array_key_exists('nickname', $data)) {
