@@ -6,6 +6,8 @@ use App\Filament\Resources\AiModelResource\Pages;
 use App\Models\AiModel;
 use Filament\Actions;
 use Filament\Forms;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -33,8 +35,37 @@ class AiModelResource extends Resource
                 ->helperText('用户看到的名称，如 智能图片生成模型v2'),
             Forms\Components\Select::make('type')->label('类型')
                 ->options(['chat' => '对话', 'image' => '图片'])
-                ->default('chat')->required(),
+                ->default('chat')->required()->live(),
             Forms\Components\Toggle::make('is_active')->label('启用')->default(true),
+            Section::make('图片模型配置')
+                ->visible(fn (Get $get) => $get('type') === 'image')
+                ->schema([
+                    Forms\Components\CheckboxList::make('config.sizes')->label('支持的尺寸')
+                        ->options([
+                            'auto' => '自动',
+                            '1:1' => '1:1',
+                            '3:2' => '3:2',
+                            '2:3' => '2:3',
+                            '16:9' => '16:9',
+                            '9:16' => '9:16',
+                            '4:3' => '4:3',
+                            '3:4' => '3:4',
+                            '5:4' => '5:4',
+                            '4:5' => '4:5',
+                            '2:1' => '2:1',
+                            '1:2' => '1:2',
+                            '3:1' => '3:1',
+                            '1:3' => '1:3',
+                        ])->columns(7)
+                        ->helperText('不选则前端显示全部尺寸'),
+                    Forms\Components\CheckboxList::make('config.qualities')->label('支持的质量')
+                        ->options([
+                            'low' => '标清 1K',
+                            'medium' => '高清 2K',
+                            'high' => '超清 4K',
+                        ])->columns(3)
+                        ->helperText('不选则前端显示全部质量'),
+                ]),
         ]);
     }
 

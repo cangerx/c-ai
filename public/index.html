@@ -3987,10 +3987,12 @@
           }
           if (d.models && d.models.length) {
             MODEL_LABELS = {};
+            MODEL_CONFIG = {};
             const container = document.getElementById("modelOptions");
             container.innerHTML = "";
             d.models.forEach((m, i) => {
               MODEL_LABELS[m.id] = m.name;
+              if (m.sizes || m.qualities) MODEL_CONFIG[m.id] = { sizes: m.sizes, qualities: m.qualities };
               const btn = document.createElement("button");
               btn.type = "button";
               btn.dataset.value = m.id;
@@ -4000,6 +4002,7 @@
             });
             state.model = d.models[0].id;
             container.closest(".segmented").className = "segmented cols-" + Math.min(d.models.length, 3);
+            updateOptionsForModel(state.model);
             updateConfigButton();
           }
         } catch {}
@@ -4011,6 +4014,7 @@
       let MODEL_LABELS = {
         "gpt-image-2": "gpt-image-2",
       };
+      let MODEL_CONFIG = {};
       const QUALITY_LABELS = {
         low: "标清 1K",
         medium: "高清 2K",
@@ -4441,6 +4445,44 @@
             showAuthPanel("login");
           }
         }
+      }
+
+      const ALL_SIZES = ["auto","1:1","3:2","2:3","16:9","9:16","4:3","3:4","5:4","4:5","2:1","1:2","3:1","1:3"];
+      const ALL_QUALITIES = ["low","medium","high"];
+      const SIZE_ICONS = {"auto":"width:16px;height:16px;border-radius:50%","1:1":"width:16px;height:16px","3:2":"width:18px;height:12px","2:3":"width:12px;height:18px","16:9":"width:21px;height:12px","9:16":"width:12px;height:21px","4:3":"width:18px;height:14px","3:4":"width:14px;height:18px","5:4":"width:18px;height:15px","4:5":"width:15px;height:18px","2:1":"width:20px;height:10px","1:2":"width:10px;height:20px","3:1":"width:21px;height:7px","1:3":"width:7px;height:21px"};
+
+      function updateOptionsForModel(modelId) {
+        const cfg = MODEL_CONFIG[modelId];
+        const sizes = (cfg && cfg.sizes && cfg.sizes.length) ? cfg.sizes : ALL_SIZES;
+        const qualities = (cfg && cfg.qualities && cfg.qualities.length) ? cfg.qualities : ALL_QUALITIES;
+
+        // 重建尺寸按钮
+        const sizeContainer = els.sizeOptions;
+        sizeContainer.innerHTML = "";
+        sizes.forEach(s => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.dataset.value = s;
+          btn.innerHTML = `<span class="size-icon" style="${SIZE_ICONS[s] || 'width:16px;height:16px'}"></span><span class="size-label">${s === 'auto' ? '自动' : s}</span>`;
+          sizeContainer.appendChild(btn);
+        });
+        sizeContainer.closest(".segmented").className = "segmented sizes cols-" + Math.min(sizes.length, 7);
+        if (!sizes.includes(state.size)) state.size = sizes[0];
+        setActiveButton(sizeContainer, state.size);
+
+        // 重建质量按钮
+        const qualContainer = els.qualityOptions;
+        qualContainer.innerHTML = "";
+        qualities.forEach(q => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.dataset.value = q;
+          btn.textContent = QUALITY_LABELS[q] || q;
+          qualContainer.appendChild(btn);
+        });
+        qualContainer.closest(".segmented").className = "segmented cols-" + Math.min(qualities.length, 3);
+        if (!qualities.includes(state.quality)) state.quality = qualities[0];
+        setActiveButton(qualContainer, state.quality);
       }
 
       function updateConfigButton() {
@@ -5776,6 +5818,7 @@
         if (!button) return;
         state.model = button.dataset.value;
         setActiveButton(els.modelOptions, state.model);
+        updateOptionsForModel(state.model);
         updateConfigButton();
         updateGenerateBtn();
       });

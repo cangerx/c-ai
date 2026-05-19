@@ -61,7 +61,13 @@ Route::get('/config', function () {
         ->where('type', 'image')
         ->where('is_active', true)
         ->get()
-        ->map(fn($m) => ['id' => $m->model_id, 'name' => $m->display_name])
+        ->map(function ($m) {
+            $item = ['id' => $m->model_id, 'name' => $m->display_name];
+            $config = json_decode($m->config, true);
+            if (!empty($config['sizes'])) $item['sizes'] = $config['sizes'];
+            if (!empty($config['qualities'])) $item['qualities'] = $config['qualities'];
+            return $item;
+        })
         ->values()->all();
 
     $billingRules = \App\Models\BillingRule::all()->map(fn($r) => [
