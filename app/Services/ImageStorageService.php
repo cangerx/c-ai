@@ -82,6 +82,40 @@ class ImageStorageService
         return $mime === 'image/jpg' ? 'image/jpeg' : $mime;
     }
 
+    public function generatePresign(string $mimeType): ?array
+    {
+        $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
+        if (!in_array($driver, ['oss', 'r2'])) {
+            return null;
+        }
+
+        $extension = $this->extensionFromMime($mimeType);
+        $key = $this->buildKey($extension);
+        $this->configureDynamicDisk($driver);
+
+        $client = Storage::disk('dynamic_s3')->getClient();
+        $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
+
+        $cmd = $client->getCommand('PutObject', [
+            'Bucket' => $bucket,
+            'Key' => $key,
+            'ContentType' => $mimeType,
+            'ACL' => 'public-read',
+        ]);
+
+        $presigned = $client->createPresignedRequest($cmd, '+5 minutes');
+        $url = (string) $presigned->getUri();
+
+        return [
+            'direct' => true,
+            'method' => 'PUT',
+            'url' => $url,
+            'key' => $key,
+            'final_url' => $this->url($key),
+            'headers' => ['Content-Type' => $mimeType],
+        ];
+    }
+
     protected function buildKey(string $extension): string
     {
         $prefix = config('services.image_storage.prefix', 'images');

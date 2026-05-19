@@ -54,7 +54,7 @@ class ChannelDispatcher
      */
     public function getAvailableChannels(string $appName, ?int $excludeId = null): Collection
     {
-        // 自动恢复：paused_at 超过 10 分钟的渠道清除暂停状态
+        // 自动恢复：paused_at 超过 30 秒的渠道清除暂停状态
         AiChannel::where('status', 'active')
             ->where('app_name', $appName)
             ->whereNotNull('paused_at')

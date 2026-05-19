@@ -120,8 +120,20 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json(['message' => '分销开通成功', 'invite_code' => $user->invite_code]);
     });
 
+    Route::post('/upload-presign', function (\Illuminate\Http\Request $request) {
+        $request->validate([
+            'mime_type' => 'required|string|in:image/png,image/jpeg,image/webp,image/gif',
+        ]);
+        $storage = app(\App\Services\ImageStorageService::class);
+        $result = $storage->generatePresign($request->input('mime_type'));
+        if (!$result) {
+            return response()->json(['direct' => false]);
+        }
+        return response()->json($result);
+    });
+
     Route::post('/upload-image', function (\Illuminate\Http\Request $request) {
-        $request->validate(['image' => 'required|image|max:10240']);
+        $request->validate(['image' => 'required|image|max:20480']);
         $file = $request->file('image');
         $storage = app(\App\Services\ImageStorageService::class);
         $key = $storage->store(file_get_contents($file->getRealPath()), $file->getMimeType());

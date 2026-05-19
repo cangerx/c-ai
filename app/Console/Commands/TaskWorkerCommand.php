@@ -8,10 +8,13 @@ use App\Models\UsageLog;
 use App\Notifications\TaskCompleted;
 use App\Notifications\TaskFailed;
 use App\Services\ChannelDispatcher;
+use App\Services\ImageProviders\ImageProviderInterface;
+use App\Services\ImageProviders\NanoBananaProvider;
+use App\Services\ImageProviders\OpenAiProvider;
+use App\Services\BillingService;
 use App\Services\ImageStorageService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use RuntimeException;
@@ -49,7 +52,9 @@ class TaskWorkerCommand extends Command
         }
 
         if ($task->status === 'pending') {
-            $task->update(['status' => 'processing', 'message' => '正在生成图片...']);
+            GenerationTask::where('task_id', $task->task_id)
+                ->where('status', 'pending')
+                ->update(['status' => 'processing', 'message' => '正在生成图片...']);
         } else {
             $task->touch();
         }
@@ -74,28 +79,15 @@ class TaskWorkerCommand extends Command
 
             try {
                 $start = microtime(true);
-                $response = $this->callApi($task, $channel);
+                $json = $this->getProvider($channel->provider)->generate($task, $channel);
                 $elapsed = round(microtime(true) - $start, 2);
 
-                // 记录上游响应头
-                Log::channel('upstream')->info('response', [
+                Log::channel('upstream')->info('provider_response', [
                     'task_id' => $taskId,
                     'channel_id' => $channel->id,
-                    'status' => $response->status(),
-                    'headers' => $response->headers(),
+                    'provider' => $channel->provider,
                     'elapsed' => $elapsed,
                 ]);
-
-                if (!$response->successful()) {
-                    throw new RuntimeException("上游返回 {$response->status()}: " . mb_substr($response->body(), 0, 300));
-                }
-
-                $json = $response->json() ?? [];
-
-                // 异步模式需要轮询
-                if (($channel->request_mode ?? 'sync') === 'async') {
-                    $json = $this->pollAsyncResult($channel, $json['id'] ?? '');
-                }
 
                 // API 调用成功，释放负载
                 $dispatcher->release($channel->id);
@@ -141,91 +133,14 @@ class TaskWorkerCommand extends Command
         $this->markFailed($task, $taskId, $index, $lastException);
     }
 
-    // ─── API 调用 ───
+    // ─── Provider 分发 ───
 
-    protected function callApi(GenerationTask $task, AiChannel $channel): \Illuminate\Http\Client\Response
+    protected function getProvider(?string $provider): ImageProviderInterface
     {
-        $mode = $task->mode;
-        $size = $this->normalizeSize($task->size ?: 'auto');
-        $requestMode = $channel->request_mode ?? 'sync';
-
-        // 判断是否有参考图
-        $imageUrls = [];
-        if ($mode === 'image' && !empty($task->files)) {
-            $imageUrls = array_values(array_filter(array_column($task->files, 'url')));
-        }
-
-        $hasImages = !empty($imageUrls);
-        $path = ($hasImages && $requestMode !== 'async') ? '/v1/images/edits' : '/v1/images/generations';
-        $baseUrl = rtrim($channel->base_url, '/');
-        $baseUrl = preg_replace('#/v1$#', '', $baseUrl);
-        $endpoint = $baseUrl . $path;
-
-        if ($requestMode === 'async') {
-            $endpoint .= '?async=true';
-        }
-
-        $body = [
-            'model' => $task->model,
-            'prompt' => $task->prompt,
-            'size' => $size,
-            'quality' => $task->quality,
-            'n' => 1,
-        ];
-
-        if ($hasImages) {
-            if ($requestMode === 'async') {
-                $body['image'] = count($imageUrls) === 1 ? $imageUrls[0] : $imageUrls;
-            } else {
-                $body['images'] = array_map(fn($u) => ['image_url' => $u], $imageUrls);
-            }
-        }
-
-        return Http::timeout(300)
-            ->connectTimeout(15)
-            ->withHeaders([
-                'Authorization' => "Bearer {$channel->api_key}",
-                'Content-Type' => 'application/json',
-            ])
-            ->post($endpoint, $body);
-    }
-
-
-    protected function pollAsyncResult(AiChannel $channel, string $asyncId): array
-    {
-        if (empty($asyncId)) {
-            throw new RuntimeException('异步接口未返回任务 ID');
-        }
-
-        $pollUrl = $baseUrl . '/v1/tasks/' . $asyncId;
-
-        for ($i = 0; $i < 120; $i++) {
-            sleep(5);
-
-            $response = Http::timeout(30)
-                ->connectTimeout(10)
-                ->withHeaders(['Authorization' => "Bearer {$channel->api_key}"])
-                ->get($pollUrl);
-
-            if (!$response->successful()) {
-                if ($response->status() === 404) continue;
-                throw new RuntimeException("轮询异步结果失败 HTTP {$response->status()}");
-            }
-
-            $result = $response->json() ?? [];
-            $state = $result['state'] ?? '';
-
-            if (in_array($state, ['failed', 'error'])) {
-                throw new RuntimeException('上游异步任务失败: ' . ($result['data']['description'] ?? ''));
-            }
-
-            if ($state === 'succeeded') {
-                $images = $result['data']['images'] ?? [];
-                return ['data' => array_map(fn($img) => ['url' => $img['url']], $images)];
-            }
-        }
-
-        throw new RuntimeException('异步任务超时：轮询 10 分钟未获得结果');
+        return match ($provider) {
+            'nano-banana' => new NanoBananaProvider(),
+            default => new OpenAiProvider(),
+        };
     }
 
     // ─── 结果处理 ───
@@ -299,6 +214,11 @@ class TaskWorkerCommand extends Command
 
         DB::transaction(function () use ($task, $index, $value, &$result) {
             $fresh = GenerationTask::where('task_id', $task->task_id)->lockForUpdate()->first();
+            if (in_array($fresh->status, ['failed', 'completed'])) {
+                $result['all_done'] = true;
+                $result['status'] = $fresh->status;
+                return;
+            }
             $items = $fresh->items ?? [];
             $items[$index] = $value;
 
@@ -354,20 +274,9 @@ class TaskWorkerCommand extends Command
 
     protected function refund(GenerationTask $task, string $taskId): void
     {
-        $affected = UsageLog::where('task_id', $taskId)
-            ->whereNull('refunded_at')
-            ->update(['refunded_at' => now()]);
-
-        if ($affected === 0) return;
-
-        $usageLog = UsageLog::where('task_id', $taskId)->first();
-        if ($usageLog && $task->user) {
-            if ($usageLog->cost_credits > 0) {
-                $task->user->increment('credits', $usageLog->cost_credits);
-            }
-            if ($usageLog->cost_balance > 0) {
-                $task->user->increment('balance', $usageLog->cost_balance);
-            }
+        $log = UsageLog::where('task_id', $taskId)->whereNull('refunded_at')->first();
+        if ($log) {
+            app(BillingService::class)->refundLog($log);
         }
     }
 
@@ -407,19 +316,4 @@ class TaskWorkerCommand extends Command
             || str_contains($msg, 'model_not_found');
     }
 
-    protected function normalizeSize(string $size): string
-    {
-        $map = [
-            '1:1' => '1024x1024',
-            '4:3' => '1024x768',
-            '3:4' => '768x1024',
-            '16:9' => '1536x864',
-            '9:16' => '864x1536',
-            '3:2' => '1536x1024',
-            '2:3' => '1024x1536',
-            '5:4' => '1280x1024',
-            '4:5' => '1024x1280',
-        ];
-        return $map[$size] ?? $size;
-    }
 }

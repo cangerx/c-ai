@@ -92,19 +92,33 @@ class GenerateController extends Controller
 
         $mode = $request->input('mode', 'text');
         $files = [];
-        if ($mode === 'image' && $request->hasFile('image')) {
-            $uploadedFiles = $request->file('image');
-            $uploadedFiles = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
-            $storage = app(ImageStorageService::class);
+        if ($mode === 'image') {
+            $fileUrls = $request->input('file_urls', []);
+            if (!empty($fileUrls) && is_array($fileUrls)) {
+                $storageUrl = \App\Models\SiteSetting::get('storage_url', '');
+                $storageHost = $storageUrl ? (parse_url($storageUrl, PHP_URL_HOST) ?: '') : '';
+                $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?: '';
+                $allowedHosts = array_filter([$storageHost, $appHost]);
+                foreach (array_slice($fileUrls, 0, 4) as $url) {
+                    if (!filter_var($url, FILTER_VALIDATE_URL)) continue;
+                    $host = parse_url($url, PHP_URL_HOST) ?: '';
+                    if (empty($allowedHosts) || !in_array($host, $allowedHosts, true)) continue;
+                    $files[] = ['name' => basename(parse_url($url, PHP_URL_PATH)), 'mime_type' => 'image/png', 'url' => $url];
+                }
+            } elseif ($request->hasFile('image')) {
+                $uploadedFiles = $request->file('image');
+                $uploadedFiles = is_array($uploadedFiles) ? $uploadedFiles : [$uploadedFiles];
+                $storage = app(ImageStorageService::class);
 
-            foreach ($uploadedFiles as $file) {
-                $binary = file_get_contents($file->getRealPath());
-                $key = $storage->store($binary, $file->getMimeType());
-                $files[] = [
-                    'name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
-                    'url' => $storage->url($key),
-                ];
+                foreach ($uploadedFiles as $file) {
+                    $binary = file_get_contents($file->getRealPath());
+                    $key = $storage->store($binary, $file->getMimeType());
+                    $files[] = [
+                        'name' => $file->getClientOriginalName(),
+                        'mime_type' => $file->getMimeType(),
+                        'url' => $storage->url($key),
+                    ];
+                }
             }
         }
 
@@ -236,47 +250,62 @@ class GenerateController extends Controller
      */
     protected function forceFailAndRefund(GenerationTask $task, string $reason): void
     {
-        $task->update([
-            'status'  => 'failed',
-            'message' => '生成失败，已自动退款，请重试',
-            'error'   => $reason,
-        ]);
+        $items = $task->items ?? [];
+        $completedItems = array_values(array_filter($items, fn($i) => is_array($i) && !empty($i['url'])));
 
-        // 原子更新防止 double refund
-        $affected = \App\Models\UsageLog::where('task_id', $task->task_id)
-            ->whereNull('refunded_at')
-            ->update(['refunded_at' => now()]);
-
-        if ($affected > 0) {
-            $log = \App\Models\UsageLog::where('task_id', $task->task_id)->first();
-            if ($log && $task->user) {
-                if ($log->cost_credits > 0) {
-                    $task->user->increment('credits', $log->cost_credits);
-                }
-                if ($log->cost_balance > 0) {
-                    $task->user->increment('balance', $log->cost_balance);
-                }
+        if (!empty($completedItems)) {
+            $affected = GenerationTask::where('task_id', $task->task_id)
+                ->whereIn('status', ['pending', 'processing'])
+                ->update([
+                    'status'       => 'completed',
+                    'message'      => count($completedItems) . "/{$task->count} 张成功（部分超时）",
+                    'items'        => json_encode($completedItems),
+                    'completed_at' => now(),
+                    'error'        => $reason,
+                ]);
+            if ($affected > 0) {
+                try { $task->user?->notify(new \App\Notifications\TaskCompleted($task->fresh())); } catch (\Throwable) {}
             }
+            return;
         }
+
+        $affected = GenerationTask::where('task_id', $task->task_id)
+            ->whereIn('status', ['pending', 'processing'])
+            ->update([
+                'status'  => 'failed',
+                'message' => '生成失败，已自动退款，请重试',
+                'error'   => $reason,
+            ]);
+
+        if ($affected === 0) return;
+
+        $log = \App\Models\UsageLog::where('task_id', $task->task_id)->whereNull('refunded_at')->first();
+        if ($log) {
+            app(\App\Services\BillingService::class)->refundLog($log);
+        }
+
+        try { $task->user?->notify(new \App\Notifications\TaskFailed($task->fresh(), '任务超时未完成，已自动退款。')); } catch (\Throwable) {}
     }
 
     protected function retryStuckTask(GenerationTask $task): void
     {
-        // 检查 jobs 表是否已有该任务的 job
-        $existingJob = DB::table('jobs')
-            ->where('payload', 'like', '%' . $task->task_id . '%')
-            ->exists();
+        // 原子抢锁：只有一个进程能成功更新（防止与 cron 竞态重复推送）
+        $affected = GenerationTask::where('task_id', $task->task_id)
+            ->whereIn('status', ['pending', 'processing'])
+            ->where('updated_at', '<', now()->subMinutes(5))
+            ->where(function ($q) {
+                $q->whereNull('attempts')->orWhere('attempts', '<', 3);
+            })
+            ->update([
+                'status' => 'pending',
+                'message' => '正在重试...',
+                'attempts' => DB::raw('COALESCE(attempts, 0) + 1'),
+                'updated_at' => now(),
+            ]);
 
-        if ($existingJob) {
-            return;
-        }
+        if ($affected === 0) return; // 被其他进程抢了或条件不再满足
 
-        $task->update([
-            'status' => 'pending',
-            'message' => '正在重试...',
-            'attempts' => ($task->attempts ?? 0) + 1,
-        ]);
-
+        $task->refresh();
         $items = $task->items ?? [];
         for ($i = 0; $i < $task->count; $i++) {
             if (!isset($items[$i]) || $items[$i] === null) {

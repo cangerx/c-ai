@@ -4007,7 +4007,8 @@
           }
         } catch {}
       })();
-      const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+      const IMAGE_MAX_BYTES = 20 * 1024 * 1024;
+      const IMAGE_COMPRESS_THRESHOLD = 5 * 1024 * 1024;
       const TASK_POLL_INTERVAL = 4000;
       const TASK_LONG_WAIT_MS = 3 * 60 * 1000;
       const TASK_VERY_LONG_WAIT_MS = 5 * 60 * 1000;
@@ -4800,6 +4801,55 @@
         return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
       }
 
+      async function uploadFileDirect(file, token) {
+        const presignRes = await fetch(AUTH_API_BASE + "/upload-presign", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ mime_type: file.type || "image/png" }),
+        });
+        if (!presignRes.ok) throw new Error("获取上传凭证失败");
+        const presign = await presignRes.json();
+
+        if (presign.direct) {
+          await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("PUT", presign.url);
+            xhr.setRequestHeader("Content-Type", presign.headers["Content-Type"]);
+            xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`上传失败 ${xhr.status}`));
+            xhr.onerror = () => reject(new Error("上传网络错误"));
+            xhr.send(file);
+          });
+          return presign.final_url;
+        }
+
+        const formData = new FormData();
+        formData.append("image", file);
+        const uploadRes = await fetch("/api/upload-image", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        if (!uploadRes.ok) throw new Error("图片上传失败");
+        const { url } = await uploadRes.json();
+        return url;
+      }
+
+      async function compressImage(file) {
+        const bitmap = await createImageBitmap(file);
+        const quality = 0.75;
+        const maxDim = 4096;
+        let scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+        const w = Math.round(bitmap.width * scale);
+        const h = Math.round(bitmap.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", quality));
+        return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+      }
+
       async function normalizeUploadFiles(files) {
         const maxFiles = state.mode === "reverse" ? 1 : 4;
         if (files.length > maxFiles) {
@@ -4810,10 +4860,13 @@
 
         for (const file of files) {
           if (file.size > IMAGE_MAX_BYTES) {
-            throw new Error(`图片 ${file.name} 超过 ${formatBytes(IMAGE_MAX_BYTES)}，无法上传。`);
+            throw new Error(`图片 ${file.name} 超过 ${formatBytes(IMAGE_MAX_BYTES)}，请选择更小的图片。`);
           }
-
-          normalized.push(file);
+          if (file.size > IMAGE_COMPRESS_THRESHOLD) {
+            normalized.push(await compressImage(file));
+          } else {
+            normalized.push(file);
+          }
         }
 
         return normalized;
@@ -4923,15 +4976,7 @@
         if (!file) throw new Error("请先上传 1 张图片");
 
         log("正在上传图片...");
-        const formData = new FormData();
-        formData.append("image", file);
-        const uploadRes = await fetch("/api/upload-image", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-        if (!uploadRes.ok) throw new Error("图片上传失败");
-        const { url: imageUrl } = await uploadRes.json();
+        const imageUrl = await uploadFileDirect(file, token);
 
         log(`请求中\nPOST /v1/chat/completions\nmodel: ${REVERSE_PROMPT_MODEL}\nmode: reverse-prompt`);
         const res = await fetch(`${FIXED_BASE_URL}${encodeURIComponent("/v1/chat/completions")}`, {
@@ -5519,9 +5564,11 @@
           throw new Error("请先上传一张参考图片");
         }
 
-        files.forEach((file) => {
-          form.append("image[]", file, file.name);
-        });
+        if (state.mode === "image" && files.length) {
+          log("正在上传参考图...");
+          const urls = await Promise.all(files.map(f => uploadFileDirect(f, token)));
+          urls.forEach(u => form.append("file_urls[]", u));
+        }
 
         log(`请求中\nPOST /api/apps/image-gen/generate\nmode: ${state.mode}\nmodel: ${model}`);
         const res = await fetch(AUTH_API_BASE + "/apps/image-gen/generate", {
@@ -5850,8 +5897,8 @@
             if (normalized.length) {
               log(
                 state.mode === "reverse"
-                  ? `已选择 ${normalized.length} 张图片，准备反推提示词。单张图片不得超过 ${formatBytes(IMAGE_MAX_BYTES)}。`
-                  : `已选择 ${normalized.length} 张参考图。单张图片不得超过 ${formatBytes(IMAGE_MAX_BYTES)}。`
+                  ? `已选择 ${normalized.length} 张图片，准备反推提示词。超过 ${formatBytes(IMAGE_COMPRESS_THRESHOLD)} 会自动压缩。`
+                  : `已选择 ${normalized.length} 张参考图。超过 ${formatBytes(IMAGE_COMPRESS_THRESHOLD)} 会自动压缩。`
               );
             }
           })

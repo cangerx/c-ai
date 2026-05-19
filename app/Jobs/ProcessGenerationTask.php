@@ -47,7 +47,9 @@ class ProcessGenerationTask implements ShouldQueue
 
         // 标记为 processing（仅首个 job 触发）
         if ($task->status === 'pending') {
-            $task->update(['status' => 'processing', 'message' => '正在生成图片...']);
+            GenerationTask::where('task_id', $this->taskId)
+                ->where('status', 'pending')
+                ->update(['status' => 'processing', 'message' => '正在生成图片...']);
         } else {
             // touch updated_at 防止被 recover-stuck 误判为卡死
             $task->touch();
@@ -136,6 +138,11 @@ class ProcessGenerationTask implements ShouldQueue
 
         DB::transaction(function () use ($task, $index, $value, &$result) {
             $fresh = GenerationTask::where('task_id', $task->task_id)->lockForUpdate()->first();
+            if (in_array($fresh->status, ['failed', 'completed'])) {
+                $result['all_done'] = true;
+                $result['status'] = $fresh->status;
+                return;
+            }
             $items = $fresh->items ?? [];
             $items[$index] = $value;
 
@@ -182,23 +189,9 @@ class ProcessGenerationTask implements ShouldQueue
 
     protected function refund(GenerationTask $task): void
     {
-        // 原子更新 refunded_at 防止并发 double refund
-        $affected = UsageLog::where('task_id', $this->taskId)
-            ->whereNull('refunded_at')
-            ->update(['refunded_at' => now()]);
-
-        if ($affected === 0) {
-            return; // 已被其他进程退款
-        }
-
-        $usageLog = UsageLog::where('task_id', $this->taskId)->first();
-        if ($usageLog && $task->user) {
-            if ($usageLog->cost_credits > 0) {
-                $task->user->increment('credits', $usageLog->cost_credits);
-            }
-            if ($usageLog->cost_balance > 0) {
-                $task->user->increment('balance', $usageLog->cost_balance);
-            }
+        $log = UsageLog::where('task_id', $this->taskId)->whereNull('refunded_at')->first();
+        if ($log) {
+            app(\App\Services\BillingService::class)->refundLog($log);
         }
     }
 

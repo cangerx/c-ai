@@ -7,6 +7,7 @@ use UnitEnum;
 use App\Filament\Resources\GenerationTaskResource\Pages;
 use App\Models\GenerationTask;
 use App\Models\UsageLog;
+use App\Notifications\TaskFailed;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -15,7 +16,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 
 class GenerationTaskResource extends Resource
@@ -222,15 +222,7 @@ class GenerationTaskResource extends Resource
                             Notification::make()->title('退款失败')->body('用户不存在')->danger()->send();
                             return;
                         }
-                        DB::transaction(function () use ($record, $log) {
-                            if ($log->cost_credits > 0) {
-                                $record->user->increment('credits', $log->cost_credits);
-                            }
-                            if ($log->cost_balance > 0) {
-                                $record->user->increment('balance', $log->cost_balance);
-                            }
-                            $log->update(['refunded_at' => now()]);
-                        });
+                        app(\App\Services\BillingService::class)->refundLog($log);
                         Notification::make()
                             ->title('退款成功')
                             ->body(sprintf('credits +%d，balance +%.2f', (int) $log->cost_credits, (float) $log->cost_balance))
@@ -249,6 +241,7 @@ class GenerationTaskResource extends Resource
                             'message' => '管理员强制标记失败。',
                             'error' => ($record->error ?: '') . ' | 管理员手动强制失败于 ' . now(),
                         ]);
+                        try { $record->user?->notify(new TaskFailed($record, '管理员已将任务标记为失败。')); } catch (\Throwable) {}
                         Notification::make()->title('已标记为失败')->body($record->task_id)->success()->send();
                     }),
             ])
