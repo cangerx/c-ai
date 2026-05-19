@@ -26,7 +26,7 @@ class NanoBananaProvider implements ImageProviderInterface
             $json = $this->generateImage($baseUrl, $channel->api_key, $task);
         }
 
-        $taskId = $json['id'] ?? $json['task_id'] ?? null;
+        $taskId = $json['id'] ?? $json['task_id'] ?? $json['data']['task_id'] ?? null;
         if ($taskId) {
             return $this->pollResult($baseUrl, $channel->api_key, $taskId);
         }
