@@ -20,16 +20,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 Route::post('/install', [\App\Http\Controllers\InstallController::class, 'run']);
             });
 
-            // Admin routes disabled — Filament handles /admin
-            // Route::middleware('web')
-            //     ->prefix('admin')
-            //     ->name('admin.')
-            //     ->group(base_path('routes/admin.php'));
-
-            Route::middleware('web')
-                ->prefix('agent')
-                ->name('agent.')
-                ->group(base_path('routes/agent.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

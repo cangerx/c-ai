@@ -26,3 +26,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 .playwright-mcp/
+*.sqlite
+*.sqlite-journal
+cang_ai
+.env.*.bak

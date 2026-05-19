@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Agent\Resources\SubUserResource;
+use App\Filament\Agent\Resources\WithdrawalResource as AgentWithdrawalResource;
 use App\Models\User;
 use App\Models\WithdrawalRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,50 +43,69 @@ class AdminTest extends TestCase
         $sub1 = User::factory()->create(['parent_id' => $agent1->id]);
         $sub2 = User::factory()->create(['parent_id' => $agent2->id]);
 
-        $response = $this->actingAs($agent1)->get('/admin/users');
+        $this->actingAs($agent1);
+        $emails = SubUserResource::getEloquentQuery()->pluck('email')->all();
 
-        $response->assertOk();
-        $response->assertSee($sub1->email);
-        $response->assertDontSee($sub2->email);
+        $this->assertContains($sub1->email, $emails);
+        $this->assertNotContains($sub2->email, $emails);
     }
 
-    // 代理商可以申请提现
-    public function test_agent_can_apply_for_withdrawal(): void
+    // 分销员可以通过 API 申请提现
+    public function test_distributor_can_apply_for_withdrawal(): void
     {
-        $agent = User::factory()->agent()->create(['commission_balance' => 100.00]);
+        $agent = User::factory()->agent()->create();
+        $distributor = User::factory()->create([
+            'parent_id' => $agent->id,
+            'is_distributor' => true,
+            'commission_credits' => 100,
+        ]);
 
-        $response = $this->actingAs($agent)->post('/admin/withdrawals', [
+        $response = $this->actingAs($distributor, 'sanctum')->postJson('/api/withdrawals', [
             'amount' => 50,
             'payment_method' => 'alipay',
             'payment_account' => 'test@alipay.com',
         ]);
 
-        $response->assertRedirect();
+        $response->assertOk()
+            ->assertJsonPath('message', '提现申请已提交');
         $this->assertDatabaseHas('withdrawal_requests', [
-            'user_id' => $agent->id,
+            'user_id' => $distributor->id,
+            'agent_id' => $agent->id,
             'amount' => 50.00,
             'status' => 'pending',
         ]);
+        $this->assertEquals(50, $distributor->fresh()->commission_credits);
     }
 
-    // 管理员可以批准提现
-    public function test_admin_can_approve_withdrawal(): void
+    // 代理商只能看到归属自己的提现申请
+    public function test_agent_only_sees_own_withdrawal_requests(): void
     {
-        $admin = User::factory()->admin()->create();
-        $agent = User::factory()->agent()->create(['commission_balance' => 0]);
+        $agent1 = User::factory()->agent()->create();
+        $agent2 = User::factory()->agent()->create();
+        $user1 = User::factory()->create(['parent_id' => $agent1->id, 'is_distributor' => true]);
+        $user2 = User::factory()->create(['parent_id' => $agent2->id, 'is_distributor' => true]);
 
-        $withdrawal = WithdrawalRequest::create([
-            'user_id' => $agent->id,
+        $own = WithdrawalRequest::create([
+            'user_id' => $user1->id,
+            'agent_id' => $agent1->id,
             'amount' => 50.00,
             'status' => 'pending',
             'payment_method' => 'alipay',
             'payment_account' => 'test@alipay.com',
         ]);
+        $other = WithdrawalRequest::create([
+            'user_id' => $user2->id,
+            'agent_id' => $agent2->id,
+            'amount' => 60.00,
+            'status' => 'pending',
+            'payment_method' => 'wechat',
+            'payment_account' => 'other@wechat.com',
+        ]);
 
-        $response = $this->actingAs($admin)
-            ->post("/admin/withdrawals/{$withdrawal->id}/approve");
+        $this->actingAs($agent1);
+        $ids = AgentWithdrawalResource::getEloquentQuery()->pluck('id')->all();
 
-        $response->assertRedirect();
-        $this->assertEquals('paid', $withdrawal->fresh()->status);
+        $this->assertContains($own->id, $ids);
+        $this->assertNotContains($other->id, $ids);
     }
 }

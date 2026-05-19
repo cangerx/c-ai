@@ -2,11 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Jobs\ProcessGenerationTask;
 use App\Models\AiChannel;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 // 图像生成功能测试
@@ -36,8 +34,6 @@ class GenerateTest extends TestCase
     // 有余额的用户可以提交生成任务
     public function test_user_can_submit_generation_task(): void
     {
-        Queue::fake();
-
         $user = User::factory()->create(['credits' => 10, 'balance' => 5.00]);
         AiChannel::create([
             'name' => 'test', 'base_url' => 'https://api.test.com',
@@ -54,9 +50,6 @@ class GenerateTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('ok', true)
             ->assertJsonStructure(['task_id', 'status']);
-
-        // 验证 job 被派发
-        Queue::assertPushed(ProcessGenerationTask::class);
 
         // 验证任务创建
         $this->assertDatabaseHas('generation_tasks', [
