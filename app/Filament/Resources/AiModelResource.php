@@ -56,6 +56,7 @@ class AiModelResource extends Resource
                             '1:2' => '1:2',
                             '3:1' => '3:1',
                             '1:3' => '1:3',
+                            '21:9' => '21:9',
                         ])->columns(7)
                         ->helperText('不选则前端显示全部尺寸'),
                     Forms\Components\CheckboxList::make('config.qualities')->label('支持的质量')
