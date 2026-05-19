@@ -57,7 +57,7 @@ class AiChannelResource extends Resource
                     Actions\Action::make('fetchModels')
                         ->label('获取模型')
                         ->icon('heroicon-o-arrow-path')
-                        ->action(function ($record, $livewire, \Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
+                        ->action(function ($record, \Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
                             $baseUrl = $record?->base_url ?? $get('base_url');
                             $apiKey = $record?->api_key ?? $get('api_key');
                             $models = static::fetchModels($baseUrl, $apiKey);

@@ -45,18 +45,19 @@ class GenerateController extends Controller
         $model = $request->input('model', 'gpt-image-2');
         $size = $request->input('size', 'auto');
 
-        // 校验模型是否存在且启用，并验证 size/quality 是否在允许范围内
-        $aiModel = \App\Models\AiModel::where('model_id', $model)
-            ->where('type', 'image')->where('is_active', true)->first();
-        if (!$aiModel) {
-            return response()->json(['error' => '模型不可用'], 422);
+        // 校验模型配置（如果 ai_models 表有记录则验证）
+        $aiModel = \App\Models\AiModel::where('model_id', $model)->where('type', 'image')->first();
+        if ($aiModel && !$aiModel->is_active) {
+            return response()->json(['error' => '模型已停用'], 422);
         }
-        $cfg = $aiModel->config ?? [];
-        if (!empty($cfg['sizes']) && !in_array($size, $cfg['sizes'])) {
-            return response()->json(['error' => '该模型不支持此尺寸'], 422);
-        }
-        if (!empty($cfg['qualities']) && !in_array($quality, $cfg['qualities'])) {
-            return response()->json(['error' => '该模型不支持此质量'], 422);
+        if ($aiModel) {
+            $cfg = $aiModel->config ?? [];
+            if (!empty($cfg['sizes']) && !in_array($size, $cfg['sizes'])) {
+                return response()->json(['error' => '该模型不支持此尺寸'], 422);
+            }
+            if (!empty($cfg['qualities']) && !in_array($quality, $cfg['qualities'])) {
+                return response()->json(['error' => '该模型不支持此质量'], 422);
+            }
         }
 
         if (!$billing->canAfford($user, $model, $quality, 'image-gen', $count)) {
@@ -65,7 +66,11 @@ class GenerateController extends Controller
 
         $channel = AiChannel::where('status', 'active')
             ->where('app_name', 'image-gen')
-            ->whereJsonContains('models', $model)
+            ->where(function ($q) use ($model) {
+                $q->whereJsonContains('models', $model)
+                  ->orWhereNull('models')
+                  ->orWhereJsonLength('models', 0);
+            })
             ->orderBy('priority', 'desc')
             ->inRandomOrder()
             ->first();
