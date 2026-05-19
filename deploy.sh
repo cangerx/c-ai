@@ -13,109 +13,181 @@ echo "  CANG-AI 部署脚本"
 echo "  目录: $APP_DIR"
 echo "============================================"
 
-# ========== 自动修复环境 ==========
+# ========== 智能环境检测与自动修复 ==========
 echo ""
-echo ">>> 自动检查并修复环境"
+echo ">>> [环境检测] 自动检查并修复所有依赖"
 
-# 检测 PHP CLI 路径（宝塔可能有多版本）
-PHP_BIN=$(which php 2>/dev/null)
+ERRORS=0
+
+# ---------- 1. 找到可用的 PHP ----------
+PHP_BIN=""
+for p in /www/server/php/83/bin/php /www/server/php/84/bin/php /www/server/php/82/bin/php $(which php 2>/dev/null); do
+    if [ -x "$p" ] && $p -r "exit(version_compare(PHP_VERSION,'8.2.0','<')?1:0);" 2>/dev/null; then
+        PHP_BIN="$p"
+        break
+    fi
+done
+
 if [ -z "$PHP_BIN" ]; then
-    for p in /www/server/php/83/bin/php /www/server/php/82/bin/php /usr/bin/php; do
-        if [ -x "$p" ]; then PHP_BIN="$p"; break; fi
+    echo "  ✗ 未找到 PHP 8.2+，请在宝塔面板 → 软件商店 → 安装 PHP 8.3"
+    exit 1
+fi
+
+PHP_VER=$($PHP_BIN -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;")
+PHP_VER_NUM=$(echo $PHP_VER | tr -d '.')
+echo "  PHP $PHP_VER → $PHP_BIN"
+
+# ---------- 2. PHP 扩展：检测+自动修复 ----------
+REQUIRED_EXTS="mbstring curl openssl pdo pdo_mysql xml ctype iconv tokenizer dom fileinfo bcmath gd intl pcntl"
+MISSING=""
+
+for ext in $REQUIRED_EXTS; do
+    if ! $PHP_BIN -m 2>/dev/null | grep -qi "^${ext}$"; then
+        MISSING="$MISSING $ext"
+    fi
+done
+
+if [ -n "$MISSING" ]; then
+    echo "  ⚠ 缺少扩展:$MISSING"
+    echo "  → 尝试自动修复..."
+
+    BT_PHP_DIR="/www/server/php/${PHP_VER_NUM}"
+    BT_PHP_INI="${BT_PHP_DIR}/etc/php.ini"
+    BT_EXT_DIR=$(ls -d ${BT_PHP_DIR}/lib/php/extensions/no-debug-non-zts-*/ 2>/dev/null | head -1)
+
+    for ext in $MISSING; do
+        FIXED=0
+
+        # 方法1: .so 已存在但未启用 → 写 php.ini
+        if [ -n "$BT_EXT_DIR" ] && [ -f "${BT_EXT_DIR}${ext}.so" ]; then
+            if [ -f "$BT_PHP_INI" ] && ! grep -q "^extension=${ext}" "$BT_PHP_INI"; then
+                echo "extension=${ext}" >> "$BT_PHP_INI"
+                echo "    ✓ 已启用 $ext (.so 已存在)"
+                FIXED=1
+            fi
+        fi
+
+        # 方法2: apt/yum 安装
+        if [ $FIXED -eq 0 ]; then
+            if command -v apt-get &>/dev/null; then
+                apt-get install -y "php${PHP_VER}-${ext}" 2>/dev/null && FIXED=1
+            elif command -v yum &>/dev/null; then
+                yum install -y "php-${ext}" 2>/dev/null && FIXED=1
+            fi
+            [ $FIXED -eq 1 ] && echo "    ✓ 系统包管理安装 $ext 成功"
+        fi
+
+        [ $FIXED -eq 0 ] && echo "    ⚠ $ext 需手动安装"
     done
-fi
-if [ -z "$PHP_BIN" ]; then
-    echo "✗ 未找到 PHP，请在宝塔面板安装 PHP 8.3"; exit 1
-fi
 
-# PHP 版本检查
-PHP_VER=$($PHP_BIN -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;" 2>/dev/null)
-if $PHP_BIN -r "exit(version_compare(PHP_VERSION,'8.3.0','<')?1:0);" 2>/dev/null; then
-    echo "✓ PHP $PHP_VER ($PHP_BIN)"
-else
-    echo "✗ PHP 版本过低 ($PHP_VER)，需要 8.3+"
-    if [ -x /www/server/php/83/bin/php ]; then
-        PHP_BIN=/www/server/php/83/bin/php
-        echo "  → 切换到 $PHP_BIN"
-    else
-        echo "  请在宝塔面板安装 PHP 8.3"; exit 1
+    # 重启 PHP-FPM 使扩展生效
+    /etc/init.d/php-fpm-${PHP_VER_NUM} restart 2>/dev/null \
+        || systemctl restart "php${PHP_VER}-fpm" 2>/dev/null \
+        || true
+
+    # 重新验证
+    FINAL_MISSING=""
+    for ext in $REQUIRED_EXTS; do
+        if ! $PHP_BIN -m 2>/dev/null | grep -qi "^${ext}$"; then
+            FINAL_MISSING="$FINAL_MISSING $ext"
+        fi
+    done
+
+    if [ -n "$FINAL_MISSING" ]; then
+        echo ""
+        echo "  ✗ 以下扩展无法自动安装:$FINAL_MISSING"
+        echo "    请手动操作: 宝塔面板 → 软件商店 → PHP $PHP_VER → 安装扩展"
+        echo "    勾选:$FINAL_MISSING"
+        ERRORS=1
     fi
 fi
 
-# 自动解除 PHP 禁用函数
-PHP_INI=$($PHP_BIN -r "echo php_ini_loaded_file();" 2>/dev/null)
-CLI_INI="${PHP_INI/php.ini/php-cli.ini}"
-PHP_INI_DIR=$(dirname "$PHP_INI")
+[ $ERRORS -eq 0 ] && echo "  ✓ PHP 扩展完整"
+
+# ---------- 3. 解除 PHP 禁用函数 ----------
+NEED_FUNCS="putenv proc_open proc_get_status proc_close exec symlink pcntl_signal pcntl_alarm"
+PHP_INI_DIR=$(dirname "$($PHP_BIN -r "echo php_ini_loaded_file();" 2>/dev/null)")
+REMOVED_FUNCS=""
+
 if [ -d "$PHP_INI_DIR" ]; then
-    NEED_FUNCS="putenv proc_open proc_get_status proc_close exec symlink"
-    CHANGED=0
     for ini_file in "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php-cli.ini"; do
         [ -f "$ini_file" ] || continue
         for fn in $NEED_FUNCS; do
-            if grep -q "$fn" "$ini_file" 2>/dev/null; then
+            if grep -q "disable_functions.*$fn" "$ini_file" 2>/dev/null; then
                 sed -i "s/,$fn//g; s/$fn,//g; s/$fn//g" "$ini_file"
-                CHANGED=1
+                REMOVED_FUNCS="$REMOVED_FUNCS $fn"
             fi
         done
     done
-    if [ $CHANGED -eq 1 ]; then
-        echo "✓ 已自动解除 PHP 禁用函数"
-        /etc/init.d/php-fpm-83 restart 2>/dev/null || /etc/init.d/php-fpm-82 restart 2>/dev/null || true
-    fi
 fi
 
-# 自动安装缺失的 PHP 扩展（宝塔方式）
-MISSING_EXT=""
-for ext in mbstring xml ctype iconv intl pdo_mysql bcmath gd fileinfo curl openssl; do
-    if ! $PHP_BIN -m 2>/dev/null | grep -qi "^$ext$"; then
-        MISSING_EXT="$MISSING_EXT $ext"
+if [ -n "$REMOVED_FUNCS" ]; then
+    echo "  ✓ 已解除禁用函数:$REMOVED_FUNCS"
+    /etc/init.d/php-fpm-${PHP_VER_NUM} restart 2>/dev/null || true
+else
+    echo "  ✓ 禁用函数无需修复"
+fi
+
+# ---------- 4. Composer ----------
+COMPOSER_BIN=""
+for c in /usr/local/bin/composer /usr/bin/composer $(which composer 2>/dev/null); do
+    if [ -x "$c" ] && $PHP_BIN "$c" --version &>/dev/null 2>&1; then
+        COMPOSER_BIN="$c"
+        break
     fi
 done
-if [ -n "$MISSING_EXT" ]; then
-    echo "⚠ 缺少扩展:$MISSING_EXT，尝试自动安装..."
-    PHP_VER_NUM=$(echo $PHP_VER | tr -d '.')
-    for ext in $MISSING_EXT; do
-        # 宝塔 PHP 扩展安装路径
-        EXT_SO="/www/server/php/${PHP_VER_NUM}/lib/php/extensions/no-debug-non-zts-*/${ext}.so"
-        if ls $EXT_SO 1>/dev/null 2>&1; then
-            echo "extension=$ext" >> "/www/server/php/${PHP_VER_NUM}/etc/php.ini"
-            echo "  → 已启用 $ext"
-        else
-            echo "  ✗ 无法自动安装 $ext，请在宝塔面板 → PHP $PHP_VER → 安装扩展"
-            exit 1
-        fi
-    done
-    /etc/init.d/php-fpm-${PHP_VER_NUM} restart 2>/dev/null || true
-fi
-echo "✓ PHP 扩展完整"
 
-# 自动安装/修复 Composer
-COMPOSER_OK=0
-if command -v composer &>/dev/null && composer --version &>/dev/null 2>&1; then
-    COMPOSER_MAJOR=$(composer --version --no-ansi 2>/dev/null | grep -oP '[0-9]+' | head -1)
-    [ "${COMPOSER_MAJOR:-0}" -ge 2 ] && COMPOSER_OK=1
+if [ -z "$COMPOSER_BIN" ]; then
+    echo "  ⚠ Composer 不可用，自动安装..."
+    curl -sS https://getcomposer.org/installer | $PHP_BIN -- --install-dir=/usr/local/bin --filename=composer 2>/dev/null
+    COMPOSER_BIN="/usr/local/bin/composer"
+    [ ! -f /usr/bin/composer ] && ln -sf "$COMPOSER_BIN" /usr/bin/composer
 fi
-if [ $COMPOSER_OK -eq 0 ]; then
-    echo "⚠ Composer 不可用或版本过低，自动安装..."
-    curl -sS https://getcomposer.org/installer | $PHP_BIN -- --install-dir=/usr/local/bin --filename=composer
-    [ -f /usr/bin/composer ] && rm -f /usr/bin/composer
-    ln -sf /usr/local/bin/composer /usr/bin/composer
+echo "  ✓ Composer $($PHP_BIN "$COMPOSER_BIN" --version --no-ansi 2>/dev/null | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+
+# ---------- 5. MySQL ----------
+if command -v mysql &>/dev/null; then
+    echo "  ✓ MySQL 可用"
+else
+    echo "  ⚠ MySQL 未检测到，请确保已安装并在 .env 配置好数据库连接"
 fi
-echo "✓ Composer $(composer --version --no-ansi 2>/dev/null | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+
+# ---------- 6. Redis ----------
+if command -v redis-cli &>/dev/null && redis-cli ping 2>/dev/null | grep -q PONG; then
+    echo "  ✓ Redis 运行中"
+else
+    echo "  ⚠ Redis 未运行，请在宝塔面板安装并启动 Redis"
+fi
+
+# ---------- 7. 目录权限 ----------
+for dir in storage storage/logs storage/framework/cache storage/framework/sessions storage/framework/views bootstrap/cache database; do
+    [ -d "$dir" ] || mkdir -p "$dir"
+done
+chown -R www:www storage bootstrap/cache database 2>/dev/null || true
+chmod -R 775 storage bootstrap/cache database 2>/dev/null || true
+echo "  ✓ 目录权限已修复"
+
+# ---------- 检测结果 ----------
+if [ $ERRORS -ne 0 ]; then
+    echo ""
+    echo "============================================"
+    echo "  ✗ 环境有问题，请按上方提示修复后重新运行"
+    echo "============================================"
+    exit 1
+fi
+
+echo ""
+echo "  ✓ 环境检测全部通过"
+echo ""
 
 # ========== 首次部署 ==========
 if [ ! -f .env ]; then
-    echo ""
     echo ">>> 首次部署 - 初始化环境"
-    composer install --no-dev --optimize-autoloader --no-interaction
-
-    # 修复权限（Web 安装向导需要）
-    chown -R www:www storage bootstrap/cache database
-    chmod -R 775 storage bootstrap/cache database
-    chown www:www "$APP_DIR" "$APP_DIR/.env" 2>/dev/null || true
+    $PHP_BIN "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
 
     cp .env.example .env
     $PHP_BIN artisan key:generate --force
+    chown www:www .env 2>/dev/null || true
 
     echo ""
     echo "请选择安装方式："
@@ -124,9 +196,10 @@ if [ ! -f .env ]; then
     read -p "请选择 [1/2]: " INSTALL_MODE
 
     if [ "$INSTALL_MODE" = "2" ]; then
-        # Web 向导模式：只需要知道域名来提示访问地址
         read -p "请输入站点域名 (如 example.com): " SITE_DOMAIN
         sed -i "s|APP_URL=.*|APP_URL=https://$SITE_DOMAIN|" .env
+        chown -R www:www storage bootstrap/cache database
+        chmod -R 775 storage bootstrap/cache database
         echo ""
         echo "============================================"
         echo "  请在浏览器访问: https://$SITE_DOMAIN/install"
@@ -136,13 +209,11 @@ if [ ! -f .env ]; then
         exit 0
     fi
 
-    # 命令行模式
     echo ""
     read -p "请输入站点域名 (如 example.com): " SITE_DOMAIN
     read -p "请输入数据库密码 (留空则自动生成): " DB_PASS
     [ -z "$DB_PASS" ] && DB_PASS=$(head -c 16 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 16)
 
-    # 写入 .env
     sed -i "s|APP_URL=.*|APP_URL=https://$SITE_DOMAIN|" .env
     sed -i "s|APP_ENV=.*|APP_ENV=production|" .env
     sed -i "s|APP_DEBUG=.*|APP_DEBUG=false|" .env
@@ -151,7 +222,6 @@ if [ ! -f .env ]; then
     sed -i "s|DB_USERNAME=.*|DB_USERNAME=cang_ai|" .env
     sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$DB_PASS|" .env
 
-    # 自动创建 MySQL 数据库和用户
     if command -v mysql &>/dev/null; then
         mysql -uroot -e "CREATE DATABASE IF NOT EXISTS cang_ai DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null
         mysql -uroot -e "CREATE USER IF NOT EXISTS 'cang_ai'@'localhost' IDENTIFIED BY '$DB_PASS';" 2>/dev/null
@@ -172,13 +242,12 @@ if [ ! -f .env ]; then
 fi
 
 # ========== 更新部署 ==========
-echo ""
 echo ">>> [1/7] 拉取最新代码"
 timeout 30 git pull origin main || echo "⚠ git pull 超时，跳过"
 
 echo ""
 echo ">>> [2/7] 安装 PHP 依赖"
-composer install --no-dev --optimize-autoloader --no-interaction
+$PHP_BIN "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
 
 echo ""
 echo ">>> [3/7] 执行数据库迁移"
