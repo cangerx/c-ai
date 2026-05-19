@@ -34,6 +34,7 @@ class AiChannelResource extends Resource
                 Forms\Components\Select::make('provider')->label('供应商')
                     ->options([
                         'openai' => 'OpenAI',
+                        'nano-banana' => 'Nano-Banana (Gemini)',
                         'azure' => 'Azure',
                         'anthropic' => 'Anthropic',
                         'custom' => '自定义',
@@ -47,24 +48,16 @@ class AiChannelResource extends Resource
                     ->live(onBlur: true),
                 Forms\Components\TextInput::make('model')->label('默认模型')
                     ->placeholder('gpt-4o'),
-                Forms\Components\CheckboxList::make('models')->label('绑定模型名称')
-                    ->options(function ($record, \Filament\Schemas\Components\Utilities\Get $get) {
-                        $models = $record?->models ?? $get('models') ?? [];
-                        if (empty($models)) {
-                            return [];
-                        }
-                        return collect($models)->sort()->mapWithKeys(fn ($m) => [$m => $m])->toArray();
-                    })
-                    ->columns(3)
-                    ->searchable()
-                    ->bulkToggleable()
-                    ->helperText('点击「获取模型」刷新列表')
+                Forms\Components\TagsInput::make('models')->label('绑定模型名称')
+                    ->placeholder('输入模型名称后回车添加')
+                    ->splitKeys(['Enter', 'Tab', ','])
+                    ->helperText('手动输入模型名回车添加，或点击「获取模型」自动拉取')
                     ->columnSpanFull(),
                 \Filament\Schemas\Components\Actions::make([
                     Actions\Action::make('fetchModels')
                         ->label('获取模型')
                         ->icon('heroicon-o-arrow-path')
-                        ->action(function ($record, $livewire, \Filament\Schemas\Components\Utilities\Get $get) {
+                        ->action(function ($record, $livewire, \Filament\Schemas\Components\Utilities\Get $get, \Filament\Schemas\Components\Utilities\Set $set) {
                             $baseUrl = $record?->base_url ?? $get('base_url');
                             $apiKey = $record?->api_key ?? $get('api_key');
                             $models = static::fetchModels($baseUrl, $apiKey);
@@ -72,20 +65,19 @@ class AiChannelResource extends Resource
                                 \Filament\Notifications\Notification::make()->title('获取失败，请检查 API 地址和 Key')->danger()->send();
                                 return;
                             }
+                            $modelIds = array_keys($models);
                             if ($record) {
-                                $record->update(['models' => array_keys($models)]);
+                                $record->update(['models' => $modelIds]);
                             }
+                            $set('models', $modelIds);
                             // 同步到 ai_models 表
-                            foreach (array_keys($models) as $modelId) {
+                            foreach ($modelIds as $modelId) {
                                 \App\Models\AiModel::firstOrCreate(
                                     ['model_id' => $modelId],
                                     ['display_name' => $modelId, 'type' => 'chat']
                                 );
                             }
                             \Filament\Notifications\Notification::make()->title('已获取 ' . count($models) . ' 个模型并保存')->success()->send();
-                            if ($record) {
-                                $livewire->redirect(request()->header('Referer'));
-                            }
                         }),
                     Actions\Action::make('testModel')
                         ->label('检测模型')
