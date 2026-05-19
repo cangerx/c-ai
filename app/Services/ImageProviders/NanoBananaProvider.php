@@ -47,6 +47,7 @@ class NanoBananaProvider implements ImageProviderInterface
             'model' => $task->model,
             'prompt' => $task->prompt,
             'aspect_ratio' => $this->mapAspectRatio($task->size),
+            'oversea' => true,
         ];
 
         $imageSize = $this->getImageSize($task);
@@ -72,6 +73,7 @@ class NanoBananaProvider implements ImageProviderInterface
             'model' => $task->model,
             'prompt' => $task->prompt,
             'image_urls' => array_slice($imageUrls, 0, 10),
+            'oversea' => true,
         ];
 
         if (count($imageUrls) > 1 || $task->size !== 'auto') {
@@ -110,33 +112,26 @@ class NanoBananaProvider implements ImageProviderInterface
             }
 
             $result = $resp['json'];
-            $status = $result['status'] ?? $result['state'] ?? '';
+            $inner = $result['data'] ?? $result;
+            $status = $inner['state'] ?? $inner['status'] ?? $result['state'] ?? $result['status'] ?? '';
 
             if (in_array($status, ['failed', 'error'])) {
-                throw new RuntimeException('Nano-Banana 任务失败: ' . ($result['message'] ?? $result['error'] ?? ''));
+                throw new RuntimeException('Nano-Banana 任务失败: ' . ($inner['msg'] ?? $inner['message'] ?? $result['message'] ?? ''));
             }
 
             if (in_array($status, ['succeeded', 'completed', 'success'])) {
-                if (!empty($result['data'])) {
-                    $items = is_array($result['data']) ? $result['data'] : [];
-                    if (!empty($items) && isset($items[0]['url'])) {
-                        return ['data' => $items];
-                    }
+                $images = $inner['data']['images'] ?? [];
+                if (!empty($images)) {
+                    return ['data' => array_map(fn($img) => ['url' => $img['url'] ?? ''], $images)];
+                }
+                if (!empty($inner['url'])) {
+                    return ['data' => [['url' => $inner['url']]]];
+                }
+                if (!empty($inner['image_url'])) {
+                    return ['data' => [['url' => $inner['image_url']]]];
                 }
                 if (!empty($result['url'])) {
                     return ['data' => [['url' => $result['url']]]];
-                }
-                if (!empty($result['image_url'])) {
-                    return ['data' => [['url' => $result['image_url']]]];
-                }
-                if (!empty($result['output'])) {
-                    $output = $result['output'];
-                    if (is_string($output)) {
-                        return ['data' => [['url' => $output]]];
-                    }
-                    if (is_array($output) && !empty($output[0])) {
-                        return ['data' => array_map(fn($u) => ['url' => is_string($u) ? $u : ($u['url'] ?? '')], $output)];
-                    }
                 }
                 throw new RuntimeException('Nano-Banana 任务完成但无法解析图片: ' . json_encode($result, JSON_UNESCAPED_UNICODE));
             }

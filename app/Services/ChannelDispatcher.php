@@ -16,10 +16,8 @@ class ChannelDispatcher
         $channels = $this->getAvailableChannels($appName, $excludeId);
 
         if ($model) {
-            $matched = $channels->filter(fn($ch) => in_array($model, $ch->models ?? []))->values();
-            if ($matched->isNotEmpty()) {
-                $channels = $matched;
-            }
+            $matched = $channels->filter(fn($ch) => in_array($model, $ch->models ?? []) || $ch->model === $model)->values();
+            $channels = $matched;
         }
 
         // 优先选指定 request_mode 的渠道
