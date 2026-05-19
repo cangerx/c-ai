@@ -4,7 +4,7 @@ namespace App\Services\ImageProviders;
 
 use App\Models\AiChannel;
 use App\Models\GenerationTask;
-use Illuminate\Support\Facades\Http;
+use App\Services\CurlClient;
 use RuntimeException;
 
 class OpenAiProvider implements ImageProviderInterface
@@ -45,19 +45,16 @@ class OpenAiProvider implements ImageProviderInterface
             }
         }
 
-        $response = Http::timeout(300)
-            ->connectTimeout(15)
-            ->withHeaders([
-                'Authorization' => "Bearer {$channel->api_key}",
-                'Content-Type' => 'application/json',
-            ])
-            ->post($endpoint, $body);
+        $resp = CurlClient::post($endpoint, $body, [
+            'Authorization' => "Bearer {$channel->api_key}",
+            'Content-Type' => 'application/json',
+        ], 300, 15);
 
-        if (!$response->successful()) {
-            throw new RuntimeException("上游返回 {$response->status()}: " . mb_substr($response->body(), 0, 300));
+        if ($resp['status'] < 200 || $resp['status'] >= 300) {
+            throw new RuntimeException("上游返回 {$resp['status']}: " . mb_substr($resp['body'], 0, 300));
         }
 
-        $json = $response->json() ?? [];
+        $json = $resp['json'];
 
         if ($requestMode === 'async') {
             $json = $this->pollAsyncResult($channel, $json['id'] ?? '');
@@ -79,17 +76,16 @@ class OpenAiProvider implements ImageProviderInterface
         for ($i = 0; $i < 120; $i++) {
             sleep(5);
 
-            $response = Http::timeout(30)
-                ->connectTimeout(10)
-                ->withHeaders(['Authorization' => "Bearer {$channel->api_key}"])
-                ->get($pollUrl);
+            $resp = CurlClient::get($pollUrl, [
+                'Authorization' => "Bearer {$channel->api_key}",
+            ], 30, 10);
 
-            if (!$response->successful()) {
-                if ($response->status() === 404) continue;
-                throw new RuntimeException("轮询异步结果失败 HTTP {$response->status()}");
+            if ($resp['status'] < 200 || $resp['status'] >= 300) {
+                if ($resp['status'] === 404) continue;
+                throw new RuntimeException("轮询异步结果失败 HTTP {$resp['status']}");
             }
 
-            $result = $response->json() ?? [];
+            $result = $resp['json'];
             $state = $result['state'] ?? '';
 
             if (in_array($state, ['failed', 'error'])) {
