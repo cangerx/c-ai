@@ -16,7 +16,12 @@ class CurlClient
         return static::request('GET', $url, null, $headers, $timeout, $connectTimeout);
     }
 
-    protected static function request(string $method, string $url, ?array $body, array $headers, int $timeout, int $connectTimeout): array
+    public static function getRaw(string $url, array $headers = [], int $timeout = 120, int $connectTimeout = 15): array
+    {
+        return static::request('GET', $url, null, $headers, $timeout, $connectTimeout, true);
+    }
+
+    protected static function request(string $method, string $url, ?array $body, array $headers, int $timeout, int $connectTimeout, bool $raw = false): array
     {
         $ch = curl_init();
 
@@ -24,6 +29,15 @@ class CurlClient
         foreach ($headers as $key => $value) {
             $curlHeaders[] = "{$key}: {$value}";
         }
+
+        $responseHeaders = [];
+        $headerCallback = function ($ch, $header) use (&$responseHeaders) {
+            $parts = explode(':', $header, 2);
+            if (count($parts) === 2) {
+                $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+            }
+            return strlen($header);
+        };
 
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
@@ -34,6 +48,9 @@ class CurlClient
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_HTTPHEADER => $curlHeaders,
             CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_ENCODING => '',
+            CURLOPT_HEADERFUNCTION => $headerCallback,
         ]);
 
         if ($method === 'POST') {
@@ -46,16 +63,23 @@ class CurlClient
         $responseBody = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $errno = curl_errno($ch);
         curl_close($ch);
 
-        if ($responseBody === false) {
-            throw new RuntimeException("cURL 请求失败: {$error}");
+        if ($responseBody === false || $errno !== 0) {
+            throw new RuntimeException("cURL 请求失败 ({$errno}): {$error}");
         }
 
-        return [
+        $result = [
             'status' => $httpCode,
             'body' => $responseBody,
-            'json' => json_decode($responseBody, true) ?? [],
+            'headers' => $responseHeaders,
         ];
+
+        if (!$raw) {
+            $result['json'] = json_decode($responseBody, true) ?? [];
+        }
+
+        return $result;
     }
 }

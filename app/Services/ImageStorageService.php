@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -35,16 +34,16 @@ class ImageStorageService
 
     public function fetchRemoteImage(string $url): array
     {
-        $response = Http::timeout(120)->connectTimeout(15)->withHeaders(['Accept' => 'image/*'])->get($url);
+        $resp = CurlClient::getRaw($url, ['Accept' => 'image/*'], 120, 15);
 
-        if (!$response->successful()) {
-            throw new RuntimeException("Failed to fetch image: HTTP {$response->status()}");
+        if ($resp['status'] < 200 || $resp['status'] >= 300) {
+            throw new RuntimeException("Failed to fetch image: HTTP {$resp['status']}");
         }
 
-        $contentType = $response->header('Content-Type', 'image/png');
+        $contentType = $resp['headers']['content-type'] ?? 'image/png';
         $mimeType = $this->normalizeMime(explode(';', $contentType)[0]);
 
-        return [$response->body(), $mimeType];
+        return [$resp['body'], $mimeType];
     }
 
     public function detectMimeFromBinary(string $binary): string
