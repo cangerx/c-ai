@@ -14,6 +14,15 @@ class AgentSite extends Model
         'status', 'reject_reason', 'approved_at',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $site) {
+            if (empty($site->slug)) {
+                $site->slug = $site->subdomain ?: str()->random(8);
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [

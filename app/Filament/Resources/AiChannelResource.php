@@ -38,7 +38,7 @@ class AiChannelResource extends Resource
                         'anthropic' => 'Anthropic',
                         'custom' => '自定义',
                     ])->required(),
-                Forms\Components\TextInput::make('base_url')->label('API 地址')->url()
+                Forms\Components\TextInput::make('base_url')->label('API 地址')->url()->required()
                     ->placeholder('https://api.openai.com/v1')
                     ->live(onBlur: true),
                 Forms\Components\TextInput::make('api_key')->label('API Key')->password()->revealable()

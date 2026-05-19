@@ -189,6 +189,7 @@ class SiteSettings extends Page
             Cache::forget("agent_site:sub:{$site->subdomain}@{$site->subdomain_domain}");
             Notification::make()->title('分站设置已保存')->success()->send();
         } else {
+            $data['slug'] = $data['subdomain'] ?? str()->random(8);
             $data['status'] = 'pending';
             $data['is_active'] = false;
             AgentSite::create($data);
