@@ -76,22 +76,24 @@ if [ -n "$MISSING" ]; then
         esac
     }
 
+    # 宝塔 PHP 同时有 php.ini（FPM）和 php-cli.ini（CLI），两个都要改
+    BT_PHP_CLI_INI="${BT_PHP_DIR}/etc/php-cli.ini"
+
     for ext in $MISSING; do
         FIXED=0
 
-        # 方法1（宝塔）: .so 已存在但未启用 → 写 php.ini
+        # 方法1（宝塔）: .so 已存在但未启用 → 写 php.ini + php-cli.ini
         if [ -n "$BT_EXT_DIR" ] && [ -f "${BT_EXT_DIR}${ext}.so" ]; then
-            if [ -f "$BT_PHP_INI" ]; then
-                # 先检查是否已有（含注释行），避免重复
-                if grep -qE "^;?\s*extension\s*=\s*${ext}(\.so)?\s*$" "$BT_PHP_INI" 2>/dev/null; then
-                    # 取消注释
-                    sed -i "s/^;\s*extension\s*=\s*${ext}\(\.so\)\?\s*$/extension=${ext}/" "$BT_PHP_INI"
-                elif ! grep -qE "^extension\s*=\s*${ext}(\.so)?\s*$" "$BT_PHP_INI" 2>/dev/null; then
-                    echo "extension=${ext}" >> "$BT_PHP_INI"
+            for _ini in "$BT_PHP_INI" "$BT_PHP_CLI_INI"; do
+                [ -f "$_ini" ] || continue
+                if grep -qE "^;?\s*extension\s*=\s*${ext}(\.so)?\s*$" "$_ini" 2>/dev/null; then
+                    sed -i "s/^;\s*extension\s*=\s*${ext}\(\.so\)\?\s*$/extension=${ext}/" "$_ini"
+                elif ! grep -qE "^extension\s*=\s*${ext}(\.so)?\s*$" "$_ini" 2>/dev/null; then
+                    echo "extension=${ext}" >> "$_ini"
                 fi
-                echo "    ✓ 已启用 $ext (.so 已存在)"
-                FIXED=1
-            fi
+            done
+            echo "    ✓ 已启用 $ext (.so 已存在)"
+            FIXED=1
         fi
 
         # 方法2: apt/yum 安装（使用正确的包名映射）
