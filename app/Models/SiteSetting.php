@@ -21,5 +21,6 @@ class SiteSetting extends Model
     {
         static::updateOrCreate(['key' => $key], ['value' => $value, 'group' => $group]);
         Cache::forget("site_setting:{$key}");
+        Cache::forget('api:config');
     }
 }

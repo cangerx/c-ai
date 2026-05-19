@@ -51,44 +51,46 @@ Route::middleware('throttle:60,1')->group(function () {
 });
 
 Route::get('/config', function () {
-    $announcements = \App\Models\Announcement::where('enabled', true)
-        ->orderBy('sort')->orderByDesc('id')
-        ->pluck('content', 'url')
-        ->map(fn($content, $url) => $url ? "{$content} · <a href='{$url}' target='_blank'>了解更多 →</a>" : $content)
-        ->values()->all();
+    return \Illuminate\Support\Facades\Cache::remember('api:config', 60, function () {
+        $announcements = \App\Models\Announcement::where('enabled', true)
+            ->orderBy('sort')->orderByDesc('id')
+            ->pluck('content', 'url')
+            ->map(fn($content, $url) => $url ? "{$content} · <a href='{$url}' target='_blank'>了解更多 →</a>" : $content)
+            ->values()->all();
 
-    $models = \Illuminate\Support\Facades\DB::table('ai_models')
-        ->where('type', 'image')
-        ->where('is_active', true)
-        ->get()
-        ->map(function ($m) {
-            $item = ['id' => $m->model_id, 'name' => $m->display_name];
-            $config = json_decode($m->config, true);
-            if (!empty($config['sizes'])) $item['sizes'] = $config['sizes'];
-            if (!empty($config['qualities'])) $item['qualities'] = $config['qualities'];
-            return $item;
-        })
-        ->values()->all();
+        $models = \Illuminate\Support\Facades\DB::table('ai_models')
+            ->where('type', 'image')
+            ->where('is_active', true)
+            ->get()
+            ->map(function ($m) {
+                $item = ['id' => $m->model_id, 'name' => $m->display_name];
+                $config = json_decode($m->config, true);
+                if (!empty($config['sizes'])) $item['sizes'] = $config['sizes'];
+                if (!empty($config['qualities'])) $item['qualities'] = $config['qualities'];
+                return $item;
+            })
+            ->values()->all();
 
-    $billingRules = \App\Models\BillingRule::all()->map(fn($r) => [
-        'app' => $r->app_name,
-        'model' => $r->model_pattern,
-        'quality' => $r->quality ?: '*',
-        'credits' => $r->cost_credits,
-    ])->values()->all();
+        $billingRules = \App\Models\BillingRule::all()->map(fn($r) => [
+            'app' => $r->app_name,
+            'model' => $r->model_pattern,
+            'quality' => $r->quality ?: '*',
+            'credits' => $r->cost_credits,
+        ])->values()->all();
 
-    return response()->json([
-        'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
-        'reverse_prompt_model' => \App\Models\SiteSetting::get('reverse_prompt_model', 'gpt-5.4-mini'),
-        'cost_per_generation' => (int) \App\Models\SiteSetting::get('billing_per_generation', 1),
-        'billing_rules' => $billingRules,
-        'announcements' => $announcements,
-        'models' => $models,
-        'login_methods' => [
-            'github' => \App\Models\SiteSetting::get('login_github_enabled', '0') === '1',
-            'wechat' => \App\Models\SiteSetting::get('login_wechat_enabled', '0') === '1',
-        ],
-    ]);
+        return [
+            'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
+            'reverse_prompt_model' => \App\Models\SiteSetting::get('reverse_prompt_model', 'gpt-5.4-mini'),
+            'cost_per_generation' => (int) \App\Models\SiteSetting::get('billing_per_generation', 1),
+            'billing_rules' => $billingRules,
+            'announcements' => $announcements,
+            'models' => $models,
+            'login_methods' => [
+                'github' => \App\Models\SiteSetting::get('login_github_enabled', '0') === '1',
+                'wechat' => \App\Models\SiteSetting::get('login_wechat_enabled', '0') === '1',
+            ],
+        ];
+    });
 });
 
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');

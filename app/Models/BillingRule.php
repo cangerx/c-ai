@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class BillingRule extends Model
 {
@@ -17,5 +18,11 @@ class BillingRule extends Model
             'cost_balance' => 'decimal:2',
             'cost_credits' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => Cache::forget('api:config'));
+        static::deleted(fn () => Cache::forget('api:config'));
     }
 }
