@@ -12,6 +12,7 @@ class CreateAgentSite extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data['slug'] = $data['subdomain'];
         $data['status'] = 'approved';
         $data['is_active'] = true;
         $data['approved_at'] = now();
