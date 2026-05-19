@@ -3,14 +3,14 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\SubSiteController;
+use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Route;
 
-// 首页：直接返回 public/index.html，不做 Laravel 重构
+// 首页：读取 index.html 并注入后台 SEO 设置
 Route::get('/', function () {
     if (!file_exists(storage_path('installed'))) {
         return redirect('/install');
     }
-    // 分站域名访问
     if (app()->bound('agent_site')) {
         return app(SubSiteController::class)->index();
     }
@@ -18,7 +18,31 @@ Route::get('/', function () {
     if (!is_file($path)) {
         abort(404);
     }
-    return response()->file($path);
+
+    $html = file_get_contents($path);
+
+    $siteName    = SiteSetting::get('site_name');
+    $description = SiteSetting::get('site_description');
+    $keywords    = SiteSetting::get('site_keywords');
+
+    if ($siteName) {
+        $safe = e($siteName);
+        $html = preg_replace_callback('/<title>[^<]*<\/title>/', fn () => '<title>' . $safe . '</title>', $html);
+        $html = preg_replace_callback('/(<meta\s+property="og:title"\s+content=")[^"]*(")/i', fn ($m) => $m[1] . $safe . $m[2], $html);
+        $html = preg_replace_callback('/(<meta\s+name="twitter:title"\s+content=")[^"]*(")/i', fn ($m) => $m[1] . $safe . $m[2], $html);
+        $html = preg_replace_callback('/<h1>[^<]*<\/h1>/', fn () => '<h1>' . $safe . '</h1>', $html);
+    }
+    if ($description) {
+        $safe = e($description);
+        $html = preg_replace_callback('/(<meta\s+name="description"\s+content=")[^"]*(")/i', fn ($m) => $m[1] . $safe . $m[2], $html);
+        $html = preg_replace_callback('/(<meta\s+property="og:description"\s+content=")[^"]*(")/i', fn ($m) => $m[1] . $safe . $m[2], $html);
+        $html = preg_replace_callback('/(<meta\s+name="twitter:description"\s+content=")[^"]*(")/i', fn ($m) => $m[1] . $safe . $m[2], $html);
+    }
+    if ($keywords) {
+        $html = preg_replace_callback('/(<meta\s+name="keywords"\s+content=")[^"]*(")/i', fn ($m) => $m[1] . e($keywords) . $m[2], $html);
+    }
+
+    return response($html)->header('Content-Type', 'text/html');
 });
 
 Route::get('/terms', fn () => response()->file(public_path('terms.html')));
