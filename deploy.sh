@@ -2,7 +2,6 @@
 # CANG-AI 宝塔一键部署/更新脚本
 # 用法: bash deploy.sh          (首次部署+更新)
 #       bash deploy.sh update   (仅更新)
-set -e
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 cd "$APP_DIR"
@@ -13,6 +12,8 @@ echo "  CANG-AI 部署脚本"
 echo "  目录: $APP_DIR"
 echo "============================================"
 
+fail() { echo ""; echo "  ✗ $1"; exit 1; }
+
 # ========== 智能环境检测与自动修复 ==========
 echo ""
 echo ">>> [环境检测] 自动检查并修复所有依赖"
@@ -22,19 +23,18 @@ ERRORS=0
 # ---------- 1. 找到可用的 PHP ----------
 PHP_BIN=""
 for p in /www/server/php/83/bin/php /www/server/php/84/bin/php /www/server/php/82/bin/php $(which php 2>/dev/null); do
-    if [ -x "$p" ] && $p -r "exit(version_compare(PHP_VERSION,'8.2.0','<')?1:0);" 2>/dev/null; then
+    if [ -x "$p" ] && "$p" -r "exit(version_compare(PHP_VERSION,'8.2.0','<')?1:0);" 2>/dev/null; then
         PHP_BIN="$p"
         break
     fi
 done
 
 if [ -z "$PHP_BIN" ]; then
-    echo "  ✗ 未找到 PHP 8.2+，请在宝塔面板 → 软件商店 → 安装 PHP 8.3"
-    exit 1
+    fail "未找到 PHP 8.2+，请在宝塔面板 → 软件商店 → 安装 PHP 8.3"
 fi
 
-PHP_VER=$($PHP_BIN -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;")
-PHP_VER_NUM=$(echo $PHP_VER | tr -d '.')
+PHP_VER=$("$PHP_BIN" -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;")
+PHP_VER_NUM=$(echo "$PHP_VER" | tr -d '.')
 echo "  PHP $PHP_VER → $PHP_BIN"
 
 # ---------- 2. PHP 扩展：检测+自动修复 ----------
@@ -42,7 +42,7 @@ REQUIRED_EXTS="mbstring curl openssl pdo pdo_mysql xml ctype iconv tokenizer dom
 MISSING=""
 
 for ext in $REQUIRED_EXTS; do
-    if ! $PHP_BIN -m 2>/dev/null | grep -qi "^${ext}$"; then
+    if ! "$PHP_BIN" -m 2>/dev/null | grep -qi "^${ext}$"; then
         MISSING="$MISSING $ext"
     fi
 done
@@ -53,42 +53,72 @@ if [ -n "$MISSING" ]; then
 
     BT_PHP_DIR="/www/server/php/${PHP_VER_NUM}"
     BT_PHP_INI="${BT_PHP_DIR}/etc/php.ini"
-    BT_EXT_DIR=$(ls -d ${BT_PHP_DIR}/lib/php/extensions/no-debug-non-zts-*/ 2>/dev/null | head -1)
+    BT_EXT_DIR=$(ls -d "${BT_PHP_DIR}"/lib/php/extensions/no-debug-non-zts-*/ 2>/dev/null | head -1)
+
+    # PHP 扩展名 → apt 包名映射（不在此表的说明是 PHP 内置，apt 装不了）
+    ext_to_apt_pkg() {
+        case "$1" in
+            pdo_mysql) echo "php${PHP_VER}-mysql" ;;
+            dom|xml)   echo "php${PHP_VER}-xml" ;;
+            mbstring)  echo "php${PHP_VER}-mbstring" ;;
+            curl)      echo "php${PHP_VER}-curl" ;;
+            gd)        echo "php${PHP_VER}-gd" ;;
+            intl)      echo "php${PHP_VER}-intl" ;;
+            bcmath)    echo "php${PHP_VER}-bcmath" ;;
+            fileinfo)  echo "" ;; # 通常内置
+            openssl)   echo "" ;; # 编译时 --with-openssl
+            ctype)     echo "" ;; # 内置
+            iconv)     echo "" ;; # 内置
+            tokenizer) echo "" ;; # 内置
+            pdo)       echo "" ;; # 内置
+            pcntl)     echo "" ;; # 内置
+            *)         echo "php${PHP_VER}-${1}" ;;
+        esac
+    }
 
     for ext in $MISSING; do
         FIXED=0
 
-        # 方法1: .so 已存在但未启用 → 写 php.ini
+        # 方法1（宝塔）: .so 已存在但未启用 → 写 php.ini
         if [ -n "$BT_EXT_DIR" ] && [ -f "${BT_EXT_DIR}${ext}.so" ]; then
-            if [ -f "$BT_PHP_INI" ] && ! grep -q "^extension=${ext}" "$BT_PHP_INI"; then
-                echo "extension=${ext}" >> "$BT_PHP_INI"
+            if [ -f "$BT_PHP_INI" ]; then
+                # 先检查是否已有（含注释行），避免重复
+                if grep -qE "^;?\s*extension\s*=\s*${ext}(\.so)?\s*$" "$BT_PHP_INI" 2>/dev/null; then
+                    # 取消注释
+                    sed -i "s/^;\s*extension\s*=\s*${ext}\(\.so\)\?\s*$/extension=${ext}/" "$BT_PHP_INI"
+                elif ! grep -qE "^extension\s*=\s*${ext}(\.so)?\s*$" "$BT_PHP_INI" 2>/dev/null; then
+                    echo "extension=${ext}" >> "$BT_PHP_INI"
+                fi
                 echo "    ✓ 已启用 $ext (.so 已存在)"
                 FIXED=1
             fi
         fi
 
-        # 方法2: apt/yum 安装
+        # 方法2: apt/yum 安装（使用正确的包名映射）
         if [ $FIXED -eq 0 ]; then
-            if command -v apt-get &>/dev/null; then
-                apt-get install -y "php${PHP_VER}-${ext}" 2>/dev/null && FIXED=1
-            elif command -v yum &>/dev/null; then
-                yum install -y "php-${ext}" 2>/dev/null && FIXED=1
+            APT_PKG=$(ext_to_apt_pkg "$ext")
+            if [ -n "$APT_PKG" ]; then
+                if command -v apt-get &>/dev/null; then
+                    apt-get install -y "$APT_PKG" 2>/dev/null && FIXED=1
+                elif command -v yum &>/dev/null; then
+                    yum install -y "php-${ext}" 2>/dev/null && FIXED=1
+                fi
+                [ $FIXED -eq 1 ] && echo "    ✓ 系统包管理安装 $ext 成功"
             fi
-            [ $FIXED -eq 1 ] && echo "    ✓ 系统包管理安装 $ext 成功"
         fi
 
         [ $FIXED -eq 0 ] && echo "    ⚠ $ext 需手动安装"
     done
 
     # 重启 PHP-FPM 使扩展生效
-    /etc/init.d/php-fpm-${PHP_VER_NUM} restart 2>/dev/null \
+    /etc/init.d/php-fpm-"${PHP_VER_NUM}" restart 2>/dev/null \
         || systemctl restart "php${PHP_VER}-fpm" 2>/dev/null \
         || true
 
     # 重新验证
     FINAL_MISSING=""
     for ext in $REQUIRED_EXTS; do
-        if ! $PHP_BIN -m 2>/dev/null | grep -qi "^${ext}$"; then
+        if ! "$PHP_BIN" -m 2>/dev/null | grep -qi "^${ext}$"; then
             FINAL_MISSING="$FINAL_MISSING $ext"
         fi
     done
@@ -102,28 +132,39 @@ if [ -n "$MISSING" ]; then
     fi
 fi
 
-[ $ERRORS -eq 0 ] && echo "  ✓ PHP 扩展完整"
+if [ $ERRORS -eq 0 ]; then
+    echo "  ✓ PHP 扩展完整"
+fi
 
 # ---------- 3. 解除 PHP 禁用函数 ----------
 NEED_FUNCS="putenv proc_open proc_get_status proc_close exec symlink pcntl_signal pcntl_alarm"
-PHP_INI_DIR=$(dirname "$($PHP_BIN -r "echo php_ini_loaded_file();" 2>/dev/null)")
+PHP_INI_DIR=$(dirname "$("$PHP_BIN" -r "echo php_ini_loaded_file();" 2>/dev/null)")
 REMOVED_FUNCS=""
 
 if [ -d "$PHP_INI_DIR" ]; then
     for ini_file in "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php-cli.ini"; do
         [ -f "$ini_file" ] || continue
+        DISABLE_LINE=$(grep -n "^disable_functions" "$ini_file" 2>/dev/null | head -1 | cut -d: -f1)
+        [ -z "$DISABLE_LINE" ] && continue
+
+        CURRENT=$(sed -n "${DISABLE_LINE}p" "$ini_file")
+        CHANGED="$CURRENT"
         for fn in $NEED_FUNCS; do
-            if grep -q "disable_functions.*$fn" "$ini_file" 2>/dev/null; then
-                sed -i "s/,$fn//g; s/$fn,//g; s/$fn//g" "$ini_file"
+            # 精确匹配整个函数名，不误伤子串
+            if echo "$CHANGED" | grep -qE "(,|=)\s*${fn}\s*(,|$)"; then
+                CHANGED=$(echo "$CHANGED" | sed -E "s/,\s*${fn}\s*//g; s/${fn}\s*,//g; s/=\s*${fn}\s*$/=/")
                 REMOVED_FUNCS="$REMOVED_FUNCS $fn"
             fi
         done
+        if [ "$CHANGED" != "$CURRENT" ]; then
+            sed -i "${DISABLE_LINE}s|.*|${CHANGED}|" "$ini_file"
+        fi
     done
 fi
 
 if [ -n "$REMOVED_FUNCS" ]; then
     echo "  ✓ 已解除禁用函数:$REMOVED_FUNCS"
-    /etc/init.d/php-fpm-${PHP_VER_NUM} restart 2>/dev/null || true
+    /etc/init.d/php-fpm-"${PHP_VER_NUM}" restart 2>/dev/null || true
 else
     echo "  ✓ 禁用函数无需修复"
 fi
@@ -131,7 +172,7 @@ fi
 # ---------- 4. Composer ----------
 COMPOSER_BIN=""
 for c in /usr/local/bin/composer /usr/bin/composer $(which composer 2>/dev/null); do
-    if [ -x "$c" ] && $PHP_BIN "$c" --version &>/dev/null 2>&1; then
+    if [ -x "$c" ] && "$PHP_BIN" "$c" --version &>/dev/null 2>&1; then
         COMPOSER_BIN="$c"
         break
     fi
@@ -139,11 +180,12 @@ done
 
 if [ -z "$COMPOSER_BIN" ]; then
     echo "  ⚠ Composer 不可用，自动安装..."
-    curl -sS https://getcomposer.org/installer | $PHP_BIN -- --install-dir=/usr/local/bin --filename=composer 2>/dev/null
+    curl -sS https://getcomposer.org/installer | "$PHP_BIN" -- --install-dir=/usr/local/bin --filename=composer 2>/dev/null
     COMPOSER_BIN="/usr/local/bin/composer"
     [ ! -f /usr/bin/composer ] && ln -sf "$COMPOSER_BIN" /usr/bin/composer
 fi
-echo "  ✓ Composer $($PHP_BIN "$COMPOSER_BIN" --version --no-ansi 2>/dev/null | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+COMPOSER_VER=$("$PHP_BIN" "$COMPOSER_BIN" --version --no-ansi 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+echo "  ✓ Composer ${COMPOSER_VER:-installed}"
 
 # ---------- 5. MySQL ----------
 if command -v mysql &>/dev/null; then
@@ -183,10 +225,13 @@ echo ""
 # ========== 首次部署 ==========
 if [ ! -f .env ]; then
     echo ">>> 首次部署 - 初始化环境"
-    $PHP_BIN "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
+    "$PHP_BIN" "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
 
+    if [ ! -f .env.example ]; then
+        fail ".env.example 文件不存在，代码不完整，请检查 git clone 是否正确"
+    fi
     cp .env.example .env
-    $PHP_BIN artisan key:generate --force
+    "$PHP_BIN" artisan key:generate --force
     chown www:www .env 2>/dev/null || true
 
     echo ""
@@ -243,25 +288,25 @@ fi
 
 # ========== 更新部署 ==========
 echo ">>> [1/7] 拉取最新代码"
-timeout 30 git pull origin main || echo "⚠ git pull 超时，跳过"
+timeout 30 git pull origin main 2>/dev/null || echo "⚠ git pull 失败或超时，跳过"
 
 echo ""
 echo ">>> [2/7] 安装 PHP 依赖"
-$PHP_BIN "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
+"$PHP_BIN" "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
 
 echo ""
 echo ">>> [3/7] 执行数据库迁移"
-$PHP_BIN artisan migrate --force
+"$PHP_BIN" artisan migrate --force
 
 echo ""
 echo ">>> [4/7] 缓存配置"
-$PHP_BIN artisan config:cache
-$PHP_BIN artisan route:cache
-$PHP_BIN artisan view:cache
+"$PHP_BIN" artisan config:cache
+"$PHP_BIN" artisan route:cache
+"$PHP_BIN" artisan view:cache
 
 echo ""
 echo ">>> [5/7] 存储链接"
-$PHP_BIN artisan storage:link 2>/dev/null || true
+"$PHP_BIN" artisan storage:link 2>/dev/null || true
 
 echo ""
 echo ">>> [6/7] 修复权限"
@@ -272,8 +317,8 @@ echo ""
 echo ">>> [7/7] 重启队列 Worker"
 pkill -f "task:worker" 2>/dev/null || true
 sleep 1
-nohup $PHP_BIN artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
-nohup $PHP_BIN artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
+nohup "$PHP_BIN" artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
+nohup "$PHP_BIN" artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
 
 echo ""
 echo "============================================"
