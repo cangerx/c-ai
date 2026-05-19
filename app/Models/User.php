@@ -122,14 +122,14 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
         return $this->invite_code;
     }
 
-    public static function randomAvatarUrl(): string
+    public static function avatarUrlForId(int $id): string
     {
-        $num = str_pad((string) random_int(1, 100), 3, '0', STR_PAD_LEFT);
+        $num = str_pad((string) (($id % 100) + 1), 3, '0', STR_PAD_LEFT);
         return '/images/avatars/' . $num . '.png';
     }
 
     public function getFilamentAvatarUrl(): ?string
     {
-        return $this->avatar ?: static::randomAvatarUrl();
+        return $this->avatar ?: static::avatarUrlForId($this->id);
     }
 }

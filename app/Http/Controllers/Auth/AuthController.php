@@ -80,7 +80,6 @@ class AuthController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'parent_id' => $parentId,
-            'avatar' => User::randomAvatarUrl(),
         ]);
         $user->role = 'user';
         $user->status = 'active';
