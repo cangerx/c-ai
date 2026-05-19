@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\GenerationTaskResource\Pages;
 
 use App\Filament\Resources\GenerationTaskResource;
+use App\Models\AiModel;
 use App\Models\GenerationTask;
 use App\Models\UsageLog;
 use App\Notifications\TaskFailed;
@@ -42,10 +43,12 @@ class ViewGenerationTask extends ViewRecord
                     ->fontFamily('mono')->copyable(),
                 TextEntry::make('user.nickname')->label('用户')
                     ->formatStateUsing(fn ($record) => $record->user?->nickname ?: $record->user?->email ?: '—'),
-                TextEntry::make('model')->label('模型')->fontFamily('mono'),
+                TextEntry::make('model')->label('模型')
+                    ->formatStateUsing(fn (?string $state) => $state ? (AiModel::where('model_id', $state)->value('display_name') ?: $state) : '—'),
                 TextEntry::make('mode')->label('模式')->default('—'),
                 TextEntry::make('size')->label('尺寸')->fontFamily('mono'),
-                TextEntry::make('quality')->label('质量'),
+                TextEntry::make('quality')->label('质量')
+                    ->formatStateUsing(fn (?string $state) => ['low' => '标清 1K', 'medium' => '高清 2K', 'high' => '超清 4K'][$state] ?? ($state ?: '—')),
                 TextEntry::make('count')->label('数量'),
                 TextEntry::make('input_count')->label('输入图数')->default('0'),
                 TextEntry::make('is_public')->label('公开')
@@ -74,7 +77,11 @@ class ViewGenerationTask extends ViewRecord
 
             Section::make('计费 / 退款')->schema([
                 TextEntry::make('billing_channel')->label('渠道')
-                    ->state(fn ($record) => '#' . (UsageLog::where('task_id', $record->task_id)->value('channel_id') ?: '—')),
+                    ->state(function ($record) {
+                        $log = UsageLog::with('channel')->where('task_id', $record->task_id)->first();
+                        if (!$log) return '—';
+                        return $log->channel?->display_name ?: $log->channel?->name ?: '#' . $log->channel_id;
+                    }),
                 TextEntry::make('billing_credits')->label('扣费 credits')
                     ->state(fn ($record) => (int) (UsageLog::where('task_id', $record->task_id)->value('cost_credits') ?? 0)),
                 TextEntry::make('billing_balance')->label('扣费 balance')

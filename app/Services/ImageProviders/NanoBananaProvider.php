@@ -69,10 +69,12 @@ class NanoBananaProvider implements ImageProviderInterface
 
     protected function editImage(string $baseUrl, string $apiKey, GenerationTask $task, array $imageUrls): array
     {
+        $resolvedUrls = array_map(fn($u) => $this->resolveLocalUrl($u), $imageUrls);
+
         $body = [
             'model' => $task->model,
             'prompt' => $task->prompt,
-            'image_urls' => array_slice($imageUrls, 0, 10),
+            'image_urls' => array_slice($resolvedUrls, 0, 10),
             'oversea' => true,
         ];
 
@@ -179,5 +181,29 @@ class NanoBananaProvider implements ImageProviderInterface
             'low' => '1K',
             default => null,
         };
+    }
+
+    protected function resolveLocalUrl(string $url): string
+    {
+        $host = parse_url($url, PHP_URL_HOST) ?: '';
+        if (!in_array($host, ['127.0.0.1', 'localhost', '0.0.0.0'], true)) {
+            return $url;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH) ?: '';
+        if (!preg_match('#^/storage/(.+)$#', $path, $m)) {
+            return $url;
+        }
+
+        $base = realpath(storage_path('app/public'));
+        $filePath = realpath(storage_path('app/public/' . $m[1]));
+        if (!$filePath || !str_starts_with($filePath, $base) || !is_file($filePath)) {
+            return $url;
+        }
+
+        $binary = file_get_contents($filePath);
+        $mime = mime_content_type($filePath) ?: 'image/png';
+
+        return 'data:' . $mime . ';base64,' . base64_encode($binary);
     }
 }

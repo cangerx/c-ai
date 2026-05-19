@@ -13,14 +13,8 @@ class ChannelDispatcher
      */
     public function acquire(string $appName, ?int $excludeId = null, ?string $preferMode = null, ?string $model = null): ?AiChannel
     {
-        $channels = $this->getAvailableChannels($appName, $excludeId);
+        $channels = $this->matchingChannels($appName, $excludeId, $model);
 
-        if ($model) {
-            $matched = $channels->filter(fn($ch) => in_array($model, $ch->models ?? []) || $ch->model === $model)->values();
-            $channels = $matched;
-        }
-
-        // 优先选指定 request_mode 的渠道
         if ($preferMode) {
             $preferred = $channels->filter(fn($ch) => ($ch->request_mode ?? 'sync') === $preferMode)->values();
             if ($preferred->isNotEmpty()) {
@@ -47,6 +41,49 @@ class ChannelDispatcher
         return null;
     }
 
+    public function acquireFallback(string $appName, ?int $excludeId = null, ?string $model = null): ?AiChannel
+    {
+        $channels = $this->matchingChannels($appName, $excludeId, $model, true);
+
+        if ($channels->isEmpty()) {
+            return null;
+        }
+
+        $channels = $channels->sortBy([
+            fn($a, $b) => ($a->status === 'active' ? 0 : 1) <=> ($b->status === 'active' ? 0 : 1),
+            fn($a, $b) => ($a->error_count ?? 0) <=> ($b->error_count ?? 0),
+            fn($a, $b) => ($a->current_load ?? 0) <=> ($b->current_load ?? 0),
+            fn($a, $b) => ($b->priority ?? 0) <=> ($a->priority ?? 0),
+        ])->values();
+
+        foreach ($channels as $channel) {
+            AiChannel::where('id', $channel->id)->update([
+                'status' => 'active',
+                'paused_at' => null,
+                'current_load' => 0,
+            ]);
+
+            if ($this->incrementLoad($channel->id)) {
+                return $channel->fresh();
+            }
+        }
+
+        return null;
+    }
+
+    protected function matchingChannels(string $appName, ?int $excludeId = null, ?string $model = null, bool $includeCooling = false): Collection
+    {
+        $channels = $includeCooling
+            ? $this->getFallbackChannels($appName, $excludeId)
+            : $this->getAvailableChannels($appName, $excludeId);
+
+        if ($model) {
+            $channels = $channels->filter(fn($ch) => in_array($model, $ch->models ?? []) || $ch->model === $model)->values();
+        }
+
+        return $channels;
+    }
+
     /**
      * 获取可用渠道列表（排除满载、暂停、指定ID）
      */
@@ -55,12 +92,14 @@ class ChannelDispatcher
         // 自动恢复：paused_at 超过 30 秒的渠道清除暂停状态
         AiChannel::where('status', 'active')
             ->where('app_name', $appName)
+            ->where('is_active', true)
             ->whereNotNull('paused_at')
             ->where('paused_at', '<', now()->subSeconds(30))
             ->update(['paused_at' => null, 'error_count' => 0]);
 
         $channels = AiChannel::where('status', 'active')
             ->where('app_name', $appName)
+            ->where('is_active', true)
             ->whereRaw('current_load < rate_limit')
             ->whereNull('paused_at')
             ->get();
@@ -72,6 +111,21 @@ class ChannelDispatcher
         })->values();
     }
 
+    public function getFallbackChannels(string $appName, ?int $excludeId = null): Collection
+    {
+        return AiChannel::where('app_name', $appName)
+            ->where('is_active', true)
+            ->whereIn('status', ['active', 'paused'])
+            ->whereRaw('current_load < rate_limit')
+            ->get()
+            ->filter(function ($ch) use ($excludeId) {
+                if ($excludeId && $ch->id === $excludeId) return false;
+                if (($ch->error_count ?? 0) >= max((int) $ch->max_errors, 1)) return false;
+                return true;
+            })
+            ->values();
+    }
+
     /**
      * 按权重（priority）加权随机选一个渠道
      */
@@ -81,19 +135,34 @@ class ChannelDispatcher
             return null;
         }
 
-        // 每个渠道权重至少为 1
-        $totalWeight = $channels->sum(fn($ch) => max($ch->priority, 1));
+        $weights = $channels->mapWithKeys(fn($ch) => [$ch->id => $this->scoreChannel($ch)]);
+        $totalWeight = max(1, $weights->sum());
         $rand = mt_rand(1, $totalWeight);
         $cumulative = 0;
 
         foreach ($channels as $ch) {
-            $cumulative += max($ch->priority, 1);
+            $cumulative += $weights[$ch->id] ?? 1;
             if ($rand <= $cumulative) {
                 return $ch;
             }
         }
 
         return $channels->last();
+    }
+
+    protected function scoreChannel(AiChannel $channel): int
+    {
+        $priority = max((int) $channel->priority, 1);
+        $rateLimit = max((int) $channel->rate_limit, 1);
+        $maxErrors = max((int) $channel->max_errors, 1);
+        $loadRatio = min(1, max(0, (int) $channel->current_load / $rateLimit));
+        $errorRatio = min(1, max(0, (int) $channel->error_count / $maxErrors));
+
+        $score = $priority * 100;
+        $score *= (1 - ($loadRatio * 0.7));
+        $score *= (1 - ($errorRatio * 0.9));
+
+        return max(1, (int) round($score));
     }
 
     /**

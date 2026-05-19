@@ -112,11 +112,11 @@
             </div>
             <div class="td-meta-item">
                 <div class="td-meta-label">模型</div>
-                <div class="td-meta-value">{{ $task->model }}</div>
+                <div class="td-meta-value">{{ \App\Models\AiModel::where('model_id', $task->model)->value('display_name') ?: $task->model }}</div>
             </div>
             <div class="td-meta-item">
                 <div class="td-meta-label">画质</div>
-                <div class="td-meta-value">{{ $task->quality }}</div>
+                <div class="td-meta-value">{{ ['low' => '标清 1K', 'medium' => '高清 2K', 'high' => '超清 4K'][$task->quality] ?? $task->quality }}</div>
             </div>
             <div class="td-meta-item">
                 <div class="td-meta-label">尺寸</div>
@@ -192,7 +192,7 @@
                 <div class="col-inner">
                     <div class="col-title">计费信息</div>
                     @if($usageLog)
-                        <div class="col-row"><span class="label">渠道</span><span class="value">#{{ $usageLog->channel_id }} {{ $usageLog->channel?->name }}</span></div>
+                        <div class="col-row"><span class="label">渠道</span><span class="value">{{ $usageLog->channel?->display_name ?: $usageLog->channel?->name ?: '#'.$usageLog->channel_id }}</span></div>
                         <div class="col-row"><span class="label">扣次数</span><span class="value">{{ $usageLog->cost_credits }}</span></div>
                         <div class="col-row"><span class="label">扣额度</span><span class="value">¥{{ number_format($usageLog->cost_balance, 2) }}</span></div>
                         <div class="col-row"><span class="label">退款</span><span class="value">

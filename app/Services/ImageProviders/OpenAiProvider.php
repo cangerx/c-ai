@@ -20,35 +20,53 @@ class OpenAiProvider implements ImageProviderInterface
         }
 
         $hasImages = !empty($imageUrls);
-        $path = ($hasImages && $requestMode !== 'async') ? '/v1/images/edits' : '/v1/images/generations';
         $baseUrl = rtrim($channel->base_url, '/');
         $baseUrl = preg_replace('#/v1$#', '', $baseUrl);
-        $endpoint = $baseUrl . $path;
 
-        if ($requestMode === 'async') {
-            $endpoint .= '?async=true';
-        }
+        if ($hasImages && $requestMode !== 'async') {
+            $localFiles = $this->resolveLocalFiles($imageUrls);
+            $endpoint = $baseUrl . '/v1/images/edits';
 
-        $body = [
-            'model' => $task->model,
-            'prompt' => $task->prompt,
-            'size' => $size,
-            'quality' => $task->quality,
-            'n' => 1,
-        ];
-
-        if ($hasImages) {
-            if ($requestMode === 'async') {
-                $body['image'] = count($imageUrls) === 1 ? $imageUrls[0] : $imageUrls;
+            if ($localFiles) {
+                $resp = $this->postMultipartEdit($endpoint, $channel->api_key, $task, $size, $localFiles);
             } else {
-                $body['images'] = array_map(fn($u) => ['image_url' => $u], $imageUrls);
+                $body = [
+                    'model' => $task->model,
+                    'prompt' => $task->prompt,
+                    'size' => $size,
+                    'quality' => $task->quality,
+                    'n' => 1,
+                    'images' => array_map(fn($u) => ['image_url' => $u], $imageUrls),
+                ];
+                $resp = CurlClient::post($endpoint, $body, [
+                    'Authorization' => "Bearer {$channel->api_key}",
+                    'Content-Type' => 'application/json',
+                ], 300, 15);
             }
-        }
+        } else {
+            $path = '/v1/images/generations';
+            $endpoint = $baseUrl . $path;
+            if ($requestMode === 'async') {
+                $endpoint .= '?async=true';
+            }
 
-        $resp = CurlClient::post($endpoint, $body, [
-            'Authorization' => "Bearer {$channel->api_key}",
-            'Content-Type' => 'application/json',
-        ], 300, 15);
+            $body = [
+                'model' => $task->model,
+                'prompt' => $task->prompt,
+                'size' => $size,
+                'quality' => $task->quality,
+                'n' => 1,
+            ];
+
+            if ($hasImages && $requestMode === 'async') {
+                $body['image'] = count($imageUrls) === 1 ? $imageUrls[0] : $imageUrls;
+            }
+
+            $resp = CurlClient::post($endpoint, $body, [
+                'Authorization' => "Bearer {$channel->api_key}",
+                'Content-Type' => 'application/json',
+            ], 300, 15);
+        }
 
         if ($resp['status'] < 200 || $resp['status'] >= 300) {
             throw new RuntimeException("上游返回 {$resp['status']}: " . mb_substr($resp['body'], 0, 300));
@@ -61,6 +79,52 @@ class OpenAiProvider implements ImageProviderInterface
         }
 
         return $json;
+    }
+
+    protected function postMultipartEdit(string $endpoint, string $apiKey, GenerationTask $task, string $size, array $localFiles): array
+    {
+        $fields = [
+            'model' => $task->model,
+            'prompt' => $task->prompt,
+            'size' => $size,
+            'quality' => $task->quality,
+            'n' => 1,
+        ];
+
+        if (count($localFiles) === 1) {
+            $fields['image'] = $this->makeCurlFile($localFiles[0]);
+        } else {
+            foreach ($localFiles as $i => $filePath) {
+                $fields["image[{$i}]"] = $this->makeCurlFile($filePath);
+            }
+        }
+
+        return CurlClient::postMultipart($endpoint, $fields, [
+            'Authorization' => "Bearer {$apiKey}",
+        ], 300, 15);
+    }
+
+    protected function makeCurlFile(string $filePath): \CURLFile
+    {
+        return new \CURLFile(
+            $filePath,
+            mime_content_type($filePath) ?: 'application/octet-stream',
+            basename($filePath)
+        );
+    }
+
+    protected function resolveLocalFiles(array $urls): array
+    {
+        $files = [];
+        foreach ($urls as $url) {
+            $file = $this->localFilePathFromUrl($url);
+            if (!$file) {
+                return [];
+            }
+            $files[] = $file;
+        }
+
+        return $files;
     }
 
     protected function pollAsyncResult(AiChannel $channel, string $asyncId): array
@@ -99,6 +163,31 @@ class OpenAiProvider implements ImageProviderInterface
         }
 
         throw new RuntimeException('异步任务超时：轮询 10 分钟未获得结果');
+    }
+
+    protected function localFilePathFromUrl(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST) ?: '';
+        if (!in_array($host, ['127.0.0.1', 'localhost', '0.0.0.0'], true)) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH) ?: '';
+        if (!preg_match('#^/storage/(.+)$#', $path, $m)) {
+            return null;
+        }
+
+        $base = realpath(storage_path('app/public'));
+        if (!$base) {
+            return null;
+        }
+
+        $filePath = realpath(storage_path('app/public/' . $m[1]));
+        if (!$filePath || !str_starts_with($filePath, $base . DIRECTORY_SEPARATOR) || !is_file($filePath)) {
+            return null;
+        }
+
+        return $filePath;
     }
 
     protected function normalizeSize(string $size): string

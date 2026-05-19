@@ -66,7 +66,9 @@ class TaskWorkerCommand extends Command
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             $released = false;
             $channel = $dispatcher->acquire('image-gen', $lastExclude, null, $task->model)
-                ?? $dispatcher->acquire('image-gen', null, null, $task->model);
+                ?? $dispatcher->acquire('image-gen', null, null, $task->model)
+                ?? $dispatcher->acquireFallback('image-gen', $lastExclude, $task->model)
+                ?? $dispatcher->acquireFallback('image-gen', null, $task->model);
             if (!$channel) {
                 $lastException = new RuntimeException('无可用渠道');
                 if ($attempt < $maxRetries) {
@@ -78,6 +80,10 @@ class TaskWorkerCommand extends Command
             $task->touch();
 
             try {
+                if ($index === 0) {
+                    UsageLog::where('task_id', $taskId)->update(['channel_id' => $channel->id]);
+                }
+
                 $start = microtime(true);
                 $json = $this->getProvider($channel->provider)->generate($task, $channel);
                 $elapsed = round(microtime(true) - $start, 2);
@@ -85,6 +91,7 @@ class TaskWorkerCommand extends Command
                 Log::channel('upstream')->info('provider_response', [
                     'task_id' => $taskId,
                     'channel_id' => $channel->id,
+                    'channel_name' => $channel->display_name ?: $channel->name,
                     'provider' => $channel->provider,
                     'elapsed' => $elapsed,
                 ]);
@@ -92,11 +99,6 @@ class TaskWorkerCommand extends Command
                 // API 调用成功，释放负载
                 $dispatcher->release($channel->id);
                 $released = true;
-
-                // 记录渠道
-                if ($index === 0) {
-                    UsageLog::where('task_id', $taskId)->update(['channel_id' => $channel->id]);
-                }
 
                 $extracted = $this->extractItems($json);
                 if (empty($extracted)) {
@@ -117,6 +119,20 @@ class TaskWorkerCommand extends Command
                 if (empty($released)) {
                     $dispatcher->reportError($channel->id);
                 }
+                if ($this->isAuthError($e)) {
+                    AiChannel::where('id', $channel->id)->update([
+                        'status' => 'error',
+                        'paused_at' => now(),
+                    ]);
+                }
+                Log::channel('upstream')->warning('provider_failed', [
+                    'task_id' => $taskId,
+                    'attempt' => $attempt,
+                    'channel_id' => $channel->id,
+                    'channel_name' => $channel->display_name ?: $channel->name,
+                    'provider' => $channel->provider,
+                    'error' => $e->getMessage(),
+                ]);
                 $lastExclude = $channel->id;
                 $lastException = $e;
 
@@ -315,6 +331,14 @@ class TaskWorkerCommand extends Command
             || str_contains($msg, '无法获取参考图片')
             || str_contains($msg, 'model_not_found')
             || str_contains($msg, 'Invalid model');
+    }
+
+    protected function isAuthError(Throwable $e): bool
+    {
+        $msg = $e->getMessage();
+        return str_contains($msg, '上游返回 401')
+            || str_contains($msg, '上游返回 403')
+            || str_contains($msg, 'Invalid token');
     }
 
 }

@@ -3,6 +3,7 @@
 namespace App\Apps\ImageGen\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiModel;
 use App\Models\GenerationTask;
 use App\Models\PromptTemplate;
 use App\Models\TemplateCategory;
@@ -29,9 +30,13 @@ class GalleryController extends Controller
 
         $tasks = $query->latest()->paginate($perPage);
 
+        $modelLabels = AiModel::where('type', 'image')
+            ->pluck('display_name', 'model_id')
+            ->all();
+
         $items = $tasks->getCollection()->filter(function ($task) {
             return !empty($task->items);
-        })->map(function ($task) {
+        })->map(function ($task) use ($modelLabels) {
             $images = collect($task->items)->filter(fn($i) => !empty($i['url']));
             if ($images->isEmpty()) return null;
 
@@ -41,6 +46,7 @@ class GalleryController extends Controller
                 'task_id' => $task->task_id,
                 'prompt' => $task->prompt,
                 'model' => $task->model,
+                'model_name' => $modelLabels[$task->model] ?? $task->model,
                 'size' => $task->size,
                 'quality' => $task->quality,
                 'image_count' => $images->count(),

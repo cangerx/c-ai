@@ -59,17 +59,6 @@ Route::get('/pricing', function () {
     return app(\App\Http\Controllers\PricingController::class)->index();
 })->name('pricing');
 
-// 本地存储图片 fallback：当 storage:link 软链接缺失或 Nginx 未正确处理时，用 PHP 兜底返回文件
-Route::get('/storage/{path}', function (string $path) {
-    $base = storage_path('app/public');
-    $full = realpath($base . '/' . $path);
-    if (!$full || !str_starts_with($full, realpath($base)) || !is_file($full)) {
-        abort(404);
-    }
-    $mime = mime_content_type($full) ?: 'application/octet-stream';
-    return response()->file($full, ['Content-Type' => $mime, 'Cache-Control' => 'public, max-age=31536000']);
-})->where('path', '.*')->name('storage.fallback');
-
 // 认证路由
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.submit');

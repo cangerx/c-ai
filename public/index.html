@@ -6109,7 +6109,7 @@
         document.getElementById('glb-img').src = images[glbImgIdx] || item.thumb;
         document.getElementById('glb-prompt').textContent = item.prompt || '无提示词';
         document.getElementById('glb-meta').innerHTML =
-          `<span>${escapeHtml(item.model || '')}</span><span>${escapeHtml(item.quality || '')}</span><span>${escapeHtml(item.size || '')}</span>`;
+          `<span>${escapeHtml(item.model_name || MODEL_LABELS[item.model] || item.model || '')}</span><span>${escapeHtml(item.quality || '')}</span><span>${escapeHtml(item.size || '')}</span>`;
         const dotsEl = document.getElementById('glb-dots');
         const prevBtn = document.querySelector('.gallery-lb-nav.prev');
         const nextBtn = document.querySelector('.gallery-lb-nav.next');

@@ -132,7 +132,14 @@ class AiChannelResource extends Resource
         return $table
             ->striped()
             ->columns([
-                Tables\Columns\TextColumn::make('display_name')->label('备注')->searchable()->weight('medium'),
+                Tables\Columns\TextColumn::make('id')->label('编号')
+                    ->badge()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('display_name')->label('渠道')
+                    ->state(fn (AiChannel $record) => $record->display_name ?: $record->name)
+                    ->description(fn (AiChannel $record) => $record->name)
+                    ->searchable(['display_name', 'name'])
+                    ->weight('medium'),
                 Tables\Columns\TextColumn::make('provider')->label('供应商')
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
@@ -141,13 +148,28 @@ class AiChannelResource extends Resource
                         'anthropic' => 'warning',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('model')->label('模型')->color('gray'),
+                Tables\Columns\TextColumn::make('models')->label('绑定模型')
+                    ->state(fn (AiChannel $record) => implode(', ', array_slice($record->models ?? array_filter([$record->model]), 0, 3)))
+                    ->description(fn (AiChannel $record) => count($record->models ?? []) > 3 ? '共 ' . count($record->models ?? []) . ' 个模型' : null)
+                    ->limit(40)
+                    ->tooltip(fn (AiChannel $record) => implode(', ', $record->models ?? array_filter([$record->model]))),
                 Tables\Columns\TextColumn::make('priority')->label('优先级')->sortable()
                     ->badge()->color('gray'),
-                Tables\Columns\TextColumn::make('current_load')->label('负载')->placeholder('0'),
+                Tables\Columns\TextColumn::make('current_load')->label('负载')
+                    ->state(fn (AiChannel $record) => ($record->current_load ?? 0) . '/' . max((int) $record->rate_limit, 1))
+                    ->description(fn (AiChannel $record) => round((($record->current_load ?? 0) / max((int) $record->rate_limit, 1)) * 100) . '%'),
                 Tables\Columns\TextColumn::make('error_count')->label('错误')
+                    ->state(fn (AiChannel $record) => ($record->error_count ?? 0) . '/' . max((int) $record->max_errors, 1))
                     ->badge()
-                    ->color(fn (int $state) => $state > 0 ? 'danger' : 'gray'),
+                    ->color(fn (AiChannel $record) => ($record->error_count ?? 0) >= ($record->max_errors ?? 5) ? 'danger' : (($record->error_count ?? 0) > 0 ? 'warning' : 'gray')),
+                Tables\Columns\TextColumn::make('cooldown_remaining')->label('冷却')
+                    ->state(function (AiChannel $record) {
+                        if (!$record->paused_at) return '—';
+                        $seconds = max(0, 30 - (int) $record->paused_at->diffInSeconds(now()));
+                        return $seconds > 0 ? $seconds . '秒' : '待恢复';
+                    })
+                    ->badge()
+                    ->color(fn (AiChannel $record) => $record->paused_at ? 'warning' : 'gray'),
                 Tables\Columns\TextColumn::make('status')->label('状态')
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
@@ -175,14 +197,21 @@ class AiChannelResource extends Resource
                     ->label('重置')
                     ->icon('heroicon-o-arrow-path')
                     ->requiresConfirmation()
-                    ->visible(fn (AiChannel $record) => $record->error_count > 0)
-                    ->action(fn (AiChannel $record) => $record->update(['error_count' => 0, 'status' => 'active', 'paused_at' => null])),
+                    ->visible(fn (AiChannel $record) => $record->error_count > 0 || $record->paused_at || $record->status !== 'active')
+                    ->action(fn (AiChannel $record) => $record->update(['error_count' => 0, 'status' => 'active', 'paused_at' => null, 'current_load' => 0])),
+                Actions\Action::make('cooldown')
+                    ->label('冷却')
+                    ->icon('heroicon-o-pause')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->visible(fn (AiChannel $record) => $record->status === 'active' && !$record->paused_at)
+                    ->action(fn (AiChannel $record) => $record->update(['paused_at' => now()])),
                 Actions\Action::make('toggleActive')
                     ->label(fn (AiChannel $record) => $record->is_active ? '禁用' : '启用')
                     ->icon('heroicon-o-power')
                     ->color(fn (AiChannel $record) => $record->is_active ? 'danger' : 'success')
                     ->requiresConfirmation()
-                    ->action(fn (AiChannel $record) => $record->update(['is_active' => !$record->is_active])),
+                    ->action(fn (AiChannel $record) => $record->update(['is_active' => !$record->is_active, 'current_load' => 0])),
                 Actions\EditAction::make(),
             ])
             ->bulkActions([
