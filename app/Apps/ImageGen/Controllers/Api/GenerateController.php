@@ -43,6 +43,21 @@ class GenerateController extends Controller
 
         $count = max(1, min(4, (int) $request->input('count', 1)));
         $model = $request->input('model', 'gpt-image-2');
+        $size = $request->input('size', 'auto');
+
+        // 校验模型是否存在且启用，并验证 size/quality 是否在允许范围内
+        $aiModel = \App\Models\AiModel::where('model_id', $model)
+            ->where('type', 'image')->where('is_active', true)->first();
+        if (!$aiModel) {
+            return response()->json(['error' => '模型不可用'], 422);
+        }
+        $cfg = $aiModel->config ?? [];
+        if (!empty($cfg['sizes']) && !in_array($size, $cfg['sizes'])) {
+            return response()->json(['error' => '该模型不支持此尺寸'], 422);
+        }
+        if (!empty($cfg['qualities']) && !in_array($quality, $cfg['qualities'])) {
+            return response()->json(['error' => '该模型不支持此质量'], 422);
+        }
 
         if (!$billing->canAfford($user, $model, $quality, 'image-gen', $count)) {
             return response()->json(['error' => '积分不足，请先充值'], 402);
@@ -50,6 +65,7 @@ class GenerateController extends Controller
 
         $channel = AiChannel::where('status', 'active')
             ->where('app_name', 'image-gen')
+            ->whereJsonContains('models', $model)
             ->orderBy('priority', 'desc')
             ->inRandomOrder()
             ->first();
