@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasAvatar
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
@@ -119,5 +120,16 @@ class User extends Authenticatable implements FilamentUser
             $this->saveQuietly();
         }
         return $this->invite_code;
+    }
+
+    public static function randomAvatarUrl(): string
+    {
+        $num = str_pad((string) random_int(1, 100), 3, '0', STR_PAD_LEFT);
+        return '/images/avatars/' . $num . '.png';
+    }
+
+    public function getFilamentAvatarUrl(): ?string
+    {
+        return $this->avatar ?: static::randomAvatarUrl();
     }
 }

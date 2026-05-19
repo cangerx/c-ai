@@ -47,6 +47,7 @@ class AuthController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'parent_id' => $parentId,
+            'avatar' => User::randomAvatarUrl(),
         ]);
         $user->role = 'user';
         $user->status = 'active';
@@ -155,7 +156,7 @@ class AuthController extends Controller
                 'name' => $ghUser->getNickname() ?: $ghUser->getName() ?: 'GitHub User',
                 'email' => $ghUser->getEmail() ?: $ghUser->getId() . '@github.oauth',
                 'github_id' => $ghUser->getId(),
-                'avatar' => $ghUser->getAvatar(),
+                'avatar' => $ghUser->getAvatar() ?: User::randomAvatarUrl(),
             ]);
             $user->role = 'user';
             $user->status = 'active';
@@ -240,7 +241,7 @@ class AuthController extends Controller
                 'email' => $openid . '@wechat.oauth',
                 'wechat_openid' => $openid,
                 'wechat_unionid' => $unionid,
-                'avatar' => $avatar,
+                'avatar' => $avatar ?: User::randomAvatarUrl(),
             ]);
             $user->role = 'user';
             $user->status = 'active';
@@ -320,6 +321,7 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'nickname' => $user->nickname,
+            'avatar' => $user->avatar ?: User::randomAvatarUrl(),
             'role' => $user->role,
             'credits' => $user->credits,
             'balance' => $user->balance,
