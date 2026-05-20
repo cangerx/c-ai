@@ -4675,7 +4675,7 @@
           mode === "image"
             ? "模仿这张参考图，生成一张类似风格的、中文的、上班主题的海报"
             : mode === "reverse"
-              ? "上传一张图片，使用 gpt-5.4-mini 反推这张图的生成提示词"
+              ? "上传一张图片，智能解析画面构图、风格与细节，生成专业级创作提示词"
               : "输入一句描述，生成风格明确、细节完整的图片";
         renderThumbs();
         setGenerationLoading(false);
@@ -5192,7 +5192,7 @@
         els.prompt.value = finalText;
         flashPromptField();
         els.resultInfo.textContent = "提示词反推完成，结果已写回输入框。";
-        els.resultUrl.innerHTML = `<span>使用模型: ${escapeHtml(data.model || REVERSE_PROMPT_MODEL)} · 渠道: ${escapeHtml(data.channel_name || "—")}</span>`;
+        els.resultUrl.innerHTML = `<span>智能解析完成 · 渠道: ${escapeHtml(data.channel_name || "—")}</span>`;
         log("提示词反推完成，结果已写回输入框。");
       }
 
