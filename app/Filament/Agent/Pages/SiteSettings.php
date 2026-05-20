@@ -65,7 +65,9 @@ class SiteSettings extends Page
                                 table: 'agent_sites',
                                 column: 'subdomain',
                                 ignorable: fn () => AgentSite::where('user_id', auth()->id())->first(),
-                                modifyRuleUsing: fn ($rule) => $rule->where('subdomain_domain', $this->data['subdomain_domain'] ?? null),
+                                modifyRuleUsing: fn ($rule) => ($this->data['subdomain_domain'] ?? null)
+                                    ? $rule->where('subdomain_domain', $this->data['subdomain_domain'])
+                                    : $rule->whereNull('subdomain_domain'),
                             ),
                         Forms\Components\Select::make('subdomain_domain')
                             ->label('选择域名')
