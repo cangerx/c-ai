@@ -316,7 +316,7 @@ chown -R www:www storage bootstrap/cache database
 chmod -R 775 storage bootstrap/cache database
 
 echo ""
-echo ">>> [7/7] 重启队列 Worker"
+echo ">>> [7/7] 重启图片任务 Worker"
 pkill -f "task:worker" 2>/dev/null || true
 sleep 1
 nohup "$PHP_BIN" artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &

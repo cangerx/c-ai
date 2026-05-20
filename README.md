@@ -11,13 +11,14 @@
 <p align="center">
   <img src="https://img.shields.io/badge/PHP-8.3+-8892BF?style=flat-square&logo=php&logoColor=white" alt="PHP">
   <img src="https://img.shields.io/badge/Laravel-13-FF2D20?style=flat-square&logo=laravel&logoColor=white" alt="Laravel">
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/License-Commercial-black?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/Worker-Redis_task:worker-red?style=flat-square" alt="Worker">
   <img src="https://img.shields.io/badge/Deploy-宝塔_|_Nginx_|_Caddy-orange?style=flat-square" alt="Deploy">
 </p>
 
 <p align="center">
-  基于 Laravel 13 构建的 AI 图像生成平台<br>
-  支持多模型渠道 · 积分计费 · 分销推广 · 浏览器一键安装
+  基于 Laravel 13 + Filament 构建的 AI 图像生成平台<br>
+  支持多模型渠道 · 智能调度 · 积分计费 · 分销推广 · 提示词工具 · 浏览器一键安装
 </p>
 
 ---
@@ -26,10 +27,10 @@
 
 |  |  |
 |--|--|
-| 🎨 **文生图 / 图生图** — 提示词或参考图，AI 即刻生成 | 🔄 **多渠道轮询** — GPT-Image、DALL·E 等模型自由切换 |
+| 🎨 **文生图 / 图生图 / 反推提示词** — 提示词或参考图，AI 即刻生成 | 🔄 **智能渠道调度** — 权重、冷却、重试、兜底渠道 |
 | 💰 **积分计费** — 按尺寸质量定价，兑换码充值 | 👥 **分销推广** — 邀请注册返佣，佣金自动结算 |
 | 📱 **全端适配** — PC / 平板 / 手机响应式设计 | 🛡️ **内容安全** — 提示词过滤 + 图片审核 |
-| ⚡ **异步队列** — 任务后台处理，失败自动重试 | 🔐 **多种登录** — 邮箱 / GitHub / 微信扫码 |
+| ⚡ **Redis Worker** — `task:worker` 后台处理，失败自动重试 | 🔐 **多种登录** — 邮箱 / GitHub / 微信扫码 |
 | 📝 **提示词模板** — 分类管理，变量填充，一键生成 | 🖼️ **公开画廊** — 作品展示，社区浏览 |
 
 ---
@@ -54,8 +55,8 @@ bash deploy.sh
 - ✅ 安装 PHP 依赖
 - ✅ 修复所有目录权限
 - ✅ 交互式选择安装方式（命令行 或 Web 向导）
-- ✅ 自动创建 MySQL 数据库和用户（命令行模式）
-- ✅ 数据库迁移、缓存配置、启动队列 Worker
+- ✅ 根据向导配置 MySQL 或 SQLite
+- ✅ 数据库迁移、缓存配置、启动 Redis `task:worker`
 
 ### 方式二：Web 安装向导
 
@@ -88,7 +89,7 @@ https://your-domain.com/install
 
 > 💡 `deploy.sh` 会自动处理：Composer 安装、PHP 禁用函数解除、扩展检测、权限修复、数据库创建。无需手动操作。
 
-**队列 Worker（可选，提升性能）：**
+**图片任务 Worker（必须）：**
 
 宝塔 → Supervisor → 添加守护进程：
 ```
@@ -116,7 +117,7 @@ bash deploy.sh
 ├─────────────────────────────────────────────┤
 │  API Layer — Laravel 13 + Sanctum 认证       │
 ├─────────────────────────────────────────────┤
-│  Queue — Database Driver + Supervisor        │
+│  Worker — Redis BLPOP + task:worker          │
 ├─────────────────────────────────────────────┤
 │  Storage — MySQL 8.0 / SQLite               │
 └─────────────────────────────────────────────┘
@@ -126,10 +127,10 @@ bash deploy.sh
 
 ```
 app/Apps/ImageGen/    → 图像生成模块（控制器、路由、视图）
-app/Services/         → 业务服务（计费、内容过滤）
-app/Jobs/             → 异步任务（图片生成、重试）
+app/Filament/         → 管理后台与代理中心
+app/Services/         → 业务服务、渠道调度、图片提供商
 public/index.html     → 前端单页应用
-resources/views/admin → 管理后台
+routes/api.php        → API 路由
 ```
 
 ---
@@ -143,6 +144,10 @@ resources/views/admin → 管理后台
 | GET | `/api/me` | 用户信息（需认证） |
 | POST | `/api/apps/image-gen/generate` | 提交生成任务（需认证） |
 | GET | `/api/apps/image-gen/status` | 查询任务状态（需认证） |
+| POST | `/api/reverse-prompt` | 图片反推提示词（需认证） |
+| POST | `/api/prompt-tool` | 提示词优化/翻译（需认证） |
+| POST | `/api/upload-image` | 上传参考图（需认证） |
+| GET | `/api/explore` | 首页作品流 JSON |
 | POST | `/api/withdrawals` | 分销员申请提现（需认证） |
 | POST | `/api/redeem` | 兑换码充值（需认证） |
 | GET | `/api/templates` | 提示词模板列表 |
@@ -156,12 +161,32 @@ resources/views/admin → 管理后台
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
-| PHP | 8.3+ | 扩展：mbstring, xml, ctype, intl, pdo_mysql, bcmath, gd, fileinfo, curl, openssl |
-| MySQL | 8.0+ | 或 SQLite |
+| PHP | 8.3+ | 扩展：mbstring, xml, ctype, iconv, intl, bcmath, gd, fileinfo, curl, openssl, redis |
+| MySQL | 8.0+ | 或 SQLite；MySQL 需 pdo_mysql，SQLite 需 sqlite3 / pdo_sqlite |
 | Composer | 2.2+ | 脚本自动安装 |
+| Redis | 6.0+ | 图片生成任务必需 |
 | Web 服务器 | Nginx / Caddy | 宝塔自带 |
 
 > ⚠️ 不需要 Node.js，前端构建产物已包含在仓库中。
+
+生产 `.env` 至少确认：
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.com
+
+DB_CONNECTION=sqlite
+DB_DATABASE=/www/wwwroot/cang-ai/database/database.sqlite
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+CACHE_STORE=redis
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
+```
 
 ---
 

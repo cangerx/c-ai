@@ -2,12 +2,15 @@
 
 ## 服务器环境要求
 
-- **PHP** 8.3+（扩展：mbstring, xml, ctype, iconv, intl, pdo_sqlite, bcmath, gd, fileinfo, curl, openssl）
-- **Node.js** 20+
+- **PHP** 8.3+（扩展：mbstring, xml, ctype, iconv, intl, bcmath, gd, fileinfo, curl, openssl, redis）
 - **Composer** 2.x
+- **Redis**（图片生成任务必需）
 - **数据库**：SQLite 或 MySQL 8.0+
+- SQLite 需 `sqlite3`、`pdo_sqlite`；MySQL 需 `pdo_mysql`
 - **Web 服务器**：Nginx 或 Caddy
-- **进程管理**：Supervisor（队列 worker）
+- **进程管理**：Supervisor（`task:worker`）
+
+> 生产部署默认不需要 Node.js；只有改动 Vite/Tailwind 资源时才需要 `npm ci && npm run build`。
 
 ## 首次部署步骤
 
@@ -23,8 +26,6 @@ cd cang-ai
 
 ```bash
 composer install --no-dev --optimize-autoloader --no-interaction
-npm ci
-npm run build
 ```
 
 ### 3. 环境配置
@@ -34,13 +35,35 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-编辑 `.env`：
+编辑 `.env`，SQLite 示例：
 ```
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://your-domain.com
-DB_CONNECTION=mysql  # 或 sqlite
-DB_DATABASE=/var/www/cang-ai/database/database.sqlite  # SQLite 时
+DB_CONNECTION=sqlite
+DB_DATABASE=/var/www/cang-ai/database/database.sqlite
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+CACHE_STORE=redis
+SESSION_DRIVER=database
+QUEUE_CONNECTION=database
+```
+
+MySQL 示例：
+```
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://your-domain.com
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=cang_ai
+DB_USERNAME=cang_ai
+DB_PASSWORD=your-password
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+CACHE_STORE=redis
+SESSION_DRIVER=database
 QUEUE_CONNECTION=database
 ```
 
@@ -48,10 +71,7 @@ QUEUE_CONNECTION=database
 
 ```bash
 php artisan migrate --force
-php artisan db:seed --force  # 如有 seeder
 ```
-
-默认管理员：`admin@cang-ai.com` / `admin123`（请立即修改密码）
 
 ### 5. 存储链接
 
@@ -83,22 +103,22 @@ your-domain.com {
 }
 ```
 
-### 8. 队列 Worker（Supervisor）
+### 8. 图片任务 Worker（Supervisor）
 
 ```bash
 cp deploy/supervisor.conf /etc/supervisor/conf.d/cang-ai.conf
 # 编辑路径和用户名
 supervisorctl reread
 supervisorctl update
-supervisorctl start cang-ai-queue:*
+supervisorctl start cang-ai-task-worker:*
 ```
 
 Supervisor 配置要点：
-- `command=php /var/www/cang-ai/artisan queue:work --sleep=3 --tries=3 --max-time=3600`
+- `command=php /var/www/cang-ai/artisan task:worker --max-retries=3`
 - `numprocs=2`
 - `autostart=true`
 - `autorestart=true`
-- `stdout_logfile=/var/www/cang-ai/storage/logs/queue.log`
+- `stdout_logfile=/var/www/cang-ai/storage/logs/worker.log`
 
 ## 日常更新
 
@@ -111,20 +131,19 @@ bash deploy/deploy.sh
 cd /var/www/cang-ai
 git pull origin main
 composer install --no-dev --optimize-autoloader
-npm ci && npm run build
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache && php artisan view:cache
-php artisan queue:restart
+supervisorctl restart cang-ai-task-worker:*
 ```
 
-## 队列 Worker 部署
+## 图片任务 Worker 部署
 
-队列负责处理图片生成等异步任务。推荐使用 Supervisor 管理：
+图片生成任务使用 Redis `BLPOP image_gen_tasks`，必须运行自定义 `task:worker`。推荐使用 Supervisor 管理：
 
 ```ini
-[program:cang-ai-queue]
+[program:cang-ai-task-worker]
 process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/cang-ai/artisan queue:work --sleep=3 --tries=3 --max-time=3600 --timeout=900
+command=php /var/www/cang-ai/artisan task:worker --max-retries=3
 directory=/var/www/cang-ai
 user=www
 numprocs=2
@@ -132,20 +151,18 @@ autostart=true
 autorestart=true
 stopasgroup=true
 killasgroup=true
-stdout_logfile=/var/www/cang-ai/storage/logs/queue.log
-stderr_logfile=/var/www/cang-ai/storage/logs/queue-error.log
+stdout_logfile=/var/www/cang-ai/storage/logs/worker.log
+stderr_logfile=/var/www/cang-ai/storage/logs/worker-error.log
 ```
 
 重启 worker：
 ```bash
-php artisan queue:restart
-# 或
-supervisorctl restart cang-ai-queue:*
+supervisorctl restart cang-ai-task-worker:*
 ```
 
-手动重试失败任务：
+手动调试 worker：
 ```bash
-php artisan queue:retry all
+php artisan task:worker --max-retries=3
 ```
 
 ## 入口说明
@@ -166,11 +183,11 @@ tail -50 storage/logs/laravel.log
 chmod -R 775 storage bootstrap/cache
 ```
 
-### 2. 队列任务不执行
+### 2. 图片任务不执行
 ```bash
-supervisorctl status cang-ai-queue:*
-# 确认 QUEUE_CONNECTION 不是 sync
-php artisan queue:work --once  # 手动执行一个任务调试
+supervisorctl status cang-ai-task-worker:*
+ps aux | grep task:worker | grep -v grep
+tail -50 storage/logs/worker.log
 ```
 
 ### 3. 图片生成失败
@@ -181,7 +198,6 @@ php artisan queue:work --once  # 手动执行一个任务调试
 ### 4. 静态资源 404
 ```bash
 php artisan storage:link
-npm run build
 ```
 
 ### 5. 数据库迁移失败
@@ -195,4 +211,4 @@ php artisan migrate --force --step  # 逐步执行
 2. 伪静态选「laravel5」
 3. PHP 版本选 8.3+，启用所需扩展
 4. 在站点根目录执行 composer 和 artisan 命令
-5. 在宝塔「Supervisor」中添加 queue worker
+5. 在宝塔「Supervisor」中添加 `task:worker`

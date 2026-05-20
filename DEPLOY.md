@@ -2,10 +2,10 @@
 
 ## 环境要求
 
-- PHP >= 8.3（需开启扩展：fileinfo, gd, redis, sqlite3, pdo_sqlite）
+- PHP >= 8.3（需开启扩展：mbstring, xml, ctype, iconv, intl, bcmath, gd, fileinfo, curl, openssl, redis）
 - Composer 2.x
-- Redis
-- SQLite 3
+- Redis（图片生成任务必需）
+- SQLite 3 / MySQL 8.0（二选一；SQLite 需 sqlite3、pdo_sqlite，MySQL 需 pdo_mysql）
 - Supervisor（进程守护）
 
 ---
@@ -38,8 +38,12 @@ wget -O install.sh https://download.bt.cn/install/install-ubuntu_6.0.sh && sudo 
 
 - `fileinfo` ✅
 - `sqlite3` ✅（通常默认已有）
+- `pdo_sqlite` ✅（使用 SQLite 时）
+- `pdo_mysql` ✅（使用 MySQL 时）
 - `gd` ✅
 - `redis` ✅
+- `intl` ✅
+- `bcmath` ✅
 
 禁用函数中移除：`putenv`, `proc_open`（Composer 和 Artisan 需要）
 
@@ -57,7 +61,7 @@ wget -O install.sh https://download.bt.cn/install/install-ubuntu_6.0.sh && sudo 
 2. 域名填写你的域名（如 `ai.example.com`）
 3. 根目录设为：`/www/wwwroot/cang-ai/public`
 4. PHP 版本选 8.3
-5. 不创建数据库（项目用 SQLite）
+5. SQLite 可不创建数据库；MySQL 部署则创建数据库
 
 ---
 
@@ -123,6 +127,7 @@ REDIS_CLIENT=phpredis
 
 CACHE_STORE=redis
 SESSION_DRIVER=database
+QUEUE_CONNECTION=database
 ```
 
 ---
@@ -149,6 +154,8 @@ location / {
 
 ## 九、Worker 进程（Supervisor）
 
+图片生成任务必须使用自定义 Redis worker，不能用 `queue:work` 替代。
+
 宝塔面板 → 软件商店 → Supervisor 管理器 → 添加守护进程：
 
 | 字段 | 值 |
@@ -157,9 +164,9 @@ location / {
 | 启动命令 | `/www/server/php/83/bin/php /www/wwwroot/cang-ai/artisan task:worker --max-retries=3` |
 | 运行目录 | `/www/wwwroot/cang-ai` |
 | 进程数量 | 2 |
-| 启动用户 | root |
+| 启动用户 | www |
 
-Worker 通过 Redis BLPOP 消费图片生成任务，支持多进程并行。
+Worker 通过 Redis `BLPOP image_gen_tasks` 消费图片生成任务，支持多进程并行。
 
 ---
 
@@ -210,8 +217,9 @@ sqlite3 database/database.sqlite "UPDATE users SET is_admin=1 WHERE email='admin
 
 1. 访问 `https://ai.example.com` — 应看到首页
 2. 访问 `https://ai.example.com/admin` — 管理后台
-3. 管理后台 → AI 渠道 → 添加渠道（填入 base_url 和 api_key）
-4. 管理后台 → 站点设置 → 模型设置 → 配置提示词工具模型
+3. 访问 `https://ai.example.com/api/explore?per_page=18` — 应返回 JSON
+4. 管理后台 → AI 渠道 → 添加渠道（填入 base_url 和 api_key）
+5. 管理后台 → 站点设置 → 模型设置 → 配置提示词工具模型和反推模型
 
 ---
 

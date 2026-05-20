@@ -4,6 +4,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/var/www/cang-ai}"
 BRANCH="${BRANCH:-main}"
+APP_USER="${APP_USER:-www-data}"
 
 cd "$APP_DIR"
 
@@ -26,12 +27,12 @@ echo "==> 存储链接..."
 php artisan storage:link 2>/dev/null || true
 
 echo "==> 修复权限..."
-chown -R www:www storage bootstrap/cache
+chown -R "$APP_USER:$APP_USER" storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
-echo "==> 重启队列 Worker..."
+echo "==> 重启图片任务 Worker..."
 if command -v supervisorctl &>/dev/null; then
-    supervisorctl restart cang-ai-queue:* 2>/dev/null || true
+    supervisorctl restart cang-ai-task-worker:* 2>/dev/null || true
 else
     pkill -f "task:worker" 2>/dev/null || true
     sleep 1
