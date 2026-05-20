@@ -6481,48 +6481,13 @@
     </script>
     <script>
     (function(){
-      function esc(v) {
-        return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
-          return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
-        });
-      }
-      function fallbackGallery() {
+      function tryLoad() {
         var grid = document.getElementById('galleryGrid');
         if (!grid || grid.querySelector('.gallery-item')) return;
-        fetch('/api/explore?per_page=18', {headers:{Accept:'application/json'}, cache:'no-store'})
-          .then(function(r){ return r.json(); })
-          .then(function(data){
-            var items = Array.isArray(data.items) ? data.items : [];
-            if (!items.length) {
-              grid.innerHTML = '<div class="gallery-empty">今日还没有最新图片，生成后会自动展示在这里。</div>';
-              return;
-            }
-            if (!window.state) window.state = {};
-            window.state.galleryItems = items;
-            grid.innerHTML = items.map(function(item, index) {
-              var imgUrl = item.thumb || item.url || (item.images && item.images[0]);
-              if (!imgUrl) return '';
-              var title = item.created_at ? new Date(item.created_at).toLocaleString() : ('图片 ' + (index + 1));
-              return '<div class="gallery-item" data-gallery-index="'+index+'" title="'+esc(title)+'"><img src="'+esc(imgUrl)+'" alt="最新图片 '+(index+1)+'" loading="lazy" decoding="async" class="loaded" /></div>';
-            }).join('');
-            grid.querySelectorAll('.gallery-item').forEach(function(el){
-              el.classList.add('img-loaded');
-              el.addEventListener('click', function(){
-                var idx = parseInt(el.getAttribute('data-gallery-index') || '0', 10);
-                if (typeof openGalleryLb === 'function') openGalleryLb(idx);
-              });
-            });
-          })
-          .catch(function(e){
-            if (grid && !grid.children.length) grid.innerHTML = '<div class="gallery-empty">图片流暂时不可用</div>';
-          });
+        if (typeof loadGalleryWall === 'function') loadGalleryWall();
       }
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function(){ setTimeout(fallbackGallery, 800); });
-      } else {
-        setTimeout(fallbackGallery, 800);
-      }
-      setTimeout(fallbackGallery, 2500);
+      setTimeout(tryLoad, 800);
+      setTimeout(tryLoad, 2500);
     })();
     </script>
     <script src="https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js"></script>
