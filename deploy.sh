@@ -14,6 +14,27 @@ echo "============================================"
 
 fail() { echo ""; echo "  ✗ $1"; exit 1; }
 
+run_git_update() {
+    if [ ! -d .git ]; then
+        echo "  ⚠ 当前目录不是 Git 仓库，跳过代码拉取"
+        return 0
+    fi
+
+    git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+
+    local stash_name="deploy-auto-stash-$(date +%Y%m%d%H%M%S)"
+    if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+        echo "  ⚠ 检测到本地未提交改动，自动备份到 git stash: $stash_name"
+        git stash push -u -m "$stash_name" >/dev/null || fail "本地改动备份失败，请手动执行 git status 检查"
+    fi
+
+    echo "  → fetch origin/main"
+    timeout 60 git fetch origin main || fail "git fetch 失败，请检查网络或仓库权限"
+
+    echo "  → pull --ff-only"
+    timeout 60 git pull --ff-only origin main || fail "git pull 失败。已备份本地改动，请执行 git stash list 查看；如分支分叉请手动处理"
+}
+
 # ========== 智能环境检测与自动修复 ==========
 echo ""
 echo ">>> [环境检测] 自动检查并修复所有依赖"
@@ -290,7 +311,7 @@ fi
 
 # ========== 更新部署 ==========
 echo ">>> [1/7] 拉取最新代码"
-timeout 30 git pull origin main 2>/dev/null || echo "⚠ git pull 失败或超时，跳过"
+run_git_update
 
 echo ""
 echo ">>> [2/7] 安装 PHP 依赖"
