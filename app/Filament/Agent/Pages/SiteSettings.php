@@ -206,13 +206,20 @@ class SiteSettings extends Page
         $userId = auth()->id();
         $site = AgentSite::firstOrNew(['user_id' => $userId]);
 
-        $data['user_id'] = $userId;
         $data['theme_color'] = $data['theme_color'] ?: '#2d5bf0';
 
-        // 只保留模型允许且数据库实际存在的字段
-        $fillable = (new AgentSite())->getFillable();
+        // 代理可修改的字段白名单（不含 status/is_active/slug 等管理字段）
+        $agentAllowed = [
+            'site_name', 'subdomain', 'subdomain_domain', 'custom_domain',
+            'logo_url', 'theme_color', 'announcement',
+            'hero_title', 'hero_subtitle', 'hero_bg_url', 'hero_bg_color',
+            'seo_title', 'seo_description', 'seo_keywords',
+            'footer_text', 'footer_icp', 'footer_links',
+            'cost_per_generation', 'commission_rate',
+        ];
+        // 再按数据库实际存在的列二次过滤，防止列尚未迁移
         $columns = \Schema::getColumnListing('agent_sites');
-        $allowed = array_intersect($fillable, $columns);
+        $allowed = array_intersect($agentAllowed, $columns);
         $data = array_intersect_key($data, array_flip($allowed));
         $data['user_id'] = $userId;
 

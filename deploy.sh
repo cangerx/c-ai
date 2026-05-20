@@ -324,6 +324,7 @@ echo ">>> [3/7] 执行数据库迁移"
 echo ""
 echo ">>> [4/7] 缓存配置"
 "$PHP_BIN" artisan config:cache
+"$PHP_BIN" artisan route:clear 2>/dev/null || true
 "$PHP_BIN" artisan route:cache
 "$PHP_BIN" artisan view:cache
 
