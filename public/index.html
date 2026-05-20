@@ -5151,7 +5151,7 @@
         els.prompt.value = finalText;
         flashPromptField();
         els.resultInfo.textContent = kind === "optimize" ? "提示词优化完成，结果已写回输入框。" : "提示词翻译完成，结果已写回输入框。";
-        els.resultUrl.innerHTML = `<span>使用模型: ${escapeHtml(data.model || PROMPT_TOOL_MODEL)} · 渠道: ${escapeHtml(data.channel_name || "—")}</span>`;
+        els.resultUrl.innerHTML = `<span>${kind === "optimize" ? "智能优化完成" : "智能翻译完成"}</span>`;
         log(kind === "optimize" ? "提示词优化完成。" : "提示词翻译完成。");
       }
 
@@ -5192,7 +5192,7 @@
         els.prompt.value = finalText;
         flashPromptField();
         els.resultInfo.textContent = "提示词反推完成，结果已写回输入框。";
-        els.resultUrl.innerHTML = `<span>智能解析完成 · 渠道: ${escapeHtml(data.channel_name || "—")}</span>`;
+        els.resultUrl.innerHTML = `<span>智能解析完成</span>`;
         log("提示词反推完成，结果已写回输入框。");
       }
 
