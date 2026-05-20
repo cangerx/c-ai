@@ -13,6 +13,58 @@ echo "  目录: $APP_DIR"
 echo "============================================"
 
 fail() { echo ""; echo "  ✗ $1"; exit 1; }
+DEPLOY_STASH_KEEP="${DEPLOY_STASH_KEEP:-5}"
+
+cleanup_deploy_stashes() {
+    if [ ! -d .git ]; then
+        return 0
+    fi
+
+    local drops
+    drops=$(git stash list 2>/dev/null \
+        | grep 'deploy-auto-stash-' \
+        | awk -F'[{ }]' "NR>${DEPLOY_STASH_KEEP}{print \$2}" \
+        | sort -nr)
+
+    if [ -n "$drops" ]; then
+        echo "  → 清理旧自动备份，仅保留最近 ${DEPLOY_STASH_KEEP} 份"
+        for idx in $drops; do
+            git stash drop "stash@{${idx}}" >/dev/null 2>&1 || true
+        done
+    fi
+}
+
+file_sha256() {
+    if command -v sha256sum &>/dev/null; then
+        sha256sum "$1" 2>/dev/null | awk '{print $1}'
+    elif command -v shasum &>/dev/null; then
+        shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
+    fi
+}
+
+install_composer_deps_if_needed() {
+    local lock_hash_file="bootstrap/cache/composer.lock.sha256"
+    local current_hash=""
+    local saved_hash=""
+
+    if [ -f composer.lock ]; then
+        current_hash=$(file_sha256 composer.lock)
+    fi
+    if [ -f "$lock_hash_file" ]; then
+        saved_hash=$(cat "$lock_hash_file" 2>/dev/null)
+    fi
+
+    if [ -f vendor/autoload.php ] && [ -n "$current_hash" ] && [ "$current_hash" = "$saved_hash" ]; then
+        echo "  ✓ PHP 依赖未变化，跳过 Composer install"
+        return 0
+    fi
+
+    "$PHP_BIN" "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction || fail "Composer install 失败"
+    if [ -n "$current_hash" ]; then
+        mkdir -p bootstrap/cache
+        echo "$current_hash" > "$lock_hash_file"
+    fi
+}
 
 run_git_update() {
     if [ ! -d .git ]; then
@@ -33,6 +85,7 @@ run_git_update() {
 
     echo "  → pull --ff-only"
     timeout 60 git pull --ff-only origin main || fail "git pull 失败。已备份本地改动，请执行 git stash list 查看；如分支分叉请手动处理"
+    cleanup_deploy_stashes
 }
 
 # ========== 智能环境检测与自动修复 ==========
@@ -248,7 +301,7 @@ echo ""
 # ========== 首次部署 ==========
 if [ ! -f .env ]; then
     echo ">>> 首次部署 - 初始化环境"
-    "$PHP_BIN" "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
+    install_composer_deps_if_needed
 
     if [ ! -f .env.example ]; then
         fail ".env.example 文件不存在，代码不完整，请检查 git clone 是否正确"
@@ -315,7 +368,7 @@ run_git_update
 
 echo ""
 echo ">>> [2/7] 安装 PHP 依赖"
-"$PHP_BIN" "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction
+install_composer_deps_if_needed
 
 echo ""
 echo ">>> [3/7] 执行数据库迁移"
@@ -330,7 +383,11 @@ echo ">>> [4/7] 缓存配置"
 
 echo ""
 echo ">>> [5/7] 存储链接"
-"$PHP_BIN" artisan storage:link 2>/dev/null || true
+if [ -L public/storage ] || [ -e public/storage ]; then
+    echo "  ✓ public/storage 已存在，跳过"
+else
+    "$PHP_BIN" artisan storage:link 2>/dev/null || true
+fi
 
 echo ""
 echo ">>> [6/7] 修复权限"
