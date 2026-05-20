@@ -219,6 +219,16 @@ class SiteSettings extends Page
         ];
         // 再按数据库实际存在的列二次过滤，防止列尚未迁移
         $columns = \Schema::getColumnListing('agent_sites');
+        $homepageColumns = ['hero_title', 'hero_subtitle', 'hero_bg_url', 'hero_bg_color'];
+        $missingHomepageColumns = array_diff($homepageColumns, $columns);
+        if ($missingHomepageColumns) {
+            Notification::make()
+                ->title('保存失败：数据库缺少首页展示字段，请先执行部署迁移')
+                ->danger()
+                ->send();
+            return;
+        }
+
         $allowed = array_intersect($agentAllowed, $columns);
         $data = array_intersect_key($data, array_flip($allowed));
         $data['user_id'] = $userId;
@@ -235,12 +245,14 @@ class SiteSettings extends Page
                 Cache::forget("agent_site_id:domain:{$site->custom_domain}");
                 Cache::forget("agent_site_id:sub:{$site->subdomain}@{$site->subdomain_domain}");
                 Cache::forget('api:config:agent:' . $site->id . ':' . $site->updated_at?->timestamp);
+                $this->form->fill($site->refresh()->toArray());
                 Notification::make()->title('分站设置已保存')->success()->send();
             } else {
                 $data['slug'] = $data['subdomain'] ?? str()->random(8);
                 $data['status'] = 'pending';
                 $data['is_active'] = false;
-                AgentSite::create($data);
+                $site = AgentSite::create($data);
+                $this->form->fill($site->refresh()->toArray());
                 Notification::make()->title('分站申请已提交，等待审核')->success()->send();
             }
         } catch (\Throwable $e) {
