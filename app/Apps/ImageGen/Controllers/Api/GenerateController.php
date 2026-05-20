@@ -8,7 +8,8 @@ use App\Models\GenerationTask;
 use App\Services\BillingService;
 use App\Services\ContentFilterService;
 use Illuminate\Support\Facades\Redis;
-use App\Services\ImageStorageService;
+use App\Apps\ImageGen\Controllers\GalleryController;
+use App\Apps\ImageGen\Services\ImageStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -223,6 +224,11 @@ class GenerateController extends Controller
         // 返回已完成的 items（过滤掉 null 占位、false 失败标记和 expired 标记）
         $allItems = $task->items ?? [];
         $doneItems = array_values(array_filter($allItems, fn($i) => is_array($i) && !empty($i['url'])));
+        // 修正数据库中固化的绝对 URL 为相对路径
+        $doneItems = array_map(function ($item) {
+            $item['url'] = GalleryController::normalizeImageUrl($item['url'] ?? null) ?? $item['url'];
+            return $item;
+        }, $doneItems);
         $progress = count($doneItems) . '/' . $task->count;
 
         $taskPayload = [

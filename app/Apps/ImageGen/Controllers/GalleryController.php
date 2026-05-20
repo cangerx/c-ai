@@ -41,6 +41,7 @@ class GalleryController extends Controller
             if ($images->isEmpty()) return null;
 
             $user = $task->user;
+            $urls = $images->pluck('url')->map(fn($u) => self::normalizeImageUrl($u))->values()->all();
 
             return [
                 'task_id' => $task->task_id,
@@ -50,8 +51,8 @@ class GalleryController extends Controller
                 'size' => $task->size,
                 'quality' => $task->quality,
                 'image_count' => $images->count(),
-                'thumb' => $images->first()['url'] ?? null,
-                'images' => $images->pluck('url')->values()->all(),
+                'thumb' => $urls[0] ?? null,
+                'images' => $urls,
                 'created_at' => $task->created_at?->toIso8601String(),
                 'time_ago' => $task->created_at?->diffForHumans(),
                 'author' => [
@@ -131,5 +132,26 @@ class GalleryController extends Controller
         return view('explore-template-use', [
             'template' => $template,
         ]);
+    }
+
+    /**
+     * 将数据库中固化的绝对本地存储 URL 转为相对路径，外部 URL 保持不变。
+     */
+    public static function normalizeImageUrl(?string $url): ?string
+    {
+        if (!$url) return null;
+
+        // 外部 URL（非本地存储）直接返回
+        if (preg_match('#^https?://#', $url)) {
+            // 匹配 http(s)://任意域名/storage/... → 转为 /storage/...
+            if (preg_match('#^https?://[^/]+(/storage/.+)$#', $url, $m)) {
+                return $m[1];
+            }
+            // 其他外部 URL（如 R2/OSS）保持原样
+            return $url;
+        }
+
+        // 已经是相对路径
+        return $url;
     }
 }
