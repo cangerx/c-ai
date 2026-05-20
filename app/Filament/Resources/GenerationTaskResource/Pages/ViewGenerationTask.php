@@ -102,7 +102,7 @@ class ViewGenerationTask extends ViewRecord
 
             Section::make('生成结果')->schema([
                 ImageEntry::make('items_urls')->hiddenLabel()
-                    ->state(fn ($record) => collect($record->items ?? [])->pluck('url')->filter()->values()->toArray())
+                    ->state(fn ($record) => collect($record->items ?? [])->pluck('url')->filter()->map(fn ($url) => $this->imageUrl($url))->values()->toArray())
                     ->height(160)
                     ->width(160)
                     ->square()
@@ -112,7 +112,7 @@ class ViewGenerationTask extends ViewRecord
 
             Section::make('上传图片')->schema([
                 ImageEntry::make('files_urls')->hiddenLabel()
-                    ->state(fn ($record) => collect($record->files ?? [])->map(fn ($f) => is_array($f) ? ($f['url'] ?? '') : $f)->filter()->values()->toArray())
+                    ->state(fn ($record) => collect($record->files ?? [])->map(fn ($f) => is_array($f) ? ($f['url'] ?? '') : $f)->filter()->map(fn ($url) => $this->imageUrl($url))->values()->toArray())
                     ->height(160)
                     ->width(160)
                     ->square()
@@ -120,6 +120,19 @@ class ViewGenerationTask extends ViewRecord
                     ->extraImgAttributes(['class' => 'lightbox-img', 'style' => 'cursor:pointer']),
             ])->visible(fn ($record) => !empty($record->files)),
         ]);
+    }
+
+    protected function imageUrl(?string $url): ?string
+    {
+        if (!$url) {
+            return null;
+        }
+
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        return asset(ltrim($url, '/'));
     }
 
     protected function getHeaderActions(): array
