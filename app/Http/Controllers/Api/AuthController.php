@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
@@ -260,6 +261,96 @@ class AuthController extends Controller
         return redirect('/#token=' . $token);
     }
 
+    /**
+     * Send a 6-digit verification code to email.
+     * type: login | forgot
+     */
+    public function sendCode(Request $request)
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'type'  => 'required|in:login,forgot',
+        ]);
+
+        $email = $data['email'];
+        $type  = $data['type'];
+
+        // Rate limit: 1 code per 60s per email
+        $rateKey = "send_code:{$type}:{$email}";
+        if (Cache::has($rateKey)) {
+            return response()->json(['message' => '发送过于频繁，请 60 秒后重试'], 429);
+        }
+
+        if ($type === 'forgot') {
+            $user = User::where('email', $email)->first();
+            if (!$user) {
+                // Don't reveal whether email exists
+                return response()->json(['message' => '验证码已发送']);
+            }
+        }
+
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        Cache::put("email_code:{$type}:{$email}", $code, 600); // 10 min
+        Cache::put($rateKey, true, 60);
+
+        $subject = $type === 'login' ? '登录验证码' : '密码重置验证码';
+        $siteName = SiteSetting::get('site_name', 'CANG-AI');
+        Mail::raw("【{$siteName}】您的{$subject}是：{$code}，10 分钟内有效。如非本人操作请忽略。", function ($msg) use ($email, $subject, $siteName) {
+            $msg->to($email)->subject("{$subject} - {$siteName}");
+        });
+
+        return response()->json(['message' => '验证码已发送']);
+    }
+
+    /**
+     * Login with email + verification code.
+     */
+    public function loginCode(Request $request)
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'code'  => 'required|string|size:6',
+        ]);
+
+        $cacheKey = "email_code:login:{$data['email']}";
+        $storedCode = Cache::get($cacheKey);
+
+        if (!$storedCode || $storedCode !== $data['code']) {
+            return response()->json(['message' => '验证码错误或已过期'], 422);
+        }
+
+        Cache::forget($cacheKey);
+
+        $user = User::where('email', $data['email'])->first();
+
+        if (!$user) {
+            // Auto-register on first code login
+            $initCredits = (int) SiteSetting::get('register_gift_credits', 5);
+            $initBalance = (float) SiteSetting::get('register_gift_balance', 0);
+
+            $user = new User([
+                'name'  => Str::before($data['email'], '@'),
+                'email' => $data['email'],
+            ]);
+            $user->role = 'user';
+            $user->status = 'active';
+            $user->credits = $initCredits;
+            $user->balance = $initBalance;
+            $user->save();
+        }
+
+        if ($user->status !== 'active') {
+            return response()->json(['message' => '账号已被禁用'], 403);
+        }
+
+        $token = $user->createToken('app')->plainTextToken;
+
+        return response()->json([
+            'token' => $token,
+            'user'  => $this->userPayload($user),
+        ]);
+    }
+
     public function forgotPassword(Request $request)
     {
         $request->validate(['email' => 'required|email']);
@@ -286,28 +377,44 @@ class AuthController extends Controller
     public function resetPassword(Request $request)
     {
         $data = $request->validate([
-            'token' => 'required|string',
+            'token' => 'nullable|string',
+            'code'  => 'nullable|string|size:6',
             'email' => 'required|email',
             'password' => 'required|string|min:6|confirmed',
         ]);
 
-        $record = DB::table('password_reset_tokens')->where('email', $data['email'])->first();
-        if (!$record || !Hash::check($data['token'], $record->token)) {
-            return response()->json(['message' => '重置链接无效或已过期'], 422);
+        $email = $data['email'];
+
+        // Code-based reset (from send-code type=forgot)
+        if (!empty($data['code'])) {
+            $cacheKey = "email_code:forgot:{$email}";
+            $storedCode = Cache::get($cacheKey);
+            if (!$storedCode || $storedCode !== $data['code']) {
+                return response()->json(['message' => '验证码错误或已过期'], 422);
+            }
+            Cache::forget($cacheKey);
+        }
+        // Token-based reset (from email link)
+        elseif (!empty($data['token'])) {
+            $record = DB::table('password_reset_tokens')->where('email', $email)->first();
+            if (!$record || !Hash::check($data['token'], $record->token)) {
+                return response()->json(['message' => '重置链接无效或已过期'], 422);
+            }
+            if (now()->diffInMinutes($record->created_at) > 30) {
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
+                return response()->json(['message' => '重置链接已过期，请重新申请'], 422);
+            }
+            DB::table('password_reset_tokens')->where('email', $email)->delete();
+        } else {
+            return response()->json(['message' => '请提供验证码或重置令牌'], 422);
         }
 
-        if (now()->diffInMinutes($record->created_at) > 30) {
-            DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
-            return response()->json(['message' => '重置链接已过期，请重新申请'], 422);
-        }
-
-        $user = User::where('email', $data['email'])->first();
+        $user = User::where('email', $email)->first();
         if (!$user) {
             return response()->json(['message' => '用户不存在'], 404);
         }
 
         $user->update(['password' => Hash::make($data['password'])]);
-        DB::table('password_reset_tokens')->where('email', $data['email'])->delete();
         $user->tokens()->delete();
 
         return response()->json(['message' => '密码重置成功，请重新登录']);

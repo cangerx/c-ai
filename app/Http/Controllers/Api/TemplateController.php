@@ -11,7 +11,7 @@ class TemplateController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = PromptTemplate::where('status', 'published');
+        $query = PromptTemplate::where('status', 'published')->with('task');
 
         if ($tag = $request->query('tag')) {
             $t = str_replace(['%', '_'], ['\%', '\_'], $tag);
@@ -26,6 +26,13 @@ class TemplateController extends Controller
             ->orderByDesc('sort_order')
             ->orderByDesc('created_at')
             ->paginate($request->integer('per_page', 20));
+
+        $templates->getCollection()->transform(function ($tpl) {
+            $tpl->cover_image = $tpl->preview_url
+                ?: ($tpl->task ? ($tpl->task->thumb ?: ($tpl->task->images[0] ?? null)) : null);
+            unset($tpl->task);
+            return $tpl;
+        });
 
         return response()->json($templates);
     }

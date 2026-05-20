@@ -49,6 +49,13 @@ class UserController extends Controller
             ->latest()
             ->paginate($perPage);
 
+        $modelLabels = \App\Models\AiModel::pluck('display_name', 'model_id')->all();
+        $logs->getCollection()->transform(function ($log) use ($modelLabels) {
+            $arr = $log->toArray();
+            $arr['model_name'] = $modelLabels[$log->model] ?? null;
+            return $arr;
+        });
+
         return response()->json($logs);
     }
 
