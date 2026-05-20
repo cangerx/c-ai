@@ -526,7 +526,12 @@
       }
 
       .prompt.has-upload {
-        padding-right: 90px;
+        min-height: 96px;
+      }
+
+      .prompt.reverse-upload {
+        min-height: 48px;
+        max-height: 88px;
       }
 
       .prompt::placeholder {
@@ -604,31 +609,63 @@
       }
 
       .thumb-row {
-        position: absolute;
-        top: 4px;
-        right: 4px;
-        bottom: 4px;
-        width: 72px;
+        position: relative;
+        width: fit-content;
+        max-width: 100%;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: stretch;
-        gap: 4px;
+        gap: 8px;
         z-index: 3;
-        overflow: hidden;
+        overflow: visible;
+        margin-top: 10px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        animation: uploadTrayIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      .thumb-row.reverse-filled {
+        margin-top: 2px;
+      }
+
+      .thumb-row::after {
+        content: attr(data-count);
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: #111827;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+      }
+
+      .thumb-row.has-files::after {
+        display: none;
       }
 
       .thumb-row.has-files {
-        width: 84px;
+        width: fit-content;
       }
 
       .thumbs {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(4, 48px);
         gap: 8px;
         min-width: 0;
-        overflow-y: auto;
+        flex: 0 0 auto;
+        overflow-y: hidden;
         overflow-x: hidden;
-        padding-right: 2px;
       }
 
       .thumbs:empty {
@@ -636,20 +673,24 @@
       }
 
       .upload-chip {
-        width: 100%;
-        height: 100%;
-        min-height: 0;
-        border-radius: 12px;
-        border: 1px dashed #d4d4d8;
-        background: #fafafa;
-        display: grid;
-        place-items: center;
+        width: 48px;
+        height: 48px;
+        min-height: 48px;
+        border-radius: 9px;
+        border: 1px dashed #cfd5df;
+        background: rgba(250, 250, 250, 0.96);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         color: #71717a;
         font-size: 11px;
         position: relative;
         overflow: hidden;
-        flex: 1 1 0;
-        gap: 2px;
+        flex: 0 0 48px;
+        gap: 0;
+        white-space: nowrap;
+        line-height: 1;
         transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
       }
 
@@ -657,6 +698,21 @@
         border-style: solid;
         border-color: rgba(79, 108, 247, 0.22);
         background: linear-gradient(180deg, #f8faff, #f3f6ff);
+      }
+
+      .upload-chip.is-full {
+        border-style: solid;
+        border-color: rgba(16, 185, 129, 0.28);
+        background: rgba(236, 253, 245, 0.92);
+        color: #059669;
+      }
+
+      .thumb-row.reverse-filled .upload-chip {
+        display: none;
+      }
+
+      .upload-chip.is-full .upload-symbol {
+        background: rgba(99, 102, 241, 0.12);
       }
 
       .upload-chip:hover {
@@ -670,21 +726,28 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 10px;
-        background: var(--accent-soft);
+        width: 20px;
+        height: 20px;
+        border-radius: 7px;
+        background: transparent;
         color: var(--accent);
         box-shadow: none;
+        flex: 0 0 auto;
+      }
+
+      .upload-symbol svg {
+        display: block;
       }
 
       .upload-label {
-        font-size: 11px;
+        display: none;
+        font-size: 0;
         color: #52525b;
       }
 
       .upload-meta {
-        font-size: 10px;
+        display: none;
+        font-size: 9px;
         color: #7c7f89;
       }
 
@@ -704,36 +767,94 @@
       .thumb {
         position: relative;
         width: 100%;
-        height: 56px;
-        border-radius: 10px;
+        height: 48px;
+        border-radius: 9px;
         overflow: hidden;
-        border: 1px solid #dedede;
-        background: #f6f6f6;
+        border: 1px solid rgba(226, 232, 240, 0.85);
+        background: #fff;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
         flex-shrink: 0;
+        animation: thumbPop 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+        cursor: zoom-in;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+
+      .thumb:hover {
+        transform: translateY(-2px);
+        border-color: rgba(79, 108, 247, 0.35);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
       }
 
       .thumb img {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
         display: block;
+        padding: 3px;
       }
 
       .thumb button {
         position: absolute;
         top: 6px;
         right: 6px;
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
         border-radius: 50%;
         border: 0;
-        background: rgba(24, 24, 27, 0.82);
+        background: rgba(24, 24, 27, 0.72);
         color: white;
         cursor: pointer;
         font-size: 12px;
         line-height: 1;
         display: grid;
         place-items: center;
+      }
+
+      .thumb.removing {
+        animation: thumbOut 0.18s ease forwards;
+      }
+
+      .image-hover-preview {
+        position: fixed;
+        z-index: 9998;
+        width: 180px;
+        height: 180px;
+        padding: 6px;
+        border-radius: 14px;
+        background: #fff;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(6px) scale(0.96);
+        transition: opacity 0.16s ease, transform 0.16s ease;
+      }
+
+      .image-hover-preview.show {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .image-hover-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 10px;
+        display: block;
+      }
+
+      @keyframes uploadTrayIn {
+        from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      @keyframes thumbPop {
+        from { opacity: 0; transform: scale(0.86); }
+        to { opacity: 1; transform: scale(1); }
+      }
+
+      @keyframes thumbOut {
+        to { opacity: 0; transform: scale(0.8); }
       }
 
       .toolbar {
@@ -3078,7 +3199,7 @@
         }
 
         .prompt.has-upload {
-          padding-right: 82px;
+          min-height: 96px;
         }
 
         .prompt-actions {
@@ -3086,11 +3207,25 @@
         }
 
         .thumb-row {
-          top: 8px;
-          right: 6px;
-          bottom: 6px;
-          width: 72px;
-          gap: 6px;
+          width: fit-content;
+          gap: 5px;
+          padding: 5px;
+        }
+
+        .thumbs {
+          grid-template-columns: repeat(4, 48px);
+          gap: 5px;
+        }
+
+        .upload-chip {
+          width: 48px;
+          height: 48px;
+          min-height: 48px;
+          flex-basis: 48px;
+        }
+
+        .thumb {
+          height: 48px;
         }
 
         .upload-chip,
@@ -3200,7 +3335,7 @@
         }
 
         .prompt.has-upload {
-          padding-right: 68px;
+          min-height: 92px;
         }
 
         .prompt-actions {
@@ -3209,11 +3344,25 @@
         }
 
         .thumb-row {
-          top: 4px;
-          right: 4px;
-          bottom: 4px;
-          width: 58px;
+          width: fit-content;
           gap: 4px;
+          padding: 4px;
+        }
+
+        .thumbs {
+          grid-template-columns: repeat(4, 44px);
+          gap: 4px;
+        }
+
+        .thumb,
+        .upload-chip {
+          height: 46px;
+          min-height: 46px;
+        }
+
+        .upload-chip {
+          width: 44px;
+          flex-basis: 44px;
         }
 
         .upload-chip,
@@ -3944,7 +4093,7 @@
       const AUTH_USER_KEY = "cangai_auth_user";
       const TASK_STORAGE_NAME = "openai_image_last_task_id";
       const AUTH_API_BASE = "/api";
-      const LIST_ENDPOINT = "/explore?per_page=18";
+      const LIST_ENDPOINT = "/api/explore?per_page=18";
       let PROMPT_TOOL_MODEL = "gpt-5.4-mini";
       let REVERSE_PROMPT_MODEL = "gpt-5.4-mini";
       let LOGIN_METHODS = { github: false, wechat: false };
@@ -4505,8 +4654,9 @@
         els.modeReverse.classList.toggle("active", mode === "reverse");
         const needsImage = mode === "image" || mode === "reverse";
         els.imageSection.style.display = needsImage ? "flex" : "none";
-        els.inlineUploadChip.style.display = needsImage ? "grid" : "none";
+        els.inlineUploadChip.style.display = needsImage ? "" : "none";
         els.prompt.classList.toggle("has-upload", needsImage);
+        els.prompt.classList.toggle("reverse-upload", mode === "reverse");
         els.configWrap.style.display = mode === "reverse" ? "none" : "";
         els.prompt.placeholder =
           mode === "image"
@@ -4514,6 +4664,7 @@
             : mode === "reverse"
               ? "上传一张图片，使用 gpt-5.4-mini 反推这张图的生成提示词"
               : "输入一句描述，生成风格明确、细节完整的图片";
+        renderThumbs();
         setGenerationLoading(false);
         if (mode === "text") {
           setStatus("", "图片生成模式");
@@ -4735,7 +4886,8 @@
       }
 
       function clearPreview() {
-        stopTaskPolling();
+        clearPreviewPolling();
+        state.results = [];
         stopLoadingMessages();
         resetTaskDelayNotice();
         state.downloadItems.forEach((item) => {
@@ -4762,7 +4914,49 @@
         clearActiveTaskId();
       }
 
+      function ensureImageHoverPreview() {
+        let preview = document.getElementById("imageHoverPreview");
+        if (!preview) {
+          preview = document.createElement("div");
+          preview.id = "imageHoverPreview";
+          preview.className = "image-hover-preview";
+          preview.innerHTML = "<img alt=\"预览图\">";
+          document.body.appendChild(preview);
+        }
+        return preview;
+      }
+
+      function positionImageHoverPreview(anchor) {
+        const preview = ensureImageHoverPreview();
+        const rect = anchor.getBoundingClientRect();
+        const gap = 12;
+        const size = 180;
+        let left = rect.left + rect.width / 2 - size / 2;
+        let top = rect.top - size - gap;
+        left = Math.max(12, Math.min(window.innerWidth - size - 12, left));
+        if (top < 12) top = rect.bottom + gap;
+        preview.style.left = `${left}px`;
+        preview.style.top = `${top}px`;
+      }
+
+      function showImageHoverPreview(url, anchor) {
+        const preview = ensureImageHoverPreview();
+        preview.querySelector("img").src = url;
+        positionImageHoverPreview(anchor);
+        preview.classList.add("show");
+      }
+
+      function hideImageHoverPreview() {
+        const preview = document.getElementById("imageHoverPreview");
+        if (preview) {
+          preview.classList.remove("show");
+          const img = preview.querySelector("img");
+          if (img) img.removeAttribute("src");
+        }
+      }
+
       function renderThumbs() {
+        hideImageHoverPreview();
         state.thumbUrls.forEach((url) => URL.revokeObjectURL(url));
         state.thumbUrls = [];
         els.thumbs.innerHTML = "";
@@ -4774,12 +4968,19 @@
           state.thumbUrls.push(thumbUrl);
           img.src = thumbUrl;
           img.alt = file.name;
+          wrap.addEventListener("mouseenter", () => showImageHoverPreview(thumbUrl, wrap));
+          wrap.addEventListener("mousemove", () => positionImageHoverPreview(wrap));
+          wrap.addEventListener("mouseleave", hideImageHoverPreview);
           const remove = document.createElement("button");
           remove.type = "button";
           remove.textContent = "×";
           remove.addEventListener("click", () => {
-            state.files.splice(index, 1);
-            renderThumbs();
+            hideImageHoverPreview();
+            wrap.classList.add("removing");
+            setTimeout(() => {
+              state.files.splice(index, 1);
+              renderThumbs();
+            }, 160);
           });
           wrap.appendChild(img);
           wrap.appendChild(remove);
@@ -4788,9 +4989,13 @@
 
         const count = state.files.length;
         els.imageSection.classList.toggle("has-files", count > 0);
+        els.imageSection.classList.toggle("reverse-filled", state.mode === "reverse" && count > 0);
+        els.imageSection.dataset.count = count > 0 ? `${count}/4` : "";
         els.inlineUploadChip.classList.toggle("has-files", count > 0);
-        els.uploadLabel.textContent = count > 0 ? `已添加 ${count} 张` : "添加图片";
-        els.uploadMeta.textContent = count > 0 ? "继续添加" : "最多 4 张";
+        els.inlineUploadChip.classList.toggle("is-full", count >= 4 && state.mode !== "reverse");
+        els.inlineUploadChip.style.display = (state.mode === "reverse" && count > 0) ? "none" : "";
+        els.uploadLabel.textContent = count >= 4 ? "4/4 已满" : (count > 0 ? `已添加 ${count}/4 张` : "添加图片");
+        els.uploadMeta.textContent = count >= 4 ? "删除后可继续添加" : (count > 0 ? "继续添加" : "最多 4 张");
       }
 
       function setActiveButton(group, value) {
@@ -4905,31 +5110,18 @@
         const token = state.savedKey.trim();
         const prompt = els.prompt.value.trim();
         if (!token || !authUser) { setSettingsOpen(true); throw new Error("请先登录"); };
-        if (!prompt) throw new Error("请先填写提示词");
+        if (!prompt) { els.prompt.focus(); throw new Error("请先输入提示词"); }
 
-        const systemPrompt =
-          kind === "optimize"
-            ? "你是专业的图像提示词优化助手。保留用户原意，补充构图、主体、光线、材质、镜头、风格、细节，但不要胡乱扩写。直接返回优化后的最终提示词，不要加解释，不要加引号。"
-            : "你是专业翻译助手。识别用户输入语言，在中文和英文之间做适合图像生成的自然翻译。只返回翻译后的最终提示词，不要解释，不要加引号。";
-
-        const userPrompt =
-          kind === "optimize"
-            ? `请优化下面这段用于图像生成的提示词：\n${prompt}`
-            : `请翻译下面这段用于图像生成的提示词，中文转英文，英文转中文：\n${prompt}`;
-
-        log(`请求中\nPOST /v1/chat/completions\nmodel: ${PROMPT_TOOL_MODEL}`);
-        const res = await fetch(`${FIXED_BASE_URL}${encodeURIComponent("/v1/chat/completions")}`, {
+        log(`请求中\nPOST /api/prompt-tool\nmodel: ${PROMPT_TOOL_MODEL}\nkind: ${kind}`);
+        const res = await fetch(`${AUTH_API_BASE}/prompt-tool`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: PROMPT_TOOL_MODEL,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
+            kind,
+            prompt,
           }),
         });
 
@@ -4939,39 +5131,15 @@
         }
 
         const data = await readJsonResponse(res);
-        const content =
-          data?.choices?.[0]?.message?.content ||
-          data?.choices?.[0]?.text ||
-          "";
-        const finalText = String(content).trim();
+        const finalText = (data.prompt || "").trim();
         if (!finalText) {
-          throw new Error("模型未返回可用内容");
+          throw new Error("模型未返回可用提示词");
         }
         els.prompt.value = finalText;
         flashPromptField();
+        els.resultInfo.textContent = kind === "optimize" ? "提示词优化完成，结果已写回输入框。" : "提示词翻译完成，结果已写回输入框。";
+        els.resultUrl.innerHTML = `<span>使用模型: ${escapeHtml(data.model || PROMPT_TOOL_MODEL)} · 渠道: ${escapeHtml(data.channel_name || "—")}</span>`;
         log(kind === "optimize" ? "提示词优化完成。" : "提示词翻译完成。");
-      }
-
-      function extractAssistantText(data) {
-        const messageContent = data?.choices?.[0]?.message?.content;
-        if (typeof messageContent === "string") {
-          return messageContent.trim();
-        }
-        if (Array.isArray(messageContent)) {
-          const text = messageContent
-            .map((part) => {
-              if (typeof part === "string") return part;
-              if (part && typeof part.text === "string") return part.text;
-              return "";
-            })
-            .join("\n")
-            .trim();
-          if (text) return text;
-        }
-        if (typeof data?.choices?.[0]?.text === "string") {
-          return data.choices[0].text.trim();
-        }
-        return "";
       }
 
       async function reversePromptFromImage() {
@@ -4979,38 +5147,21 @@
         const file = state.files[0];
         if (!token || !authUser) { setSettingsOpen(true); throw new Error("请先登录"); };
         if (!file) throw new Error("请先上传 1 张图片");
+        const userPrompt = els.prompt.value.trim();
 
         log("正在上传图片...");
         const imageUrl = await uploadFileDirect(file, token);
 
-        log(`请求中\nPOST /v1/chat/completions\nmodel: ${REVERSE_PROMPT_MODEL}\nmode: reverse-prompt`);
-        const res = await fetch(`${FIXED_BASE_URL}${encodeURIComponent("/v1/chat/completions")}`, {
+        log(`请求中\nPOST /api/reverse-prompt\nmodel: ${REVERSE_PROMPT_MODEL}\nmode: reverse-prompt`);
+        const res = await fetch(`${AUTH_API_BASE}/reverse-prompt`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: REVERSE_PROMPT_MODEL,
-            messages: [
-              {
-                role: "system",
-                content: "你是专业的图像提示词反推助手。请根据用户上传的图片，提炼一段高质量、可直接用于图像生成的最终提示词。输出中文，包含主体、场景、构图、光线、色彩、材质、风格、镜头和细节。只返回最终提示词，不要解释，不要加标题，不要加引号。",
-              },
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: "请根据这张图片反推出一段适合继续生成同类画面的提示词。",
-                  },
-                  {
-                    type: "image_url",
-                    image_url: { url: imageUrl },
-                  },
-                ],
-              },
-            ],
+            image_url: imageUrl,
+            prompt: userPrompt,
           }),
         });
 
@@ -5020,7 +5171,7 @@
         }
 
         const data = await readJsonResponse(res);
-        const finalText = extractAssistantText(data);
+        const finalText = (data.prompt || "").trim();
         if (!finalText) {
           throw new Error("模型未返回可用提示词");
         }
@@ -5028,7 +5179,7 @@
         els.prompt.value = finalText;
         flashPromptField();
         els.resultInfo.textContent = "提示词反推完成，结果已写回输入框。";
-        els.resultUrl.innerHTML = `<span>使用模型: ${escapeHtml(PROMPT_TOOL_MODEL)}</span>`;
+        els.resultUrl.innerHTML = `<span>使用模型: ${escapeHtml(data.model || REVERSE_PROMPT_MODEL)} · 渠道: ${escapeHtml(data.channel_name || "—")}</span>`;
         log("提示词反推完成，结果已写回输入框。");
       }
 
@@ -5893,11 +6044,16 @@
       });
 
       els.imageInput.addEventListener("change", (event) => {
+        if (state.mode !== "reverse" && state.files.length >= 4) {
+          event.target.value = "";
+          log("参考图最多上传 4 张，请先删除一张后再添加。", { flash: true });
+          return;
+        }
         const files = Array.from(event.target.files || []);
         Promise.resolve()
           .then(async () => {
             const normalized = await normalizeUploadFiles(files);
-            state.files = normalized;
+            state.files = (state.mode === "reverse" ? normalized.slice(0, 1) : normalized.slice(0, 4));
             renderThumbs();
             if (normalized.length) {
               log(
@@ -5931,7 +6087,7 @@
         Promise.resolve()
           .then(async () => {
             const normalized = await normalizeUploadFiles(imageFiles);
-            state.files = state.mode === "reverse" ? normalized : [...state.files, ...normalized].slice(0, 16);
+            state.files = state.mode === "reverse" ? normalized.slice(0, 1) : [...state.files, ...normalized].slice(0, 4);
             renderThumbs();
             log(`已粘贴 ${normalized.length} 张图片。`);
           })
@@ -5970,7 +6126,7 @@
         Promise.resolve()
           .then(async () => {
             const normalized = await normalizeUploadFiles(droppedFiles);
-            state.files = state.mode === 'reverse' ? normalized : [...state.files, ...normalized].slice(0, 16);
+            state.files = state.mode === 'reverse' ? normalized.slice(0, 1) : [...state.files, ...normalized].slice(0, 4);
             renderThumbs();
             log(`已拖入 ${normalized.length} 张图片。`);
           })
@@ -6024,6 +6180,8 @@
           if (state.mode === "reverse") {
             clearActiveTaskId();
             resetTaskDelayNotice();
+            openGenerationStage();
+            renderLoadingCards();
             setStatus("warn", "分析中");
             els.resultInfo.textContent = "正在分析图片内容并反推提示词...";
             els.resultUrl.textContent = "";

@@ -72,7 +72,7 @@ class TaskWorkerCommand extends Command
             if (!$channel) {
                 $lastException = new RuntimeException('无可用渠道');
                 if ($attempt < $maxRetries) {
-                    sleep(3 * $attempt);
+                    sleep(15 * $attempt);
                 }
                 continue;
             }

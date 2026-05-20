@@ -38,6 +38,7 @@ class SiteSettings extends Page implements HasForms
         'site_keywords' => 'general',
         // 模型
         'prompt_tool_model' => 'model',
+        'reverse_prompt_model' => 'model',
         // 计费
         'billing_per_generation' => 'billing',
         // 注册赠送
@@ -79,10 +80,14 @@ class SiteSettings extends Page implements HasForms
 
                 Section::make('模型设置')->schema([
                     Forms\Components\TextInput::make('prompt_tool_model')
-                        ->label('提示词工具模型（反推/优化/翻译）')
+                        ->label('提示词工具模型（优化/翻译）')
                         ->placeholder('gpt-5.4-mini')
-                        ->helperText('用于提示词反推、优化、翻译等辅助任务的模型 ID'),
-                ]),
+                        ->helperText('用于提示词优化、翻译等辅助任务的模型 ID'),
+                    Forms\Components\TextInput::make('reverse_prompt_model')
+                        ->label('图片反推模型')
+                        ->placeholder('gpt-5.4-mini')
+                        ->helperText('用于图片反推提示词的视觉模型 ID，需绑定到至少一个可用渠道'),
+                ])->columns(2),
 
                 Section::make('计费设置')->schema([
                     Forms\Components\TextInput::make('billing_per_generation')

@@ -87,16 +87,46 @@ class NanoBananaProvider implements ImageProviderInterface
             $body['image_size'] = $imageSize;
         }
 
-        $resp = CurlClient::post("{$baseUrl}/api/gemini/nano-banana-edit", $body, [
-            'Authorization' => $apiKey,
-            'Content-Type' => 'application/json',
-        ], 300, 15);
+        return $this->submitEditWithFallback($baseUrl, $apiKey, $body);
+    }
 
-        if ($resp['status'] < 200 || $resp['status'] >= 300) {
-            throw new RuntimeException("上游返回 {$resp['status']}: " . mb_substr($resp['body'], 0, 300));
+    protected function submitEditWithFallback(string $baseUrl, string $apiKey, array $body): array
+    {
+        $variants = [];
+        foreach ([$body] as $candidate) {
+            $variants[] = $candidate;
+
+            if (array_key_exists('image_size', $candidate)) {
+                $withoutImageSize = $candidate;
+                unset($withoutImageSize['image_size']);
+                $variants[] = $withoutImageSize;
+            }
+
+            if (array_key_exists('aspect_ratio', $candidate)) {
+                $withoutAspectRatio = $candidate;
+                unset($withoutAspectRatio['aspect_ratio']);
+                $variants[] = $withoutAspectRatio;
+            }
         }
 
-        return $resp['json'];
+        $last = null;
+        foreach ($variants as $variant) {
+            $resp = CurlClient::post("{$baseUrl}/api/gemini/nano-banana-edit", $variant, [
+                'Authorization' => $apiKey,
+                'Content-Type' => 'application/json',
+            ], 300, 15);
+
+            if ($resp['status'] < 200 || $resp['status'] >= 300) {
+                throw new RuntimeException("上游返回 {$resp['status']}: " . mb_substr($resp['body'], 0, 300));
+            }
+
+            $last = $resp['json'];
+            if (($last['code'] ?? 0) !== 400 || ($last['msg'] ?? '') !== 'fail_to_submit_task') {
+                return $last;
+            }
+        }
+
+        return $last ?? [];
     }
 
     protected function pollResult(string $baseUrl, string $apiKey, string $taskId): array

@@ -3,9 +3,10 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RedeemController;
-use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\TemplateController;
+use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WithdrawalController;
+use App\Apps\ImageGen\Controllers\GalleryController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['ok' => true]));
@@ -93,7 +94,9 @@ Route::get('/config', function () {
     });
 });
 
-Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+Route::get('/explore', [GalleryController::class, 'index']);
+
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:login');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
@@ -141,6 +144,34 @@ Route::middleware('auth:sanctum')->group(function () {
         $key = $storage->store(file_get_contents($file->getRealPath()), $file->getMimeType());
         return response()->json(['url' => $storage->url($key)]);
     });
+
+    Route::post('/reverse-prompt', function (\Illuminate\Http\Request $request) {
+        $data = $request->validate([
+            'image_url' => 'required|string|max:4096',
+            'prompt' => 'nullable|string|max:4000',
+        ]);
+
+        $result = app(\App\Services\ReversePromptService::class)->analyze(
+            $data['image_url'],
+            $data['prompt'] ?? null
+        );
+
+        return response()->json($result);
+    })->middleware('throttle:20,1');
+
+    Route::post('/prompt-tool', function (\Illuminate\Http\Request $request) {
+        $data = $request->validate([
+            'kind' => 'required|string|in:optimize,translate',
+            'prompt' => 'required|string|max:8000',
+        ]);
+
+        $result = app(\App\Services\PromptToolService::class)->run(
+            $data['kind'],
+            $data['prompt']
+        );
+
+        return response()->json($result);
+    })->middleware('throttle:30,1');
 
     Route::get('/distributor/invites', function (\Illuminate\Http\Request $request) {
         $user = $request->user();
