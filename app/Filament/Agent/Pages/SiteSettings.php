@@ -227,9 +227,14 @@ class SiteSettings extends Page
             if ($site->exists) {
                 Cache::forget("agent_site:domain:{$site->custom_domain}");
                 Cache::forget("agent_site:sub:{$site->subdomain}@{$site->subdomain_domain}");
+                Cache::forget("agent_site_id:domain:{$site->custom_domain}");
+                Cache::forget("agent_site_id:sub:{$site->subdomain}@{$site->subdomain_domain}");
                 $site->update($data);
                 Cache::forget("agent_site:domain:{$site->custom_domain}");
                 Cache::forget("agent_site:sub:{$site->subdomain}@{$site->subdomain_domain}");
+                Cache::forget("agent_site_id:domain:{$site->custom_domain}");
+                Cache::forget("agent_site_id:sub:{$site->subdomain}@{$site->subdomain_domain}");
+                Cache::forget('api:config:agent:' . $site->id . ':' . $site->updated_at?->timestamp);
                 Notification::make()->title('分站设置已保存')->success()->send();
             } else {
                 $data['slug'] = $data['subdomain'] ?? str()->random(8);
