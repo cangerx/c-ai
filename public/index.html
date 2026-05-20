@@ -4339,7 +4339,12 @@
 
       function renderProfile() {
         if (!authUser) return;
-        document.getElementById("profileAvatar").textContent = (authUser.name || "U")[0].toUpperCase();
+        const avatarEl = document.getElementById("profileAvatar");
+        if (authUser.avatar) {
+          avatarEl.innerHTML = `<img src="${escapeHtml(authUser.avatar)}" alt="" style="width:100%;height:100%;border-radius:inherit;object-fit:cover;">`;
+        } else {
+          avatarEl.textContent = (authUser.name || "U")[0].toUpperCase();
+        }
         document.getElementById("profileName").textContent = authUser.nickname || authUser.name;
         document.getElementById("profileEmail").textContent = authUser.email;
         document.getElementById("profileCredits").textContent = authUser.credits ?? 0;
