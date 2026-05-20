@@ -606,7 +606,7 @@
                         </div>
                         <div class="card-prompt">${escHtml(item.prompt || '')}</div>
                         <div class="card-meta">
-                            <span class="tag">${escHtml(item.model)}</span>
+                            <span class="tag">${escHtml(item.model_name || item.model)}</span>
                             <span>${escHtml(item.quality)} · ${escHtml(item.size)}</span>
                         </div>
                     </div>
@@ -706,7 +706,7 @@
 
             document.getElementById('lb-prompt').textContent = item.prompt || '无提示词';
             document.getElementById('lb-tags').innerHTML =
-                `<span>${escHtml(item.model)}</span><span>${escHtml(item.quality)}</span><span>${escHtml(item.size)}</span>`;
+                `<span>${escHtml(item.model_name || item.model)}</span><span>${escHtml(item.quality)}</span><span>${escHtml(item.size)}</span>`;
 
             // Dots
             const dotsEl = document.getElementById('lb-dots');
@@ -785,7 +785,7 @@
             const item = allItems[currentIndex];
             const images = item.images || [item.thumb];
             const url = images[currentImgIdx] || item.thumb;
-            if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) return;
+            if (!url) return;
             const a = document.createElement('a');
             a.href = url; a.download = `cang-ai-${parseInt(item.task_id)}-${currentImgIdx}.png`;
             a.target = '_blank'; a.click();
