@@ -57,7 +57,7 @@ class GalleryController extends Controller
                 'time_ago' => $task->created_at?->diffForHumans(),
                 'author' => [
                     'name' => $user?->nickname ?: $user?->name ?: '匿名',
-                    'avatar' => null,
+                    'avatar' => $user ? ($user->avatar ?: \App\Models\User::avatarUrlForId($user->id)) : null,
                 ],
             ];
         })->filter()->values();
