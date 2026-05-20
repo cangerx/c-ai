@@ -46,7 +46,15 @@ class RedeemCodeResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('code')->label('兑换码')->copyable()->searchable(),
+                Tables\Columns\TextColumn::make('id')->label('编号')->numeric()->sortable()->size('sm'),
+                Tables\Columns\TextColumn::make('code')->label('兑换码')
+                    ->copyable()
+                    ->copyMessage('兑换码已复制')
+                    ->copyMessageDuration(1500)
+                    ->searchable()
+                    ->fontFamily('mono')
+                    ->size('sm')
+                    ->tooltip(fn (RedeemCode $record) => $record->code),
                 Tables\Columns\TextColumn::make('credits')->label('积分')->suffix(' 积分'),
                 Tables\Columns\TextColumn::make('status')->label('状态')
                     ->badge()
@@ -164,6 +172,50 @@ class RedeemCodeResource extends Resource
                         });
                         \Filament\Notifications\Notification::make()->title('已删除')->success()->send();
                     }),
+            ])
+            ->bulkActions([
+                Actions\BulkActionGroup::make([
+                    Actions\BulkAction::make('disable')
+                        ->label('批量禁用')
+                        ->icon('heroicon-o-x-mark')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            DB::transaction(function () use ($records) {
+                                foreach ($records as $record) {
+                                    if ($record->status === 'unused') {
+                                        User::where('id', $record->created_by)->increment('credits', $record->credits);
+                                        $record->update(['status' => 'disabled']);
+                                    }
+                                }
+                            });
+                            \Filament\Notifications\Notification::make()
+                                ->title("已禁用 {$records->count()} 个兑换码并退回积分")
+                                ->success()
+                                ->send();
+                        }),
+                    Actions\BulkAction::make('delete')
+                        ->label('批量删除')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('确认批量删除')
+                        ->modalDescription('删除未使用的兑换码将退回积分，确认？')
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            DB::transaction(function () use ($records) {
+                                foreach ($records as $record) {
+                                    if ($record->status === 'unused') {
+                                        User::where('id', $record->created_by)->increment('credits', $record->credits);
+                                    }
+                                    $record->delete();
+                                }
+                            });
+                            \Filament\Notifications\Notification::make()
+                                ->title('已批量删除')
+                                ->success()
+                                ->send();
+                        }),
+                ]),
             ])
             ->defaultSort('id', 'desc');
     }

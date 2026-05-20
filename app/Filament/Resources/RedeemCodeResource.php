@@ -7,6 +7,7 @@ use UnitEnum;
 use App\Filament\Resources\RedeemCodeResource\Pages;
 use App\Models\Plan;
 use App\Models\RedeemCode;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -43,8 +44,14 @@ class RedeemCodeResource extends Resource
         return $table
             ->striped()
             ->columns([
+                Tables\Columns\TextColumn::make('id')->label('编号')->numeric()->sortable()->size('sm'),
                 Tables\Columns\TextColumn::make('code')->label('兑换码')->searchable()
-                    ->copyable()->fontFamily('mono')->size('sm')->limit(16),
+                    ->copyable()
+                    ->copyMessage('兑换码已复制')
+                    ->copyMessageDuration(1500)
+                    ->fontFamily('mono')
+                    ->size('sm')
+                    ->tooltip(fn (RedeemCode $record) => $record->code),
                 Tables\Columns\TextColumn::make('type')->label('类型')
                     ->badge()
                     ->formatStateUsing(fn (string $state) => match ($state) {
@@ -78,7 +85,10 @@ class RedeemCodeResource extends Resource
                 Tables\Columns\TextColumn::make('batch_id')->label('批次')->searchable()
                     ->fontFamily('mono')->size('sm')->color('gray'),
                 Tables\Columns\TextColumn::make('user.name')->label('使用者')->placeholder('—')
-                    ->url(fn (RedeemCode $record) => $record->user_id ? UserResource::getUrl('edit', ['record' => $record->user_id]) : null),
+                    ->url(fn (RedeemCode $record) => $record->user_id ? UserResource::getUrl('edit', ['record' => $record->user_id]) : null)
+                    ->tooltip(fn (RedeemCode $record) => $record->user ? "{$record->user->name} ({$record->user->email})" : null),
+                Tables\Columns\TextColumn::make('expires_at')->label('过期时间')->dateTime('Y-m-d H:i')->placeholder('永久')->sortable()->toggleable(),
+                Tables\Columns\TextColumn::make('used_at')->label('使用时间')->dateTime('Y-m-d H:i')->placeholder('—')->sortable()->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')->label('创建时间')->dateTime('Y-m-d H:i')->sortable(),
             ])
             ->filters([
@@ -96,6 +106,49 @@ class RedeemCodeResource extends Resource
                     ->requiresConfirmation()
                     ->visible(fn (RedeemCode $record) => $record->status === 'unused')
                     ->action(fn (RedeemCode $record) => $record->update(['status' => 'disabled'])),
+            ])
+            ->bulkActions([
+                Actions\BulkActionGroup::make([
+                    Actions\BulkAction::make('disable')
+                        ->label('批量作废')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $disabledCount = 0;
+                            foreach ($records as $record) {
+                                if ($record->status === 'unused') {
+                                    $record->update(['status' => 'disabled']);
+                                    $disabledCount++;
+                                }
+                            }
+                            \Filament\Notifications\Notification::make()
+                                ->title("已作废 {$disabledCount} 个未使用兑换码")
+                                ->success()
+                                ->send();
+                        }),
+                    Actions\BulkAction::make('delete')
+                        ->label('批量删除')
+                        ->icon('heroicon-o-trash')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('确认批量删除')
+                        ->modalDescription('删除未使用的兑换码将退回积分，已使用/已作废的仅删除记录。')
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $refundCount = 0;
+                            foreach ($records as $record) {
+                                if ($record->status === 'unused') {
+                                    User::where('id', $record->created_by)->increment('credits', $record->credits);
+                                    $refundCount++;
+                                }
+                                $record->delete();
+                            }
+                            \Filament\Notifications\Notification::make()
+                                ->title("已删除 {$records->count()} 个兑换码，退回 {$refundCount} 个积分")
+                                ->success()
+                                ->send();
+                        }),
+                ]),
             ])
             ->headerActions([
                 Actions\Action::make('batchGenerate')
