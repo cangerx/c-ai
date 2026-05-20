@@ -36,6 +36,13 @@ class SiteSettings extends Page implements HasForms
         'site_name' => 'general',
         'site_description' => 'general',
         'site_keywords' => 'general',
+        // 首页可视化
+        'hero_title' => 'general',
+        'hero_subtitle' => 'general',
+        'hero_bg_url' => 'general',
+        'hero_bg_color' => 'general',
+        'footer_text' => 'general',
+        'footer_icp' => 'general',
         // 模型
         'prompt_tool_model' => 'model',
         'reverse_prompt_model' => 'model',
@@ -76,6 +83,33 @@ class SiteSettings extends Page implements HasForms
                     Forms\Components\TextInput::make('site_name')->label('站点名称')->placeholder('CANG-AI'),
                     Forms\Components\TextInput::make('site_description')->label('站点描述（SEO Description）'),
                     Forms\Components\TextInput::make('site_keywords')->label('SEO 关键词')->placeholder('AI,图像生成,绘画'),
+                ])->columns(2),
+
+                Section::make('首页展示')->description('自定义主站首页标题、背景和页脚')->collapsible()->schema([
+                    Forms\Components\TextInput::make('hero_title')
+                        ->label('首页大标题')
+                        ->placeholder('不填则使用站点名称')
+                        ->maxLength(200),
+                    Forms\Components\TextInput::make('hero_subtitle')
+                        ->label('副标题 / 标语')
+                        ->placeholder('一句话描述平台')
+                        ->maxLength(500),
+                    Forms\Components\TextInput::make('hero_bg_url')
+                        ->label('背景图片地址')
+                        ->placeholder('https://... 留空则使用背景色')
+                        ->url()
+                        ->maxLength(500),
+                    Forms\Components\ColorPicker::make('hero_bg_color')
+                        ->label('背景色')
+                        ->helperText('无背景图时生效'),
+                    Forms\Components\TextInput::make('footer_text')
+                        ->label('页脚文本')
+                        ->placeholder('例：© 2025 CANG-AI')
+                        ->maxLength(300),
+                    Forms\Components\TextInput::make('footer_icp')
+                        ->label('备案号')
+                        ->placeholder('例：京ICP备XXXXXXXX号')
+                        ->maxLength(100),
                 ])->columns(2),
 
                 Section::make('模型设置')->schema([

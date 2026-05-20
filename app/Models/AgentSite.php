@@ -10,6 +10,7 @@ class AgentSite extends Model
         'user_id', 'slug', 'subdomain', 'subdomain_domain', 'custom_domain', 'site_name', 'logo_url',
         'theme_color', 'seo_title', 'seo_description', 'seo_keywords',
         'footer_text', 'footer_icp', 'footer_links',
+        'hero_title', 'hero_subtitle', 'hero_bg_url', 'hero_bg_color',
         'announcement', 'cost_per_generation', 'commission_rate', 'is_active',
         'status', 'reject_reason', 'approved_at',
     ];

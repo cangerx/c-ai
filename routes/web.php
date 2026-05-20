@@ -42,6 +42,18 @@ Route::get('/', function () {
         $html = preg_replace_callback('/(<meta\s+name="keywords"\s+content=")[^"]*(")/i', fn ($m) => $m[1] . e($keywords) . $m[2], $html);
     }
 
+    // 注入首页可视化设置供前端 JS 使用
+    $siteConfig = json_encode([
+        'name' => $siteName,
+        'hero_title' => SiteSetting::get('hero_title'),
+        'hero_subtitle' => SiteSetting::get('hero_subtitle'),
+        'hero_bg_url' => SiteSetting::get('hero_bg_url'),
+        'hero_bg_color' => SiteSetting::get('hero_bg_color'),
+        'footer_text' => SiteSetting::get('footer_text'),
+        'footer_icp' => SiteSetting::get('footer_icp'),
+    ]);
+    $html = str_replace('</head>', "<script>window.__SITE_CONFIG__={$siteConfig};</script></head>", $html);
+
     return response($html)->header('Content-Type', 'text/html');
 });
 

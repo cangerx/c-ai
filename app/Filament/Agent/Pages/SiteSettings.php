@@ -100,6 +100,28 @@ class SiteSettings extends Page
                             ->columnSpanFull(),
                     ])->columns(2),
 
+                Section::make('首页展示')
+                    ->description('自定义首页标题、副标题和背景')
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\TextInput::make('hero_title')
+                            ->label('首页大标题')
+                            ->placeholder('不填则使用站点名称')
+                            ->maxLength(200),
+                        Forms\Components\TextInput::make('hero_subtitle')
+                            ->label('副标题 / 标语')
+                            ->placeholder('一句话描述你的平台')
+                            ->maxLength(500),
+                        Forms\Components\TextInput::make('hero_bg_url')
+                            ->label('背景图片地址')
+                            ->placeholder('https://... 留空则使用背景色')
+                            ->url()
+                            ->maxLength(500),
+                        Forms\Components\ColorPicker::make('hero_bg_color')
+                            ->label('背景色')
+                            ->helperText('无背景图时生效'),
+                    ])->columns(2),
+
                 Section::make('SEO 搜索优化')
                     ->collapsible()
                     ->collapsed()
@@ -172,28 +194,42 @@ class SiteSettings extends Page
 
     public function save(): void
     {
-        $data = $this->form->getState();
+        try {
+            $data = $this->form->getState();
+        } catch (\Throwable $e) {
+            Notification::make()->title('表单验证失败: ' . $e->getMessage())->danger()->send();
+            return;
+        }
+
         $userId = auth()->id();
         $site = AgentSite::firstOrNew(['user_id' => $userId]);
 
         $data['user_id'] = $userId;
         $data['theme_color'] = $data['theme_color'] ?: '#2d5bf0';
 
-        if ($site->exists) {
-            // Bust OLD cache keys before update
-            Cache::forget("agent_site:domain:{$site->custom_domain}");
-            Cache::forget("agent_site:sub:{$site->subdomain}@{$site->subdomain_domain}");
-            $site->update($data);
-            // Bust NEW cache keys in case they differ
-            Cache::forget("agent_site:domain:{$site->custom_domain}");
-            Cache::forget("agent_site:sub:{$site->subdomain}@{$site->subdomain_domain}");
-            Notification::make()->title('分站设置已保存')->success()->send();
-        } else {
-            $data['slug'] = $data['subdomain'] ?? str()->random(8);
-            $data['status'] = 'pending';
-            $data['is_active'] = false;
-            AgentSite::create($data);
-            Notification::make()->title('分站申请已提交，等待审核')->success()->send();
+        // 只保留模型允许的字段
+        $fillable = (new AgentSite())->getFillable();
+        $data = array_intersect_key($data, array_flip($fillable));
+        $data['user_id'] = $userId;
+
+        try {
+            if ($site->exists) {
+                Cache::forget("agent_site:domain:{$site->custom_domain}");
+                Cache::forget("agent_site:sub:{$site->subdomain}@{$site->subdomain_domain}");
+                $site->update($data);
+                Cache::forget("agent_site:domain:{$site->custom_domain}");
+                Cache::forget("agent_site:sub:{$site->subdomain}@{$site->subdomain_domain}");
+                Notification::make()->title('分站设置已保存')->success()->send();
+            } else {
+                $data['slug'] = $data['subdomain'] ?? str()->random(8);
+                $data['status'] = 'pending';
+                $data['is_active'] = false;
+                AgentSite::create($data);
+                Notification::make()->title('分站申请已提交，等待审核')->success()->send();
+            }
+        } catch (\Throwable $e) {
+            \Log::error('分站设置保存失败', ['error' => $e->getMessage(), 'user_id' => $userId]);
+            Notification::make()->title('保存失败: ' . mb_substr($e->getMessage(), 0, 100))->danger()->send();
         }
     }
 }
