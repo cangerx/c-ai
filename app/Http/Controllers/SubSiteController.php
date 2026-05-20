@@ -11,26 +11,33 @@ class SubSiteController extends Controller
     {
         $site = app('agent_site') ?? abort(404);
         $site->loadMissing('agent');
-        $inviteCode = $site->agent?->ensureInviteCode();
+
+        try {
+            $inviteCode = $site->agent?->ensureInviteCode();
+        } catch (\Throwable $e) {
+            $inviteCode = null;
+        }
 
         $html = file_get_contents(public_path('index.html'));
+
+        $attrs = $site->getAttributes();
         $inject = '<script>window.__AGENT_SITE__=' . json_encode([
-            'name' => $site->site_name,
-            'color' => $site->theme_color,
-            'logo' => $site->logo_url,
-            'seo_title' => $site->seo_title,
-            'seo_description' => $site->seo_description,
-            'seo_keywords' => $site->seo_keywords,
-            'hero_title' => $site->hero_title,
-            'hero_subtitle' => $site->hero_subtitle,
-            'hero_bg_url' => $site->hero_bg_url,
-            'hero_bg_color' => $site->hero_bg_color,
-            'footer_text' => $site->footer_text,
-            'footer_icp' => $site->footer_icp,
+            'name' => $attrs['site_name'] ?? null,
+            'color' => $attrs['theme_color'] ?? null,
+            'logo' => $attrs['logo_url'] ?? null,
+            'seo_title' => $attrs['seo_title'] ?? null,
+            'seo_description' => $attrs['seo_description'] ?? null,
+            'seo_keywords' => $attrs['seo_keywords'] ?? null,
+            'hero_title' => $attrs['hero_title'] ?? null,
+            'hero_subtitle' => $attrs['hero_subtitle'] ?? null,
+            'hero_bg_url' => $attrs['hero_bg_url'] ?? null,
+            'hero_bg_color' => $attrs['hero_bg_color'] ?? null,
+            'footer_text' => $attrs['footer_text'] ?? null,
+            'footer_icp' => $attrs['footer_icp'] ?? null,
             'footer_links' => $site->footer_links,
-            'announcement' => $site->announcement,
+            'announcement' => $attrs['announcement'] ?? null,
             'invite_code' => $inviteCode,
-            'cost_per_generation' => $site->cost_per_generation,
+            'cost_per_generation' => $attrs['cost_per_generation'] ?? null,
         ]) . ';</script>';
 
         $html = str_replace('</head>', $inject . '</head>', $html);
