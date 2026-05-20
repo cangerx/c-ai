@@ -209,9 +209,11 @@ class SiteSettings extends Page
         $data['user_id'] = $userId;
         $data['theme_color'] = $data['theme_color'] ?: '#2d5bf0';
 
-        // 只保留模型允许的字段
+        // 只保留模型允许且数据库实际存在的字段
         $fillable = (new AgentSite())->getFillable();
-        $data = array_intersect_key($data, array_flip($fillable));
+        $columns = \Schema::getColumnListing('agent_sites');
+        $allowed = array_intersect($fillable, $columns);
+        $data = array_intersect_key($data, array_flip($allowed));
         $data['user_id'] = $userId;
 
         try {
