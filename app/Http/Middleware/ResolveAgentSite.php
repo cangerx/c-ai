@@ -42,7 +42,7 @@ class ResolveAgentSite
                     if (str_ends_with($host, '.' . $domain)) {
                         $sub = substr($host, 0, -(strlen($domain) + 1));
                         $isMainDomain = ($domain === $mainDomain);
-                        $site = Cache::remember("agent_site:sub:{$sub}@{$domain}", 300, function () use ($sub, $domain, $isMainDomain, $hasColumn) {
+                        $siteId = Cache::remember("agent_site_id:sub:{$sub}@{$domain}", 300, function () use ($sub, $domain, $isMainDomain, $hasColumn) {
                             $query = AgentSite::where('subdomain', $sub);
 
                             if ($hasColumn('subdomain_domain')) {
@@ -58,23 +58,25 @@ class ResolveAgentSite
                                 $query->where('is_active', true);
                             }
 
-                            return $query->first();
+                            return $query->value('id');
                         });
+                        $site = $siteId ? AgentSite::find($siteId) : null;
                         $matched = true;
                         break;
                     }
                 }
 
                 if (!$matched && $hasColumn('custom_domain')) {
-                    $site = Cache::remember("agent_site:domain:{$host}", 300, function () use ($host, $hasColumn) {
+                    $siteId = Cache::remember("agent_site_id:domain:{$host}", 300, function () use ($host, $hasColumn) {
                         $query = AgentSite::where('custom_domain', $host);
 
                         if ($hasColumn('is_active')) {
                             $query->where('is_active', true);
                         }
 
-                        return $query->first();
+                        return $query->value('id');
                     });
+                    $site = $siteId ? AgentSite::find($siteId) : null;
                 }
             }
         } catch (\Throwable $e) {
@@ -88,7 +90,7 @@ class ResolveAgentSite
             Cache::forget('wildcard_domains_list');
         }
 
-        if ($site) {
+        if ($site instanceof AgentSite) {
             app()->instance('agent_site', $site);
             $request->attributes->set('agent_site', $site);
         }

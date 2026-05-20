@@ -10,6 +10,12 @@ class SubSiteController extends Controller
     public function index()
     {
         $site = app('agent_site') ?? abort(404);
+        if (!$site instanceof AgentSite) {
+            \Log::error('SubSite invalid agent_site instance', ['type' => get_debug_type($site)]);
+            app()->forgetInstance('agent_site');
+
+            return response(@file_get_contents(public_path('index.html')) ?: '', 200);
+        }
 
         try {
             $site->loadMissing('agent');
@@ -74,6 +80,10 @@ class SubSiteController extends Controller
     public function pricing()
     {
         $site = app('agent_site') ?? abort(404);
+        if (!$site instanceof AgentSite) {
+            app()->forgetInstance('agent_site');
+            abort(404);
+        }
         $plans = AgentPlan::where('agent_id', $site->user_id)->active()->ordered()->get();
         return view('pricing', ['plans' => $plans, 'agentSite' => $site]);
     }
