@@ -168,6 +168,18 @@ class OpenAiProvider implements ImageProviderInterface
     protected function localFilePathFromUrl(string $url): ?string
     {
         $host = parse_url($url, PHP_URL_HOST) ?: '';
+
+        // 相对路径 /storage/... 直接解析
+        if (empty($host) && preg_match('#^/storage/(.+)$#', $url, $m)) {
+            $base = realpath(storage_path('app/public'));
+            if (!$base) return null;
+            $filePath = realpath(storage_path('app/public/' . $m[1]));
+            if (!$filePath || !str_starts_with($filePath, $base . DIRECTORY_SEPARATOR) || !is_file($filePath)) {
+                return null;
+            }
+            return $filePath;
+        }
+
         if (!in_array($host, ['127.0.0.1', 'localhost', '0.0.0.0'], true)) {
             return null;
         }

@@ -24,7 +24,15 @@ class ImageStorageService
             return $key;
         }
 
-        return $this->disk()->url($key);
+        $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
+
+        if (in_array($driver, ['oss', 'r2'])) {
+            $this->configureDynamicDisk($driver);
+            return Storage::disk('dynamic_s3')->url($key);
+        }
+
+        // 本地存储：返回相对路径，避免 APP_URL 配置不一致导致图片无法加载
+        return '/storage/' . ltrim($key, '/');
     }
 
     public function delete(string $key): void

@@ -216,6 +216,19 @@ class NanoBananaProvider implements ImageProviderInterface
     protected function resolveLocalUrl(string $url): string
     {
         $host = parse_url($url, PHP_URL_HOST) ?: '';
+
+        // 相对路径 /storage/... 直接解析为 data URI
+        if (empty($host) && preg_match('#^/storage/(.+)$#', $url, $m)) {
+            $base = realpath(storage_path('app/public'));
+            $filePath = realpath(storage_path('app/public/' . $m[1]));
+            if (!$filePath || !$base || !str_starts_with($filePath, $base) || !is_file($filePath)) {
+                return $url;
+            }
+            $binary = file_get_contents($filePath);
+            $mime = mime_content_type($filePath) ?: 'image/png';
+            return 'data:' . $mime . ';base64,' . base64_encode($binary);
+        }
+
         if (!in_array($host, ['127.0.0.1', 'localhost', '0.0.0.0'], true)) {
             return $url;
         }

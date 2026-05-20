@@ -98,8 +98,14 @@ class GenerateController extends Controller
                 $storageUrl = \App\Models\SiteSetting::get('storage_url', '');
                 $storageHost = $storageUrl ? (parse_url($storageUrl, PHP_URL_HOST) ?: '') : '';
                 $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?: '';
-                $allowedHosts = array_filter([$storageHost, $appHost]);
+                $requestHost = $request->getHost();
+                $allowedHosts = array_filter([$storageHost, $appHost, $requestHost]);
                 foreach (array_slice($fileUrls, 0, 4) as $url) {
+                    // 支持相对路径 /storage/... (本地存储返回的路径)
+                    if (preg_match('#^/storage/.+$#', $url)) {
+                        $files[] = ['name' => basename($url), 'mime_type' => 'image/png', 'url' => $url];
+                        continue;
+                    }
                     if (!filter_var($url, FILTER_VALIDATE_URL)) continue;
                     $host = parse_url($url, PHP_URL_HOST) ?: '';
                     if (empty($allowedHosts) || !in_array($host, $allowedHosts, true)) continue;
