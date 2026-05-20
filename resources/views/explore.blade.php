@@ -561,9 +561,9 @@
                 <div class="lightbox-prompt" id="lb-prompt"></div>
                 <div class="lightbox-tags" id="lb-tags"></div>
                 <div class="lightbox-actions">
-                    <button onclick="copyPrompt()">📋 复制</button>
-                    <button onclick="downloadImg()">⬇ 下载</button>
-                    <button class="primary" onclick="usePrompt()">✨ 使用</button>
+                    <button onclick="copyPrompt()">复制</button>
+                    <button onclick="downloadImg()">下载</button>
+                    <button class="primary" onclick="usePrompt()">使用</button>
                 </div>
             </div>
         </div>
