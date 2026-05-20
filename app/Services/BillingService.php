@@ -16,8 +16,12 @@ class BillingService
     /**
      * 获取扣费积分：优先匹配 billing_rules 表，未命中则用全局默认
      */
-    public function getCost(string $model = '', string $quality = '', string $appName = 'image-gen'): int
+    public function getCost(string $model = '', string $quality = '', string $appName = 'image-gen', ?AgentSite $agentSite = null): int
     {
+        if ($agentSite?->cost_per_generation) {
+            return (int) $agentSite->cost_per_generation;
+        }
+
         $rule = $this->matchRule($appName, $model, $quality);
         if ($rule) {
             return $rule->cost_credits;
@@ -64,9 +68,9 @@ class BillingService
         return (bool) preg_match($regex, $value);
     }
 
-    public function canAfford(User $user, string $model = '', string $quality = '', string $appName = 'image-gen', int $count = 1): bool
+    public function canAfford(User $user, string $model = '', string $quality = '', string $appName = 'image-gen', int $count = 1, ?AgentSite $agentSite = null): bool
     {
-        return $user->credits >= $this->getCost($model, $quality, $appName) * $count;
+        return $user->credits >= $this->getCost($model, $quality, $appName, $agentSite) * $count;
     }
 
     public function charge(User $user, string $quality, array $meta = []): UsageLog
@@ -74,7 +78,8 @@ class BillingService
         $model = $meta['model'] ?? '';
         $appName = $meta['app_name'] ?? 'image-gen';
         $count = $meta['count'] ?? 1;
-        $cost = $this->getCost($model, $quality, $appName) * $count;
+        $agentSite = $meta['agent_site'] ?? null;
+        $cost = $this->getCost($model, $quality, $appName, $agentSite instanceof AgentSite ? $agentSite : null) * $count;
 
         return DB::transaction(function () use ($user, $cost, $quality, $meta, $appName) {
             $user = User::lockForUpdate()->find($user->id);

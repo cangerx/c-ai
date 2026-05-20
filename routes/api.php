@@ -51,8 +51,13 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::post('/templates/{template}/build', [TemplateController::class, 'build']);
 });
 
-Route::get('/config', function () {
-    return \Illuminate\Support\Facades\Cache::remember('api:config', 60, function () {
+Route::get('/config', function (\Illuminate\Http\Request $request) {
+    $agentSite = \App\Models\AgentSite::resolveForHost($request->getHost());
+    $cacheKey = $agentSite
+        ? 'api:config:agent:' . $agentSite->id . ':' . $agentSite->updated_at?->timestamp
+        : 'api:config';
+
+    return \Illuminate\Support\Facades\Cache::remember($cacheKey, 60, function () use ($agentSite) {
         $announcements = \App\Models\Announcement::where('enabled', true)
             ->orderBy('sort')->orderByDesc('id')
             ->pluck('content', 'url')
@@ -79,11 +84,15 @@ Route::get('/config', function () {
             'credits' => $r->cost_credits,
         ])->values()->all();
 
+        $costPerGeneration = $agentSite?->cost_per_generation
+            ? (int) $agentSite->cost_per_generation
+            : (int) \App\Models\SiteSetting::get('billing_per_generation', 1);
+
         return [
             'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
             'reverse_prompt_model' => \App\Models\SiteSetting::get('reverse_prompt_model', 'gpt-5.4-mini'),
-            'cost_per_generation' => (int) \App\Models\SiteSetting::get('billing_per_generation', 1),
-            'billing_rules' => $billingRules,
+            'cost_per_generation' => $costPerGeneration,
+            'billing_rules' => $agentSite?->cost_per_generation ? [] : $billingRules,
             'announcements' => $announcements,
             'models' => $models,
             'login_methods' => [

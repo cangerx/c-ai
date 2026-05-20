@@ -4,6 +4,7 @@ namespace App\Apps\ImageGen\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiChannel;
+use App\Models\AgentSite;
 use App\Models\GenerationTask;
 use App\Services\BillingService;
 use App\Services\ContentFilterService;
@@ -45,6 +46,7 @@ class GenerateController extends Controller
         $count = max(1, min(4, (int) $request->input('count', 1)));
         $model = $request->input('model', 'gpt-image-2');
         $size = $request->input('size', 'auto');
+        $agentSite = AgentSite::resolveForHost($request->getHost());
 
         // 校验模型配置（如果 ai_models 表有记录则验证）
         $aiModel = \App\Models\AiModel::where('model_id', $model)->where('type', 'image')->first();
@@ -61,7 +63,7 @@ class GenerateController extends Controller
             }
         }
 
-        if (!$billing->canAfford($user, $model, $quality, 'image-gen', $count)) {
+        if (!$billing->canAfford($user, $model, $quality, 'image-gen', $count, $agentSite)) {
             return response()->json(['error' => '积分不足，请先充值'], 402);
         }
 
@@ -86,6 +88,7 @@ class GenerateController extends Controller
                 'model' => $request->input('model', 'gpt-image-2'),
                 'channel_id' => $channel->id,
                 'count' => $count,
+                'agent_site' => $agentSite,
             ]);
         } catch (\RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 402);

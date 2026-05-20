@@ -4097,8 +4097,10 @@
       let PROMPT_TOOL_MODEL = "gpt-5.4-mini";
       let REVERSE_PROMPT_MODEL = "gpt-5.4-mini";
       let LOGIN_METHODS = { github: false, wechat: false };
-      let COST_PER_GENERATION = 1;
-      let BILLING_RULES = [];
+      const AGENT_SITE_CONFIG = window.__AGENT_SITE__ || null;
+      const AGENT_SITE_COST = AGENT_SITE_CONFIG && AGENT_SITE_CONFIG.cost_per_generation ? Number(AGENT_SITE_CONFIG.cost_per_generation) : null;
+      let COST_PER_GENERATION = AGENT_SITE_COST || 1;
+      let BILLING_RULES = AGENT_SITE_COST ? [] : [];
       (async () => {
         try {
           const r = await fetch("/api/config");
@@ -4106,8 +4108,14 @@
           const d = await r.json();
           if (d.prompt_tool_model) PROMPT_TOOL_MODEL = d.prompt_tool_model;
           if (d.reverse_prompt_model) REVERSE_PROMPT_MODEL = d.reverse_prompt_model;
-          if (d.cost_per_generation) { COST_PER_GENERATION = d.cost_per_generation; updateGenerateBtn(); }
-          if (d.billing_rules) { BILLING_RULES = d.billing_rules; updateGenerateBtn(); }
+          if (AGENT_SITE_COST) {
+            COST_PER_GENERATION = AGENT_SITE_COST;
+            BILLING_RULES = [];
+            updateGenerateBtn();
+          } else {
+            if (d.cost_per_generation) { COST_PER_GENERATION = d.cost_per_generation; updateGenerateBtn(); }
+            if (d.billing_rules) { BILLING_RULES = d.billing_rules; updateGenerateBtn(); }
+          }
           if (d.login_methods) {
             LOGIN_METHODS = d.login_methods;
             const oauthWrap = document.getElementById("oauthMethodsWrap");
