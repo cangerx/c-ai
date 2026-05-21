@@ -597,6 +597,9 @@ deploy_frontend() {
         return 0
     fi
 
+    # 将 Node.js 目录加入 PATH，确保 npm 子进程能找到 node
+    export PATH="$(dirname "$NODE_BIN"):$PATH"
+
     # Clone 或 Pull
     if [ ! -d "$FRONTEND_DIR" ]; then
         echo "  → 首次克隆前端仓库..."
