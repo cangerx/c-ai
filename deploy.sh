@@ -1,16 +1,30 @@
 #!/bin/bash
-# CANG-AI 宝塔一键部署/更新脚本
-# 用法: bash deploy.sh          (首次部署+更新)
-#       bash deploy.sh update   (仅更新)
+# CANG-AI 一键部署/更新脚本（前后端）
+# 用法:
+#   bash deploy.sh                 首次全栈部署
+#   bash deploy.sh update          一键更新前后端
+#   bash deploy.sh update-backend  仅更新后端
+#   bash deploy.sh update-frontend 仅更新前端
+#   bash deploy.sh nginx           仅生成 Nginx 配置
+#   bash deploy.sh status          查看运行状态
+
+set -euo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+FRONTEND_DIR="${FRONTEND_DIR:-$(dirname "$APP_DIR")/cang-ai-web}"
+FRONTEND_REPO="https://github.com/cangerx/cang-ai-web.git"
+FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+ACTION="${1:-full}"
+
 cd "$APP_DIR"
 git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
 
-echo "============================================"
-echo "  CANG-AI 部署脚本"
-echo "  目录: $APP_DIR"
-echo "============================================"
+echo "╔══════════════════════════════════════════╗"
+echo "║  CANG-AI 部署脚本                        ║"
+echo "║  后端: $APP_DIR"
+echo "║  前端: $FRONTEND_DIR"
+echo "║  操作: $ACTION"
+echo "╚══════════════════════════════════════════╝"
 
 fail() { echo ""; echo "  ✗ $1"; exit 1; }
 DEPLOY_STASH_KEEP="${DEPLOY_STASH_KEEP:-5}"
@@ -296,7 +310,309 @@ fi
 
 echo ""
 echo "  ✓ 环境检测全部通过"
+
+# ---------- 8. Node.js ----------
+NODE_BIN=""
+for n in /www/server/nodejs/v20/bin/node /www/server/nodejs/v18/bin/node $(which node 2>/dev/null); do
+    if [ -x "$n" ] && "$n" -e "process.exit(parseInt(process.version.slice(1))<18?1:0)" 2>/dev/null; then
+        NODE_BIN="$n"
+        break
+    fi
+done
+NPM_BIN=""
+if [ -n "$NODE_BIN" ]; then
+    NPM_BIN="$(dirname "$NODE_BIN")/npm"
+    [ ! -x "$NPM_BIN" ] && NPM_BIN=$(which npm 2>/dev/null || true)
+    NODE_VER=$("$NODE_BIN" -v 2>/dev/null)
+    echo "  ✓ Node.js $NODE_VER → $NODE_BIN"
+else
+    echo "  ⚠ Node.js 18+ 未找到（前端部署需要）"
+    echo "    宝塔面板 → 网站 → Node 项目 → 安装 Node.js 20"
+fi
+
+# ---------- 9. PM2 ----------
+PM2_BIN=""
+if [ -n "$NODE_BIN" ]; then
+    PM2_DIR="$(dirname "$NODE_BIN")"
+    for pm in "$PM2_DIR/pm2" $(which pm2 2>/dev/null); do
+        [ -x "$pm" ] && PM2_BIN="$pm" && break
+    done
+    if [ -z "$PM2_BIN" ]; then
+        echo "  → 安装 PM2..."
+        "$NPM_BIN" install -g pm2 2>/dev/null
+        PM2_BIN="$PM2_DIR/pm2"
+    fi
+    [ -x "$PM2_BIN" ] && echo "  ✓ PM2 就绪"
+fi
+
 echo ""
+
+# ========== 状态查看 ==========
+show_status() {
+    echo ">>> 运行状态"
+    echo ""
+    echo "── 后端 ──"
+    echo "  目录: $APP_DIR"
+    [ -f .env ] && echo "  APP_URL: $(grep ^APP_URL .env | cut -d= -f2)"
+    [ -f .env ] && echo "  APP_ENV: $(grep ^APP_ENV .env | cut -d= -f2)"
+    echo "  Worker: $(pgrep -f 'task:worker' | wc -l | tr -d ' ') 进程"
+    echo ""
+    echo "── 前端 ──"
+    echo "  目录: $FRONTEND_DIR"
+    [ -d "$FRONTEND_DIR" ] && echo "  存在: ✓" || echo "  存在: ✗"
+    if [ -n "$PM2_BIN" ] && "$PM2_BIN" list 2>/dev/null | grep -q "cang-ai-web"; then
+        echo "  PM2 状态:"
+        "$PM2_BIN" show cang-ai-web 2>/dev/null | grep -E "status|uptime|restart|memory" | head -5
+    else
+        echo "  PM2: 未运行"
+    fi
+    echo ""
+    if [ -n "$PM2_BIN" ]; then
+        echo "── PM2 全局 ──"
+        "$PM2_BIN" list 2>/dev/null
+    fi
+}
+
+if [ "$ACTION" = "status" ]; then
+    show_status
+    exit 0
+fi
+
+# ========== Nginx 配置生成 ==========
+generate_nginx() {
+    local DOMAIN="${SITE_DOMAIN:-}"
+    if [ -z "$DOMAIN" ] && [ -f .env ]; then
+        DOMAIN=$(grep ^APP_URL .env | cut -d= -f2 | sed 's|https\?://||')
+    fi
+    if [ -z "$DOMAIN" ]; then
+        read -p "请输入站点域名 (如 ai.example.com): " DOMAIN
+    fi
+    [ -z "$DOMAIN" ] && fail "域名不能为空"
+
+    local PHP_SOCK="/tmp/php-cgi-${PHP_VER_NUM}.sock"
+    [ ! -e "$PHP_SOCK" ] && PHP_SOCK="/run/php/php${PHP_VER}-fpm.sock"
+
+    local CONF_FILE="/www/server/panel/vhost/nginx/${DOMAIN}.conf"
+    [ ! -d "$(dirname "$CONF_FILE")" ] && CONF_FILE="/etc/nginx/sites-available/${DOMAIN}.conf"
+
+    cat > /tmp/cang-ai-nginx.conf << NGINX_EOF
+# CANG-AI 前后端统一配置 - 自动生成于 $(date +%Y-%m-%d)
+# 域名: $DOMAIN
+# 后端: $APP_DIR/public
+# 前端: http://127.0.0.1:$FRONTEND_PORT
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $DOMAIN;
+
+    # ── SSL（宝塔会自动补充，或手动取消注释） ──
+    # listen 443 ssl http2;
+    # listen [::]:443 ssl http2;
+    # ssl_certificate    /www/server/panel/vhost/cert/$DOMAIN/fullchain.pem;
+    # ssl_certificate_key /www/server/panel/vhost/cert/$DOMAIN/privkey.pem;
+    # ssl_protocols TLSv1.2 TLSv1.3;
+
+    # ── 通用 ──
+    client_max_body_size 50m;
+    access_log /www/wwwlogs/${DOMAIN}.log;
+    error_log  /www/wwwlogs/${DOMAIN}.error.log;
+
+    # ── 后端 Laravel（API + 后台 + 资源） ──
+    location ~ ^/(api|admin|agent|livewire|filament|install|up|sanctum) {
+        root $APP_DIR/public;
+        try_files \$uri \$uri/ /index.php?\$query_string;
+
+        location ~ \\.php\$ {
+            fastcgi_pass unix:$PHP_SOCK;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+            include fastcgi_params;
+            fastcgi_read_timeout 300;
+        }
+    }
+
+    # ── 后端静态资源 ──
+    location ~ ^/(storage|images|css/filament|js/filament|vendor) {
+        root $APP_DIR/public;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        try_files \$uri =404;
+    }
+
+    # ── 静态页面 ──
+    location ~ ^/(privacy|terms)\\.html\$ {
+        root $APP_DIR/public;
+        expires 1d;
+    }
+    location = /robots.txt {
+        root $APP_DIR/public;
+    }
+    location = /favicon.ico {
+        root $APP_DIR/public;
+        log_not_found off;
+    }
+
+    # ── 前端 Next.js ──
+    location / {
+        proxy_pass http://127.0.0.1:$FRONTEND_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_connect_timeout 60;
+        proxy_read_timeout 300;
+    }
+
+    # ── 禁止访问隐藏文件 ──
+    location ~ /\\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+}
+NGINX_EOF
+
+    echo ""
+    echo "  Nginx 配置已生成: /tmp/cang-ai-nginx.conf"
+    echo ""
+
+    if [ -d "$(dirname "$CONF_FILE")" ]; then
+        read -p "  是否写入到 $CONF_FILE？(y/N): " WRITE_CONF
+        if [ "$WRITE_CONF" = "y" ] || [ "$WRITE_CONF" = "Y" ]; then
+            [ -f "$CONF_FILE" ] && cp "$CONF_FILE" "${CONF_FILE}.bak.$(date +%Y%m%d%H%M%S)"
+            cp /tmp/cang-ai-nginx.conf "$CONF_FILE"
+            nginx -t 2>&1 && nginx -s reload && echo "  ✓ Nginx 配置已生效" || echo "  ⚠ Nginx 配置有误，已回滚请检查"
+        fi
+    else
+        echo "  请手动将 /tmp/cang-ai-nginx.conf 内容复制到 Nginx 站点配置中"
+    fi
+}
+
+if [ "$ACTION" = "nginx" ]; then
+    generate_nginx
+    exit 0
+fi
+
+# ========== 前端部署函数 ==========
+deploy_frontend() {
+    echo ""
+    echo "━━━ 前端部署 ━━━"
+
+    if [ -z "$NODE_BIN" ] || [ -z "$NPM_BIN" ]; then
+        echo "  ⚠ 跳过前端：Node.js 未安装"
+        return 0
+    fi
+
+    # Clone 或 Pull
+    if [ ! -d "$FRONTEND_DIR" ]; then
+        echo "  → 首次克隆前端仓库..."
+        git clone "$FRONTEND_REPO" "$FRONTEND_DIR" || fail "前端仓库克隆失败"
+    else
+        echo "  → 拉取前端最新代码..."
+        cd "$FRONTEND_DIR"
+        git config --global --add safe.directory "$FRONTEND_DIR" 2>/dev/null || true
+        git pull --ff-only origin main || echo "  ⚠ pull 失败，尝试 reset"
+        git fetch origin main && git reset --hard origin/main
+    fi
+
+    cd "$FRONTEND_DIR"
+
+    # 环境文件
+    local BACKEND_URL="http://127.0.0.1:8000"
+    if [ -f "$APP_DIR/.env" ]; then
+        local APP_URL=$(grep ^APP_URL "$APP_DIR/.env" | cut -d= -f2)
+        [ -n "$APP_URL" ] && BACKEND_URL="$APP_URL"
+    fi
+
+    echo "NEXT_PUBLIC_API_URL=$BACKEND_URL" > .env.local
+    echo "  ✓ .env.local → NEXT_PUBLIC_API_URL=$BACKEND_URL"
+
+    # 依赖安装（hash 检测）
+    local lock_hash=""
+    local saved_hash=""
+    [ -f package-lock.json ] && lock_hash=$(file_sha256 package-lock.json)
+    [ -f node_modules/.lock_hash ] && saved_hash=$(cat node_modules/.lock_hash 2>/dev/null)
+
+    if [ -d node_modules ] && [ -n "$lock_hash" ] && [ "$lock_hash" = "$saved_hash" ]; then
+        echo "  ✓ 前端依赖未变化，跳过 npm install"
+    else
+        echo "  → npm install..."
+        "$NPM_BIN" install --production=false || fail "npm install 失败"
+        [ -n "$lock_hash" ] && echo "$lock_hash" > node_modules/.lock_hash
+    fi
+
+    # 构建
+    echo "  → npm run build..."
+    "$NPM_BIN" run build || fail "前端构建失败"
+
+    # PM2 启动/重启
+    if [ -n "$PM2_BIN" ]; then
+        if "$PM2_BIN" list 2>/dev/null | grep -q "cang-ai-web"; then
+            echo "  → PM2 重启前端..."
+            "$PM2_BIN" restart cang-ai-web
+        else
+            echo "  → PM2 启动前端..."
+            "$PM2_BIN" start "$NPM_BIN" --name "cang-ai-web" -- start -- -p "$FRONTEND_PORT"
+        fi
+        "$PM2_BIN" save 2>/dev/null || true
+        echo "  ✓ 前端运行在 :$FRONTEND_PORT"
+    else
+        echo "  ⚠ PM2 未安装，请手动启动: cd $FRONTEND_DIR && npm start -- -p $FRONTEND_PORT"
+    fi
+
+    cd "$APP_DIR"
+}
+
+# ========== 后端部署函数 ==========
+deploy_backend() {
+    echo ""
+    echo "━━━ 后端部署 ━━━"
+    cd "$APP_DIR"
+
+    echo "  [1/6] 拉取最新代码"
+    run_git_update
+
+    echo "  [2/6] 安装 PHP 依赖"
+    install_composer_deps_if_needed
+
+    echo "  [3/6] 执行数据库迁移"
+    "$PHP_BIN" artisan migrate --force
+
+    echo "  [4/6] 缓存配置"
+    "$PHP_BIN" artisan config:cache
+    "$PHP_BIN" artisan route:clear 2>/dev/null || true
+    "$PHP_BIN" artisan route:cache
+    "$PHP_BIN" artisan view:cache
+
+    echo "  [5/6] 存储链接+权限"
+    if [ ! -L public/storage ] && [ ! -e public/storage ]; then
+        "$PHP_BIN" artisan storage:link 2>/dev/null || true
+    fi
+    chown -R www:www storage bootstrap/cache database 2>/dev/null || true
+    chmod -R 775 storage bootstrap/cache database 2>/dev/null || true
+
+    echo "  [6/6] 重启 Worker"
+    if [ -n "$PM2_BIN" ]; then
+        if "$PM2_BIN" list 2>/dev/null | grep -q "cang-ai-worker"; then
+            "$PM2_BIN" restart cang-ai-worker
+        else
+            "$PM2_BIN" start "$PHP_BIN" --name "cang-ai-worker" -- artisan task:worker --max-retries=3
+            "$PM2_BIN" start "$PHP_BIN" --name "cang-ai-worker-2" -- artisan task:worker --max-retries=3
+        fi
+        "$PM2_BIN" save 2>/dev/null || true
+    else
+        pkill -f "task:worker" 2>/dev/null || true
+        sleep 1
+        nohup "$PHP_BIN" artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
+        nohup "$PHP_BIN" artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
+    fi
+    echo "  ✓ 后端部署完成"
+}
 
 # ========== 首次部署 ==========
 if [ ! -f .env ]; then
@@ -362,48 +678,34 @@ if [ ! -f .env ]; then
     [ "$CONTINUE" = "n" ] && exit 0
 fi
 
-# ========== 更新部署 ==========
-echo ">>> [1/7] 拉取最新代码"
-run_git_update
+# ========== 按 ACTION 执行 ==========
+case "$ACTION" in
+    update-backend)
+        deploy_backend
+        ;;
+    update-frontend)
+        deploy_frontend
+        ;;
+    update|full)
+        deploy_backend
+        deploy_frontend
+        if [ "$ACTION" = "full" ] && [ ! -f /tmp/cang-ai-nginx.conf ]; then
+            echo ""
+            read -p "是否生成 Nginx 配置？(y/N): " GEN_NGINX
+            [ "$GEN_NGINX" = "y" ] || [ "$GEN_NGINX" = "Y" ] && generate_nginx
+        fi
+        ;;
+    *)
+        echo "未知操作: $ACTION"
+        echo "用法: bash deploy.sh [update|update-backend|update-frontend|nginx|status]"
+        exit 1
+        ;;
+esac
 
 echo ""
-echo ">>> [2/7] 安装 PHP 依赖"
-install_composer_deps_if_needed
-
-echo ""
-echo ">>> [3/7] 执行数据库迁移"
-"$PHP_BIN" artisan migrate --force
-
-echo ""
-echo ">>> [4/7] 缓存配置"
-"$PHP_BIN" artisan config:cache
-"$PHP_BIN" artisan route:clear 2>/dev/null || true
-"$PHP_BIN" artisan route:cache
-"$PHP_BIN" artisan view:cache
-
-echo ""
-echo ">>> [5/7] 存储链接"
-if [ -L public/storage ] || [ -e public/storage ]; then
-    echo "  ✓ public/storage 已存在，跳过"
-else
-    "$PHP_BIN" artisan storage:link 2>/dev/null || true
-fi
-
-echo ""
-echo ">>> [6/7] 修复权限"
-chown -R www:www storage bootstrap/cache database
-chmod -R 775 storage bootstrap/cache database
-
-echo ""
-echo ">>> [7/7] 重启图片任务 Worker"
-pkill -f "task:worker" 2>/dev/null || true
-sleep 1
-nohup "$PHP_BIN" artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
-nohup "$PHP_BIN" artisan task:worker --max-retries=3 >> storage/logs/worker.log 2>&1 &
-
-echo ""
-echo "============================================"
-echo "  部署完成 ✓"
-echo "  站点: $(grep APP_URL .env | cut -d= -f2)"
-echo "  Worker PID: $(pgrep -f 'task:worker' | tr '\n' ' ')"
-echo "============================================"
+echo "╔══════════════════════════════════════════╗"
+echo "║  部署完成 ✓"
+[ -f .env ] && echo "║  站点: $(grep ^APP_URL .env | cut -d= -f2)"
+echo "║  Worker: $(pgrep -f 'task:worker' 2>/dev/null | wc -l | tr -d ' ') 进程"
+[ -n "$PM2_BIN" ] && echo "║  PM2: $("$PM2_BIN" list 2>/dev/null | grep -c 'online' || echo 0) 在线"
+echo "╚══════════════════════════════════════════╝"
