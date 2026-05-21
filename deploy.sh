@@ -401,7 +401,8 @@ echo "  ✓ 环境检测全部通过"
 
 # ---------- 8. Node.js ----------
 NODE_BIN=""
-for n in /www/server/nodejs/v20/bin/node /www/server/nodejs/v18/bin/node $(which node 2>/dev/null); do
+BT_NODE_CANDIDATES=$(ls -d /www/server/nodejs/v*/bin/node 2>/dev/null | sort -V -r)
+for n in $BT_NODE_CANDIDATES $(which node 2>/dev/null) /usr/local/bin/node /usr/bin/node; do
     if [ -x "$n" ] && "$n" -e "process.exit(parseInt(process.version.slice(1))<18?1:0)" 2>/dev/null; then
         NODE_BIN="$n"
         break
