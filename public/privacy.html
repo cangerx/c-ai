@@ -5,38 +5,69 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>隐私政策 - CANG-AI</title>
   <meta name="description" content="CANG-AI 隐私政策，了解我们如何收集、使用和保护您的个人信息。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#f5f3f0; --panel:rgba(255,255,255,0.72); --line:rgba(0,0,0,0.06); --text:#1a1a1a; --muted:#6b7280; --muted-soft:#9ca3af; --accent:#2d5bf0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Noto Sans SC", -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; -webkit-font-smoothing: antialiased; min-height: 100vh; position: relative; }
-    body::before { content:""; position:fixed; inset:0; background: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(45,91,240,0.06), transparent), radial-gradient(ellipse 60% 40% at 80% 10%, rgba(249,115,22,0.04), transparent); pointer-events:none; z-index:0; }
-    .page { position:relative; z-index:1; max-width:720px; margin:0 auto; padding:48px 24px 80px; }
-    .back { display:inline-flex; align-items:center; gap:4px; font-size:13px; color:var(--muted); text-decoration:none; margin-bottom:28px; padding:6px 12px; border-radius:8px; transition:all .2s; }
-    .back:hover { background:var(--panel); color:var(--text); }
-    .header { margin-bottom:32px; }
-    .header h1 { font-size:26px; font-weight:700; letter-spacing:-0.5px; }
-    .header .date { font-size:12px; color:var(--muted-soft); margin-top:6px; }
-    .card { background:var(--panel); backdrop-filter:saturate(1.8) blur(20px); border:1px solid var(--line); border-radius:14px; padding:28px 28px; margin-bottom:20px; }
-    h2 { font-size:16px; font-weight:600; margin-bottom:12px; color:var(--text); }
-    p { font-size:14px; color:#374151; margin-bottom:10px; }
-    ul { padding-left:18px; margin-bottom:12px; }
-    li { font-size:14px; color:#374151; margin-bottom:6px; }
-    li strong { color:var(--text); }
-    a { color:var(--accent); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    .footer { text-align:center; padding-top:24px; font-size:12px; color:var(--muted-soft); }
+    :root{--bg:#f5f3f0;--panel:rgba(255,255,255,0.72);--panel-strong:rgba(255,255,255,0.92);--line:rgba(0,0,0,0.06);--text:#1a1a1a;--muted:#6b7280;--muted-soft:#9ca3af;--accent:#2d5bf0;--accent-soft:rgba(45,91,240,0.08);--shadow-soft:0 8px 32px -8px rgba(0,0,0,0.08);--glass:saturate(1.8) blur(20px)}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    body{font-family:"Noto Sans SC",-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.8;-webkit-font-smoothing:antialiased;min-height:100vh;position:relative;overflow-x:hidden}
+    body::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(45,91,240,0.06),transparent),radial-gradient(ellipse 60% 40% at 80% 10%,rgba(249,115,22,0.04),transparent),radial-gradient(ellipse 50% 60% at 50% 100%,rgba(45,91,240,0.03),transparent);pointer-events:none;z-index:0}
+    body::after{content:"";position:fixed;inset:0;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+    .page{position:relative;z-index:1;max-width:680px;margin:0 auto;padding:48px 24px 80px}
+    .nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:40px}
+    .back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--muted);text-decoration:none;padding:8px 14px;border-radius:10px;background:var(--panel);backdrop-filter:var(--glass);border:1px solid var(--line);transition:all .25s ease}
+    .back:hover{color:var(--text);border-color:rgba(0,0,0,0.1);box-shadow:var(--shadow-soft)}
+    .back svg{width:14px;height:14px}
+    .nav-links{display:flex;gap:4px}
+    .nav-link{font-size:12px;color:var(--muted-soft);text-decoration:none;padding:6px 12px;border-radius:8px;transition:all .2s}
+    .nav-link:hover{color:var(--text);background:var(--panel)}
+    .nav-link.active{color:var(--accent);background:var(--accent-soft);font-weight:500}
+    .hero{text-align:center;margin-bottom:40px}
+    .hero-icon{width:48px;height:48px;margin:0 auto 16px;background:var(--accent-soft);border-radius:14px;display:flex;align-items:center;justify-content:center}
+    .hero-icon svg{width:24px;height:24px;color:var(--accent)}
+    .hero h1{font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-bottom:6px}
+    .hero .date{font-size:12px;color:var(--muted-soft);font-weight:500;letter-spacing:0.5px}
+    .card{background:var(--panel);backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:16px;padding:24px 28px;margin-bottom:16px;transition:border-color .25s ease}
+    .card:hover{border-color:rgba(0,0,0,0.1)}
+    .card-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700;margin-right:10px;flex-shrink:0}
+    h2{font-size:15px;font-weight:600;margin-bottom:14px;color:var(--text);display:flex;align-items:center}
+    p{font-size:13.5px;color:#4b5563;margin-bottom:10px;line-height:1.9}
+    ul{padding-left:18px;margin-bottom:10px}
+    li{font-size:13.5px;color:#4b5563;margin-bottom:7px;line-height:1.8}
+    li::marker{color:var(--muted-soft)}
+    li strong{color:var(--text);font-weight:600}
+    a{color:var(--accent);text-decoration:none;font-weight:500;transition:opacity .2s}
+    a:hover{opacity:.75}
+    .contact-box{background:var(--accent-soft);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:12px}
+    .contact-box svg{width:18px;height:18px;color:var(--accent);flex-shrink:0}
+    .contact-box span{font-size:13.5px;color:#4b5563}
+    .footer{text-align:center;padding-top:32px;font-size:11px;color:var(--muted-soft);letter-spacing:0.3px}
+    @media(max-width:640px){.page{padding:32px 16px 60px}.card{padding:20px 22px}.hero h1{font-size:24px}.nav-links{display:none}}
   </style>
 </head>
 <body>
   <div class="page">
-    <a href="/" class="back">← 返回首页</a>
-    <div class="header">
+    <nav class="nav">
+      <a href="/" class="back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        返回首页
+      </a>
+      <div class="nav-links">
+        <a href="/privacy.html" class="nav-link active">隐私政策</a>
+        <a href="/terms.html" class="nav-link">服务条款</a>
+      </div>
+    </nav>
+
+    <div class="hero">
+      <div class="hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
       <h1>隐私政策</h1>
-      <div class="date">最后更新：2025年1月</div>
+      <div class="date">最后更新：2026 年 5 月</div>
     </div>
 
     <div class="card">
-      <h2>1. 信息收集</h2>
+      <h2><span class="card-num">1</span>信息收集</h2>
       <p>我们在您使用 CANG-AI 平台时可能收集以下信息：</p>
       <ul>
         <li><strong>账户信息：</strong>注册时提供的邮箱地址、用户名、昵称等。</li>
@@ -48,7 +79,7 @@
     </div>
 
     <div class="card">
-      <h2>2. 信息使用</h2>
+      <h2><span class="card-num">2</span>信息使用</h2>
       <p>我们收集的信息将用于：</p>
       <ul>
         <li>提供、维护和改进平台服务。</li>
@@ -60,7 +91,7 @@
     </div>
 
     <div class="card">
-      <h2>3. 信息存储与保护</h2>
+      <h2><span class="card-num">3</span>信息存储与保护</h2>
       <ul>
         <li>您的数据存储在安全的服务器上，我们采用行业标准的加密和安全措施保护您的信息。</li>
         <li>您上传的参考图片在生成完成后将在 24 小时内自动删除。</li>
@@ -70,7 +101,7 @@
     </div>
 
     <div class="card">
-      <h2>4. 信息共享</h2>
+      <h2><span class="card-num">4</span>信息共享</h2>
       <p>我们不会出售您的个人信息。仅在以下情况下可能共享：</p>
       <ul>
         <li>经您明确同意。</li>
@@ -81,7 +112,7 @@
     </div>
 
     <div class="card">
-      <h2>5. Cookie 使用</h2>
+      <h2><span class="card-num">5</span>Cookie 使用</h2>
       <p>本平台使用 Cookie 和本地存储来：</p>
       <ul>
         <li>维持您的登录状态。</li>
@@ -92,7 +123,7 @@
     </div>
 
     <div class="card">
-      <h2>6. 用户权利</h2>
+      <h2><span class="card-num">6</span>用户权利</h2>
       <p>您对个人信息享有以下权利：</p>
       <ul>
         <li><strong>查看：</strong>查看我们持有的您的个人信息。</li>
@@ -104,22 +135,25 @@
     </div>
 
     <div class="card">
-      <h2>7. 未成年人保护</h2>
+      <h2><span class="card-num">7</span>未成年人保护</h2>
       <p>本平台不面向 14 周岁以下的未成年人提供服务。如果我们发现无意中收集了未成年人的信息，将立即删除相关数据。</p>
     </div>
 
     <div class="card">
-      <h2>8. 政策变更</h2>
+      <h2><span class="card-num">8</span>政策变更</h2>
       <p>我们可能不时更新本隐私政策。重大变更时将通过平台公告或邮件通知您。继续使用本平台即视为接受更新后的政策。</p>
     </div>
 
     <div class="card">
-      <h2>9. 联系我们</h2>
+      <h2><span class="card-num">9</span>联系我们</h2>
       <p>如对本隐私政策有任何疑问或需要行使您的数据权利，请通过以下方式联系：</p>
-      <p>邮箱：<a href="mailto:support@cang-ai.com">support@cang-ai.com</a></p>
+      <div class="contact-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        <span><a href="mailto:support@cang-ai.com">support@cang-ai.com</a></span>
+      </div>
     </div>
 
-    <div class="footer">&copy; 2025 CANG-AI &middot; All rights reserved</div>
+    <div class="footer">&copy; 2026 CANG-AI &middot; All rights reserved</div>
   </div>
 </body>
 </html>
