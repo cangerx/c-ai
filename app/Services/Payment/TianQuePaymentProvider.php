@@ -45,17 +45,17 @@ class TianQuePaymentProvider implements PaymentProvider
         ]);
 
         $response = $this->call('/order/activePlusScan', $reqData);
+        $this->assertSuccess($response);
 
         $data = $this->extractRespData($response);
-        if (!$this->isBizSuccess($data)) {
-            $bizCode = $data['bizCode'] ?? ($response['code'] ?? '');
-            $bizMsg = $data['bizMsg'] ?? ($response['msg'] ?? '');
-            throw new \RuntimeException("天阙下单失败: [$bizCode] $bizMsg");
+        $payUrl = $data['payUrl'] ?? $data['qrCode'] ?? '';
+        if ($payUrl === '') {
+            throw new \RuntimeException('天阙下单失败: 响应缺少 payUrl');
         }
 
         return [
-            'qr_code' => $data['payUrl'] ?? '',
-            'provider_order_no' => $data['uuid'] ?? null,
+            'qr_code' => $payUrl,
+            'provider_order_no' => $data['uuid'] ?? $data['sxfUuid'] ?? null,
             'raw' => $response,
         ];
     }
@@ -69,6 +69,7 @@ class TianQuePaymentProvider implements PaymentProvider
         ]);
 
         $response = $this->call('/query/tradeQuery', $reqData);
+        $this->assertSuccess($response);
         $data = $this->extractRespData($response);
 
         $raw = strtoupper((string) ($data['tranSts'] ?? ''));
@@ -148,11 +149,27 @@ class TianQuePaymentProvider implements PaymentProvider
         return $resp['respData'] ?? $resp['data'] ?? $resp;
     }
 
-    /** bizCode=0000 才视为业务成功 */
-    protected function isBizSuccess(array $data): bool
+    /**
+     * 顺行付/天阙响应成功语义：
+     *  - 外层 code = 0000 才表示请求/路由成功
+     *  - 内层 respData.bizCode (若存在) = 0000 才表示业务成功
+     * 任何一层非成功都抛出，便于把真实错误透出。
+     */
+    protected function assertSuccess(array $resp): void
     {
-        $code = (string) ($data['bizCode'] ?? '');
-        return $code === '0000' || $code === '';
+        $outerCode = (string) ($resp['code'] ?? '');
+        $outerMsg  = (string) ($resp['msg']  ?? '');
+        if ($outerCode !== '' && $outerCode !== '0000') {
+            throw new \RuntimeException("天阙网关错误: [$outerCode] $outerMsg");
+        }
+        $data = $resp['respData'] ?? $resp['data'] ?? null;
+        if (is_array($data) && isset($data['bizCode'])) {
+            $bizCode = (string) $data['bizCode'];
+            $bizMsg  = (string) ($data['bizMsg'] ?? '');
+            if ($bizCode !== '0000') {
+                throw new \RuntimeException("天阙业务错误: [$bizCode] $bizMsg");
+            }
+        }
     }
 
     protected function resolveHost(): string

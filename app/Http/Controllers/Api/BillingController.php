@@ -114,7 +114,8 @@ class BillingController extends Controller
         $cfg = config('payment.providers.' . config('payment.default'));
         $expiresAt = now()->addMinutes((int) ($cfg['order_expires_minutes'] ?? 10));
 
-        $order = DB::transaction(function () use ($user, $package, $amount, $credits, $bonusBalance, $expiresAt) {
+        $providerName = config('payment.default', 'tianque');
+        $order = DB::transaction(function () use ($user, $package, $amount, $credits, $bonusBalance, $expiresAt, $providerName) {
             return Order::create([
                 'order_no'      => $this->generateOrderNo(),
                 'user_id'       => $user->id,
@@ -123,6 +124,7 @@ class BillingController extends Controller
                 'credits'       => $credits,
                 'bonus_balance' => $bonusBalance,
                 'subject'       => $package ? $package->name : "充值 ¥{$amount}",
+                'pay_provider'  => $providerName,
                 'status'        => Order::STATUS_PENDING,
                 'expires_at'    => $expiresAt,
             ]);
