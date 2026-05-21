@@ -15,7 +15,7 @@ return [
             'private_key' => env('TIANQUE_PRIVATE_KEY', ''),
             'public_key' => env('TIANQUE_PUBLIC_KEY', ''),
             'sign_type' => env('TIANQUE_SIGN_TYPE', 'RSA'),
-            'version' => env('TIANQUE_VERSION', '1.2'),
+            'version' => env('TIANQUE_VERSION', '1.0'),
             'notify_url' => env('TIANQUE_NOTIFY_URL', env('APP_URL') . '/api/payment/notify/tianque'),
             'order_expires_minutes' => 10,
         ],

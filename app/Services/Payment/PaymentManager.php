@@ -34,6 +34,15 @@ class PaymentManager
             if ($key === 'sandbox') $val = filter_var($val, FILTER_VALIDATE_BOOLEAN);
             $cfg[$key] = $val;
         }
+
+        // notify_url 未手动配置时，自动基于 APP_URL 生成
+        if (empty($cfg['notify_url']) || str_contains($cfg['notify_url'], '127.0.0.1') || str_contains($cfg['notify_url'], 'localhost')) {
+            $appUrl = rtrim(config('app.url', ''), '/');
+            if ($appUrl && !str_contains($appUrl, '127.0.0.1') && !str_contains($appUrl, 'localhost')) {
+                $cfg['notify_url'] = $appUrl . '/api/payment/notify/' . $name;
+            }
+        }
+
         return $cfg;
     }
 }

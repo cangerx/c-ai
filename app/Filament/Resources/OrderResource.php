@@ -16,7 +16,9 @@ use Filament\Forms;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Filament\Notifications\Notification;
+use App\Services\Payment\PaymentManager;
 
 class OrderResource extends Resource
 {
@@ -134,6 +136,54 @@ class OrderResource extends Resource
                             ]);
                         });
                         Notification::make()->title('订单已手动入账')->success()->send();
+                    }),
+                Actions\Action::make('refund')
+                    ->label('退款')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('danger')
+                    ->visible(fn (Order $r) => $r->status === 'paid')
+                    ->requiresConfirmation()
+                    ->modalHeading('确认退款')
+                    ->modalDescription(fn (Order $r) => "将向天阙发起退款 ¥{$r->amount}，并扣回已发放的积分和余额。此操作不可撤销。")
+                    ->action(function (Order $record) {
+                        try {
+                            $refundNo = 'RF' . date('YmdHis') . strtoupper(Str::random(6));
+                            $provider = app(PaymentManager::class)->driver();
+                            $result = $provider->refundOrder($record, $refundNo);
+
+                            DB::transaction(function () use ($record, $refundNo, $result) {
+                                $r = Order::lockForUpdate()->find($record->id);
+                                if (!$r || $r->status === 'refunded') return;
+
+                                $r->update(['status' => 'refunded']);
+
+                                if ($r->credits_granted) {
+                                    $u = User::lockForUpdate()->find($r->user_id);
+                                    if ($u) {
+                                        $u->credits = max(0, (int) $u->credits - (int) $r->credits);
+                                        if ((float) $r->bonus_balance > 0) {
+                                            $u->balance = max(0, (float) $u->balance - (float) $r->bonus_balance);
+                                        }
+                                        $u->total_recharged = max(0, (float) $u->total_recharged - (float) $r->amount);
+                                        $u->save();
+                                    }
+                                }
+
+                                PaymentTransaction::create([
+                                    'order_id' => $r->id,
+                                    'type' => 'refund',
+                                    'provider' => $r->pay_provider,
+                                    'result' => 'success',
+                                    'provider_trade_no' => $result['provider_trade_no'] ?? null,
+                                    'response' => $result['raw'] ?? null,
+                                    'request' => ['refund_no' => $refundNo, 'operator' => auth()->user()->email ?? null],
+                                ]);
+                            });
+
+                            Notification::make()->title('退款成功')->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()->title('退款失败')->body($e->getMessage())->danger()->send();
+                        }
                     }),
             ]);
     }

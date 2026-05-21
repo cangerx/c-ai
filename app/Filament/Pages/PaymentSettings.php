@@ -119,8 +119,8 @@ class PaymentSettings extends Page implements HasForms
                 ->schema([
                     Forms\Components\Select::make('payment_tianque_version')
                         ->label('身份类型 version')
-                        ->options(['1.2' => '商户 (version=1.2)', '1.0' => '服务商 (version=1.0)'])
-                        ->default('1.2')
+                        ->options(['1.0' => '服务商 (version=1.0)', '1.2' => '商户 (version=1.2)'])
+                        ->default('1.0')
                         ->required(),
                     Forms\Components\TextInput::make('payment_tianque_org_id')
                         ->label('机构编号 orgId')

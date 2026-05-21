@@ -295,7 +295,15 @@ class AuthController extends Controller
 
         $subject = $type === 'login' ? '登录验证码' : '密码重置验证码';
         $siteName = SiteSetting::get('site_name', 'CANG-AI');
-        Mail::raw("【{$siteName}】您的{$subject}是：{$code}，10 分钟内有效。如非本人操作请忽略。", function ($msg) use ($email, $subject, $siteName) {
+        $heading = $type === 'login' ? '登录验证' : '密码重置';
+        Mail::send('emails.verification-code', [
+            'code' => $code,
+            'heading' => $heading,
+            'subject' => $subject,
+            'siteName' => $siteName,
+            'tagline' => $subject,
+            'expiry' => '10',
+        ], function ($msg) use ($email, $subject, $siteName) {
             $msg->to($email)->subject("{$subject} - {$siteName}");
         });
 
@@ -367,8 +375,14 @@ class AuthController extends Controller
         );
 
         $resetUrl = url('/reset-password?token=' . $token . '&email=' . urlencode($user->email));
-        Mail::raw("您正在重置 CANG-AI 账号密码，请点击以下链接完成重置（30分钟内有效）：\n\n{$resetUrl}\n\n如非本人操作，请忽略此邮件。", function ($msg) use ($user) {
-            $msg->to($user->email)->subject('重置密码 - CANG-AI');
+        $siteName = SiteSetting::get('site_name', 'CANG-AI');
+        Mail::send('emails.reset-password', [
+            'resetUrl' => $resetUrl,
+            'subject' => '重置密码',
+            'siteName' => $siteName,
+            'tagline' => '密码重置',
+        ], function ($msg) use ($user, $siteName) {
+            $msg->to($user->email)->subject("重置密码 - {$siteName}");
         });
 
         return response()->json(['message' => '如果该邮箱已注册，重置链接将发送到您的邮箱']);

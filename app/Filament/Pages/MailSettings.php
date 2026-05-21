@@ -159,8 +159,13 @@ class MailSettings extends Page implements HasForms
                 $this->applyDbMailConfig();
 
                 try {
-                    Mail::raw('这是一封来自 CANG-AI 的测试邮件，收到说明邮件配置正确。', function ($msg) use ($to) {
-                        $msg->to($to)->subject('CANG-AI 邮件测试');
+                    $siteName = SiteSetting::get('site_name', 'CANG-AI');
+                    Mail::send('emails.test', [
+                        'subject' => '邮件测试',
+                        'siteName' => $siteName,
+                        'tagline' => '连通测试',
+                    ], function ($msg) use ($to, $siteName) {
+                        $msg->to($to)->subject("{$siteName} 邮件测试");
                     });
                     Notification::make()
                         ->title('测试邮件已发送')

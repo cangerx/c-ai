@@ -223,13 +223,14 @@ class BillingController extends Controller
             'type' => 'notify',
             'provider' => $order->pay_provider,
             'result' => 'success',
-            'provider_trade_no' => $data['transactionId'] ?? null,
+            'provider_trade_no' => $data['transactionId'] ?? $data['sxfUuid'] ?? null,
             'request' => $payload,
         ]);
 
-        $status = strtoupper((string) ($data['tradeStatus'] ?? $data['status'] ?? ''));
-        if ($status === 'SUCCESS' || $status === 'PAID') {
-            $this->markPaid($order, $data['transactionId'] ?? null);
+        $bizCode  = (string) ($data['bizCode'] ?? '');
+        $tranSts  = strtoupper((string) ($data['tranSts'] ?? ''));
+        if ($bizCode === '0000' && $tranSts === 'SUCCESS') {
+            $this->markPaid($order, $data['transactionId'] ?? $data['sxfUuid'] ?? null);
         }
 
         return $providerSvc->notifySuccessResponse();

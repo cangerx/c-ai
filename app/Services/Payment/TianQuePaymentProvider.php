@@ -9,11 +9,7 @@ use Illuminate\Support\Facades\Log;
 
 class TianQuePaymentProvider implements PaymentProvider
 {
-    /** 天阙平台公钥（固定公开值，用于回调验签） */
-    public const TIANQUE_PUBLIC_KEY_SANDBOX = 'MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCOmsrFtFPTnEzfpJ/hDl5RODBxw4i9Ex3NmmG/N7A1+by032zZZgLLpdNh8y5otjFY0E37Nyr4FGKFRSSuDiTk8vfx3pv6ImS1Rxjjg4qdVHIfqhCeB0Z2ZPuBD3Gbj8hHFEtXZq8+msAFu/5ZQjiVhgs5WWBjh54LYWSum+d9+wIDAQAB';
-    public const TIANQUE_PUBLIC_KEY_PROD = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjo1+KBcvwDSIo+nMYLeOJ19Ju4ii0xH66ZxFd869EWFWk/EJa3xIA2+4qGf/Ic7m7zi/NHuCnfUtUDmUdP0JfaZiYwn+1Ek7tYAOc1+1GxhzcexSJLyJlR2JLMfEM+rZooW4Ei7q3a8jdTWUNoak/bVPXnLEVLrbIguXABERQ0Ze0X9Fs0y/zkQFg8UjxUN88g2CRfMC6LldHm7UBo+d+WlpOYH7u0OTzoLLiP/04N1cfTgjjtqTBI7qkOGxYs6aBZHG1DJ6WdP+5w+ho91sBTVajsCxAaMoExWQM2ipf/1qGdsWmkZScPflBqg7m0olOD87ymAVP/3Tcbvi34bDfwIDAQAB';
-
-    /** tranSts 值映射（来自官方 skill 文档） */
+    /** tranSts 值映射（来自官方文档） */
     public const STATUS_MAP = [
         'SUCCESS'  => Order::STATUS_PAID,
         'PAYING'   => Order::STATUS_PENDING,
@@ -39,12 +35,12 @@ class TianQuePaymentProvider implements PaymentProvider
             'amt'         => number_format((float) $order->amount, 2, '.', ''),
             'payType'     => strtoupper($payMethod),
             'subject'     => $order->subject ?: '充值',
-            'tradeSource' => '02',
+            'tradeSource' => '01',
             'trmIp'       => $clientIp,
             'notifyUrl'   => $this->cfg['notify_url'],
         ]);
 
-        $response = $this->call('/order/activePlusScan', $reqData);
+        $response = $this->call('/order/activeScan', $reqData);
         $this->assertSuccess($response);
 
         $data = $this->extractRespData($response);
@@ -84,21 +80,43 @@ class TianQuePaymentProvider implements PaymentProvider
 
     public function verifyNotify(array $payload): ?array
     {
-        $sign = $payload['sign'] ?? null;
-        if (!$sign) return null;
+        Log::info('TianQue notify received', ['payload' => $payload]);
 
-        $copy = $payload;
-        unset($copy['sign']);
-        $signContent = $this->getSignContent($copy);
-
-        $ok = $this->verifySignature($signContent, $sign);
-        if (!$ok) {
-            Log::warning('TianQue notify sign mismatch', ['payload' => $payload]);
+        $code = (string) ($payload['code'] ?? '');
+        if ($code !== '0000') {
+            Log::warning('TianQue notify outer code not 0000', ['code' => $code]);
             return null;
         }
 
-        // 回调结构与下单返回相同：respData 装着业务字段
-        return $payload['respData'] ?? $payload['reqData'] ?? $payload['data'] ?? $payload;
+        $respData = $payload['respData'] ?? $payload['reqData'] ?? $payload['data'] ?? $payload;
+        if (!is_array($respData)) {
+            Log::warning('TianQue notify missing respData');
+            return null;
+        }
+
+        return $respData;
+    }
+
+    public function refundOrder(Order $order, string $refundOrderNo, ?float $refundAmount = null): array
+    {
+        $amt = $refundAmount ?? (float) $order->amount;
+        $reqData = $this->compactRequired([
+            'mno'          => $this->cfg['mno'],
+            'ordNo'        => $refundOrderNo,
+            'origOrderNo'  => $order->order_no,
+            'amt'          => number_format($amt, 2, '.', ''),
+        ]);
+
+        $response = $this->call('/order/refund', $reqData);
+        // 退款接口 bizCode=2002 表示"已退款/重复退款"，视为成功
+        $this->assertSuccess($response, ['2002']);
+        $data = $this->extractRespData($response);
+
+        return [
+            'refund_order_no' => $refundOrderNo,
+            'provider_trade_no' => $data['transactionId'] ?? $data['sxfUuid'] ?? null,
+            'raw' => $response,
+        ];
     }
 
     public function notifySuccessResponse(): string
@@ -113,7 +131,7 @@ class TianQuePaymentProvider implements PaymentProvider
         // 外层字段（注意：reqId 32位hex；timestamp 14位数字；version 商户=1.2）
         $bean = [
             'signType'  => $this->cfg['sign_type'] ?? 'RSA',
-            'version'   => $this->cfg['version'] ?? '1.2',
+            'version'   => $this->cfg['version'] ?? '1.0',
             'orgId'     => $this->cfg['org_id'],
             'reqId'     => $this->generateReqId(),
             'timestamp' => date('YmdHis'),
@@ -155,7 +173,7 @@ class TianQuePaymentProvider implements PaymentProvider
      *  - 内层 respData.bizCode (若存在) = 0000 才表示业务成功
      * 任何一层非成功都抛出，便于把真实错误透出。
      */
-    protected function assertSuccess(array $resp): void
+    protected function assertSuccess(array $resp, array $extraBizCodes = []): void
     {
         $outerCode = (string) ($resp['code'] ?? '');
         $outerMsg  = (string) ($resp['msg']  ?? '');
@@ -166,7 +184,8 @@ class TianQuePaymentProvider implements PaymentProvider
         if (is_array($data) && isset($data['bizCode'])) {
             $bizCode = (string) $data['bizCode'];
             $bizMsg  = (string) ($data['bizMsg'] ?? '');
-            if ($bizCode !== '0000') {
+            $ok = $bizCode === '0000' || in_array($bizCode, $extraBizCodes, true);
+            if (!$ok) {
                 throw new \RuntimeException("天阙业务错误: [$bizCode] $bizMsg");
             }
         }
@@ -178,24 +197,13 @@ class TianQuePaymentProvider implements PaymentProvider
         return $sandbox ? $this->cfg['host'] : ($this->cfg['host_production'] ?? $this->cfg['host']);
     }
 
-    /**
-     * 平台公钥优先级：
-     *  1. cfg['public_key']（用户在后台显式覆盖时）
-     *  2. 内置常量（按 sandbox/生产环境选择）
-     */
-    protected function resolvePublicKey(): string
-    {
-        $custom = trim((string) ($this->cfg['public_key'] ?? ''));
-        if ($custom !== '') return $custom;
-        $sandbox = (bool) ($this->cfg['sandbox'] ?? true);
-        return $sandbox ? self::TIANQUE_PUBLIC_KEY_SANDBOX : self::TIANQUE_PUBLIC_KEY_PROD;
-    }
-
     public function getSignContent(array $params): string
     {
         ksort($params);
         $parts = [];
         foreach ($params as $k => $v) {
+            if ($k === 'sign') continue;
+            if ($v === null || $v === '') continue;
             if (is_array($v)) {
                 $parts[] = $k . '=' . json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             } else {
@@ -215,16 +223,6 @@ class TianQuePaymentProvider implements PaymentProvider
         $algo = ($this->cfg['sign_type'] ?? 'RSA') === 'RSA2' ? OPENSSL_ALGO_SHA256 : OPENSSL_ALGO_SHA1;
         openssl_sign($data, $signature, $pk, $algo);
         return base64_encode($signature);
-    }
-
-    protected function verifySignature(string $data, string $sign): bool
-    {
-        $publicKey = $this->resolvePublicKey();
-        $pem = $this->formatKey($publicKey, 'pub');
-        $pk = openssl_pkey_get_public($pem);
-        if (!$pk) return false;
-        $algo = ($this->cfg['sign_type'] ?? 'RSA') === 'RSA2' ? OPENSSL_ALGO_SHA256 : OPENSSL_ALGO_SHA1;
-        return openssl_verify($data, base64_decode($sign), $pk, $algo) === 1;
     }
 
     /**
