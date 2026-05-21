@@ -26,7 +26,7 @@ class ImageStorageService
 
         $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
 
-        if (in_array($driver, ['oss', 'r2'])) {
+        if (in_array($driver, ['oss', 'cos', 'r2'])) {
             $this->configureDynamicDisk($driver);
             return Storage::disk('dynamic_s3')->url($key);
         }
@@ -92,7 +92,7 @@ class ImageStorageService
     public function generatePresign(string $mimeType): ?array
     {
         $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
-        if (!in_array($driver, ['oss', 'r2'])) {
+        if (!in_array($driver, ['oss', 'cos', 'r2'])) {
             return null;
         }
 
@@ -136,7 +136,7 @@ class ImageStorageService
     {
         $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
 
-        if (in_array($driver, ['oss', 'r2'])) {
+        if (in_array($driver, ['oss', 'cos', 'r2'])) {
             $this->configureDynamicDisk($driver);
             return Storage::disk('dynamic_s3');
         }
@@ -156,7 +156,7 @@ class ImageStorageService
             'bucket' => \App\Models\SiteSetting::get('storage_bucket', ''),
             'endpoint' => \App\Models\SiteSetting::get('storage_endpoint', ''),
             'url' => \App\Models\SiteSetting::get('storage_url', ''),
-            'use_path_style_endpoint' => $driver === 'oss',
+            'use_path_style_endpoint' => in_array($driver, ['oss', 'cos']),
             'throw' => true,
         ];
 

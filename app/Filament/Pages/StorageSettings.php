@@ -55,6 +55,13 @@ class StorageSettings extends Page implements HasForms
             'doc'      => 'https://help.aliyun.com/zh/oss/getting-started/',
             'doc_text' => '阿里云 OSS 入门指南',
         ],
+        'cos' => [
+            'label'    => '腾讯云 COS',
+            'desc'     => '腾讯云对象存储，S3 兼容，适合国内用户，与腾讯云 CDN 无缝集成。',
+            'icon'     => 'heroicon-o-cloud',
+            'doc'      => 'https://cloud.tencent.com/document/product/436/7751',
+            'doc_text' => '腾讯云 COS 入门指南',
+        ],
         'r2' => [
             'label'    => 'Cloudflare R2',
             'desc'     => '免出口流量费、S3 兼容，适合海外或走 Cloudflare CDN 的场景。',
@@ -69,6 +76,12 @@ class StorageSettings extends Page implements HasForms
             'storage_endpoint' => 'https://oss-cn-hangzhou.aliyuncs.com',
             'storage_region'   => 'oss-cn-hangzhou',
             'storage_bucket'   => 'my-bucket',
+            'storage_url'      => 'https://cdn.example.com',
+        ],
+        'cos' => [
+            'storage_endpoint' => 'https://cos.ap-guangzhou.myqcloud.com',
+            'storage_region'   => 'ap-guangzhou',
+            'storage_bucket'   => 'my-bucket-1250000000',
             'storage_url'      => 'https://cdn.example.com',
         ],
         'r2' => [
@@ -168,6 +181,7 @@ class StorageSettings extends Page implements HasForms
                         $tipMap = [
                             'local' => '适合开发环境和小流量站点，无需任何外部服务',
                             'oss'   => '中国大陆访问最快，按用量付费，需在阿里云创建 RAM 子账号',
+                            'cos'   => 'S3 兼容，适合国内用户，需在腾讯云创建子账号或 API 密钥',
                             'r2'    => '免出口流量费，适合海外或走 Cloudflare CDN 的场景',
                         ];
                         $bulb = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:1rem;height:1rem;flex-shrink:0;margin-top:.125rem"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg>';
@@ -198,7 +212,7 @@ class StorageSettings extends Page implements HasForms
                     ->content('本地存储无需任何凭证，直接进入下一步即可。'),
 
                 Grid::make(2)
-                    ->visible(fn (Get $get) => in_array($get('storage_driver'), ['oss', 'r2']))
+                    ->visible(fn (Get $get) => in_array($get('storage_driver'), ['oss', 'cos', 'r2']))
                     ->schema([
                         Forms\Components\TextInput::make('storage_access_key')
                             ->label('Access Key ID')
@@ -354,7 +368,7 @@ class StorageSettings extends Page implements HasForms
             ->color('info')
             ->action(function () {
                 $driver = SiteSetting::get('storage_driver', 'local');
-                if (!in_array($driver, ['oss', 'r2'])) {
+                if (!in_array($driver, ['oss', 'cos', 'r2'])) {
                     Notification::make()
                         ->title('当前驱动无需测试')
                         ->body('本地存储不需要连接测试。')
@@ -445,7 +459,7 @@ class StorageSettings extends Page implements HasForms
             'bucket' => $bucket,
             'endpoint' => $endpoint,
             'url' => SiteSetting::get('storage_url', ''),
-            'use_path_style_endpoint' => $driver === 'oss',
+            'use_path_style_endpoint' => in_array($driver, ['oss', 'cos']),
             'throw' => true,
         ];
         config(['filesystems.disks.dynamic_s3_test' => $config]);
