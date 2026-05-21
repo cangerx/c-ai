@@ -8,7 +8,7 @@
 #   bash deploy.sh nginx           仅生成 Nginx 配置
 #   bash deploy.sh status          查看运行状态
 
-set -euo pipefail
+set +e  # 脚本自行管理错误处理，不用 set -e
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 FRONTEND_DIR="${FRONTEND_DIR:-$(dirname "$APP_DIR")/cang-ai-web}"
