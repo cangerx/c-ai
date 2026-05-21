@@ -16,7 +16,7 @@ Route::get('/', function () {
     }
     $path = public_path('index.html');
     if (!is_file($path)) {
-        abort(404);
+        return redirect('/admin');
     }
 
     $html = file_get_contents($path);
