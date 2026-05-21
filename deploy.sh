@@ -401,6 +401,8 @@ echo "  ✓ 环境检测全部通过"
 
 # ---------- 8. Node.js ----------
 NODE_BIN=""
+NPM_BIN=""
+PM2_BIN=""
 BT_NODE_CANDIDATES=$(ls -d /www/server/nodejs/v*/bin/node 2>/dev/null | sort -V -r)
 for n in $BT_NODE_CANDIDATES $(which node 2>/dev/null) /usr/local/bin/node /usr/bin/node; do
     if [ -x "$n" ] && "$n" -e "process.exit(parseInt(process.version.slice(1))<18?1:0)" 2>/dev/null; then
@@ -408,30 +410,47 @@ for n in $BT_NODE_CANDIDATES $(which node 2>/dev/null) /usr/local/bin/node /usr/
         break
     fi
 done
-NPM_BIN=""
+
 if [ -n "$NODE_BIN" ]; then
-    NPM_BIN="$(dirname "$NODE_BIN")/npm"
-    [ ! -x "$NPM_BIN" ] && NPM_BIN=$(which npm 2>/dev/null || true)
+    NODE_DIR="$(dirname "$NODE_BIN")"
+    NPM_BIN="${NODE_DIR}/npm"
+    [ ! -x "$NPM_BIN" ] && NPM_BIN=$(which npm 2>/dev/null || echo "")
     NODE_VER=$("$NODE_BIN" -v 2>/dev/null)
     echo "  ✓ Node.js $NODE_VER → $NODE_BIN"
+
+    # 关键：将 Node 目录加入 PATH（全局生效，解决 npm 子进程找不到 node 的问题）
+    export PATH="${NODE_DIR}:$PATH"
+    # 创建符号链接到 /usr/local/bin（永久解决 PATH 问题）
+    for bin_name in node npm npx; do
+        if [ -x "${NODE_DIR}/${bin_name}" ] && [ ! -e "/usr/local/bin/${bin_name}" ]; then
+            ln -sf "${NODE_DIR}/${bin_name}" "/usr/local/bin/${bin_name}" 2>/dev/null || true
+        fi
+    done
 else
     echo "  ⚠ Node.js 18+ 未找到（前端部署需要）"
     echo "    宝塔面板 → 网站 → Node 项目 → 安装 Node.js 20"
 fi
 
 # ---------- 9. PM2 ----------
-PM2_BIN=""
-if [ -n "$NODE_BIN" ]; then
-    PM2_DIR="$(dirname "$NODE_BIN")"
-    for pm in "$PM2_DIR/pm2" $(which pm2 2>/dev/null); do
+if [ -n "$NODE_BIN" ] && [ -n "$NPM_BIN" ]; then
+    for pm in "${NODE_DIR}/pm2" $(which pm2 2>/dev/null) "${NODE_DIR}/../lib/node_modules/pm2/bin/pm2"; do
         [ -x "$pm" ] && PM2_BIN="$pm" && break
     done
     if [ -z "$PM2_BIN" ]; then
         echo "  → 安装 PM2..."
-        "$NPM_BIN" install -g pm2 2>/dev/null
-        PM2_BIN="$PM2_DIR/pm2"
+        "$NPM_BIN" install -g pm2 2>/dev/null || true
+        # 重新查找
+        for pm in "${NODE_DIR}/pm2" $(which pm2 2>/dev/null) "${NODE_DIR}/../lib/node_modules/pm2/bin/pm2"; do
+            [ -x "$pm" ] && PM2_BIN="$pm" && break
+        done
     fi
-    [ -x "$PM2_BIN" ] && echo "  ✓ PM2 就绪"
+    if [ -n "$PM2_BIN" ] && [ -x "$PM2_BIN" ]; then
+        echo "  ✓ PM2 就绪 → $PM2_BIN"
+        [ ! -e /usr/local/bin/pm2 ] && ln -sf "$PM2_BIN" /usr/local/bin/pm2 2>/dev/null || true
+    else
+        echo "  ⚠ PM2 安装失败，前端需手动启动"
+        PM2_BIN=""
+    fi
 fi
 
 echo ""
@@ -597,9 +616,6 @@ deploy_frontend() {
         return 0
     fi
 
-    # 将 Node.js 目录加入 PATH，确保 npm 子进程能找到 node
-    export PATH="$(dirname "$NODE_BIN"):$PATH"
-
     # Clone 或 Pull
     if [ ! -d "$FRONTEND_DIR" ]; then
         echo "  → 首次克隆前端仓库..."
@@ -634,13 +650,14 @@ deploy_frontend() {
         echo "  ✓ 前端依赖未变化，跳过 npm install"
     else
         echo "  → npm install..."
-        "$NPM_BIN" install --production=false || fail "npm install 失败"
+        rm -rf node_modules/.cache 2>/dev/null || true
+        "$NPM_BIN" install --omit=optional 2>/dev/null || "$NPM_BIN" install || fail "npm install 失败"
         [ -n "$lock_hash" ] && echo "$lock_hash" > node_modules/.lock_hash
     fi
 
     # 构建
-    echo "  → npm run build..."
-    "$NPM_BIN" run build || fail "前端构建失败"
+    echo "  → npm run build（首次构建需要几分钟）..."
+    NODE_OPTIONS="--max-old-space-size=1024" "$NPM_BIN" run build || fail "前端构建失败"
 
     # PM2 启动/重启
     if [ -n "$PM2_BIN" ]; then
@@ -649,7 +666,8 @@ deploy_frontend() {
             "$PM2_BIN" restart cang-ai-web
         else
             echo "  → PM2 启动前端..."
-            "$PM2_BIN" start "$NPM_BIN" --name "cang-ai-web" -- start -- -p "$FRONTEND_PORT"
+            cd "$FRONTEND_DIR"
+            "$PM2_BIN" start "$NPM_BIN" --name "cang-ai-web" --cwd "$FRONTEND_DIR" -- start -- -p "$FRONTEND_PORT"
         fi
         "$PM2_BIN" save 2>/dev/null || true
         echo "  ✓ 前端运行在 :$FRONTEND_PORT"
