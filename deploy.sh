@@ -126,103 +126,191 @@ PHP_VER_NUM=$(echo "$PHP_VER" | tr -d '.')
 echo "  PHP $PHP_VER → $PHP_BIN"
 
 # ---------- 2. PHP 扩展：检测+自动修复 ----------
+BT_PHP_DIR="/www/server/php/${PHP_VER_NUM}"
+BT_PHP_INI="${BT_PHP_DIR}/etc/php.ini"
+BT_PHP_CLI_INI="${BT_PHP_DIR}/etc/php-cli.ini"
+BT_EXT_DIR=$(ls -d "${BT_PHP_DIR}"/lib/php/extensions/no-debug-non-zts-*/ 2>/dev/null | head -1)
+IS_BT=0
+[ -d "$BT_PHP_DIR" ] && IS_BT=1
+
+# 用 php -r 检测扩展（同时检测编译内置和动态加载的）
+check_ext() {
+    "$PHP_BIN" -r "exit(extension_loaded('$1')?0:1);" 2>/dev/null
+}
+
 REQUIRED_EXTS="mbstring curl openssl pdo pdo_mysql xml ctype iconv tokenizer dom fileinfo bcmath gd intl pcntl"
 MISSING=""
 
 for ext in $REQUIRED_EXTS; do
-    if ! "$PHP_BIN" -m 2>/dev/null | grep -qi "^${ext}$"; then
+    if ! check_ext "$ext"; then
         MISSING="$MISSING $ext"
     fi
 done
 
 if [ -n "$MISSING" ]; then
     echo "  ⚠ 缺少扩展:$MISSING"
-    echo "  → 尝试自动修复..."
+    echo "  → 自动安装中..."
 
-    BT_PHP_DIR="/www/server/php/${PHP_VER_NUM}"
-    BT_PHP_INI="${BT_PHP_DIR}/etc/php.ini"
-    BT_EXT_DIR=$(ls -d "${BT_PHP_DIR}"/lib/php/extensions/no-debug-non-zts-*/ 2>/dev/null | head -1)
-
-    # PHP 扩展名 → apt 包名映射（不在此表的说明是 PHP 内置，apt 装不了）
-    ext_to_apt_pkg() {
+    # 宝塔扩展名映射（宝塔安装脚本里用的名称）
+    bt_ext_name() {
         case "$1" in
-            pdo_mysql) echo "php${PHP_VER}-mysql" ;;
-            dom|xml)   echo "php${PHP_VER}-xml" ;;
-            mbstring)  echo "php${PHP_VER}-mbstring" ;;
-            curl)      echo "php${PHP_VER}-curl" ;;
-            gd)        echo "php${PHP_VER}-gd" ;;
-            intl)      echo "php${PHP_VER}-intl" ;;
-            bcmath)    echo "php${PHP_VER}-bcmath" ;;
-            fileinfo)  echo "" ;; # 通常内置
-            openssl)   echo "" ;; # 编译时 --with-openssl
-            ctype)     echo "" ;; # 内置
-            iconv)     echo "" ;; # 内置
-            tokenizer) echo "" ;; # 内置
-            pdo)       echo "" ;; # 内置
-            pcntl)     echo "" ;; # 内置
-            *)         echo "php${PHP_VER}-${1}" ;;
+            pdo_mysql) echo "pdo_mysql" ;;
+            dom|xml)   echo "xml" ;;
+            *)         echo "$1" ;;
         esac
     }
 
-    # 宝塔 PHP 同时有 php.ini（FPM）和 php-cli.ini（CLI），两个都要改
-    BT_PHP_CLI_INI="${BT_PHP_DIR}/etc/php-cli.ini"
+    # 宝塔 PHP 扩展安装方法
+    bt_install_ext() {
+        local ext="$1"
+        local bt_name
+        bt_name=$(bt_ext_name "$ext")
+        local install_script="${BT_PHP_DIR}/src/ext/${bt_name}/install.sh"
 
-    for ext in $MISSING; do
-        FIXED=0
-
-        # 方法1（宝塔）: .so 已存在但未启用 → 写 php.ini + php-cli.ini
-        if [ -n "$BT_EXT_DIR" ] && [ -f "${BT_EXT_DIR}${ext}.so" ]; then
-            for _ini in "$BT_PHP_INI" "$BT_PHP_CLI_INI"; do
-                [ -f "$_ini" ] || continue
-                if grep -qE "^;?\s*extension\s*=\s*${ext}(\.so)?\s*$" "$_ini" 2>/dev/null; then
-                    sed -i "s/^;\s*extension\s*=\s*${ext}\(\.so\)\?\s*$/extension=${ext}/" "$_ini"
-                elif ! grep -qE "^extension\s*=\s*${ext}(\.so)?\s*$" "$_ini" 2>/dev/null; then
-                    echo "extension=${ext}" >> "$_ini"
+        # 方法1: .so 已存在，只需在 php.ini 里启用
+        if [ -n "$BT_EXT_DIR" ]; then
+            for so_name in "$ext" "$bt_name"; do
+                if [ -f "${BT_EXT_DIR}${so_name}.so" ]; then
+                    for _ini in "$BT_PHP_INI" "$BT_PHP_CLI_INI"; do
+                        [ -f "$_ini" ] || continue
+                        if grep -qE "^;\s*extension\s*=\s*${so_name}" "$_ini" 2>/dev/null; then
+                            sed -i "s/^;\s*extension\s*=\s*${so_name}/extension=${so_name}/" "$_ini"
+                        elif ! grep -qE "^extension\s*=\s*${so_name}" "$_ini" 2>/dev/null; then
+                            echo "extension=${so_name}" >> "$_ini"
+                        fi
+                    done
+                    echo "    ✓ $ext → 启用 .so"
+                    return 0
                 fi
             done
-            echo "    ✓ 已启用 $ext (.so 已存在)"
-            FIXED=1
         fi
 
-        # 方法2: apt/yum 安装（使用正确的包名映射）
-        if [ $FIXED -eq 0 ]; then
-            APT_PKG=$(ext_to_apt_pkg "$ext")
-            if [ -n "$APT_PKG" ]; then
-                if command -v apt-get &>/dev/null; then
-                    apt-get install -y "$APT_PKG" 2>/dev/null && FIXED=1
-                elif command -v yum &>/dev/null; then
-                    yum install -y "php-${ext}" 2>/dev/null && FIXED=1
-                fi
-                [ $FIXED -eq 1 ] && echo "    ✓ 系统包管理安装 $ext 成功"
+        # 方法2: 宝塔 install.sh 脚本编译安装
+        if [ -f "$install_script" ]; then
+            echo "    → $ext: 编译安装中（可能需要 1-2 分钟）..."
+            bash "$install_script" 2>/dev/null
+            if check_ext "$ext"; then
+                echo "    ✓ $ext → 编译安装成功"
+                return 0
             fi
         fi
 
-        [ $FIXED -eq 0 ] && echo "    ⚠ $ext 需手动安装"
+        # 方法3: 宝塔 API 安装（btpip/bt 命令行）
+        if command -v bt &>/dev/null; then
+            echo "    → $ext: 通过宝塔 CLI 安装..."
+            bt 14 <<< "${PHP_VER_NUM}
+${bt_name}
+" 2>/dev/null
+            if [ -n "$BT_EXT_DIR" ] && [ -f "${BT_EXT_DIR}${ext}.so" ]; then
+                for _ini in "$BT_PHP_INI" "$BT_PHP_CLI_INI"; do
+                    [ -f "$_ini" ] || continue
+                    grep -qE "^extension\s*=\s*${ext}" "$_ini" 2>/dev/null || echo "extension=${ext}" >> "$_ini"
+                done
+                echo "    ✓ $ext → bt CLI 安装成功"
+                return 0
+            fi
+        fi
+
+        # 方法4: 宝塔 API HTTP 接口安装
+        if [ -f /www/server/panel/BT-Panel ]; then
+            local bt_panel_path="/www/server/panel"
+            echo "    → $ext: 通过宝塔面板 API 安装..."
+            cd "$bt_panel_path"
+            python3 -c "
+import sys
+sys.path.insert(0, '.')
+try:
+    from plugin.php.php_main import phpMain
+    p = phpMain()
+    p.install_ext({'version': '${PHP_VER_NUM}', 'name': '${bt_name}'})
+    print('OK')
+except Exception as e:
+    print(f'FAIL: {e}')
+" 2>/dev/null | grep -q "OK" && {
+                echo "    ✓ $ext → 面板 API 安装成功"
+                cd "$APP_DIR"
+                return 0
+            }
+            cd "$APP_DIR"
+        fi
+
+        # 方法5: phpize 手动编译（内置扩展）
+        local php_src_dir="${BT_PHP_DIR}/src"
+        local ext_src=""
+        for d in "${php_src_dir}/ext/${ext}" "${php_src_dir}/ext/${bt_name}"; do
+            [ -d "$d" ] && ext_src="$d" && break
+        done
+
+        if [ -n "$ext_src" ] && [ -x "${BT_PHP_DIR}/bin/phpize" ]; then
+            echo "    → $ext: phpize 编译中..."
+            cd "$ext_src"
+            "${BT_PHP_DIR}/bin/phpize" 2>/dev/null
+            ./configure --with-php-config="${BT_PHP_DIR}/bin/php-config" 2>/dev/null
+            make -j$(nproc) 2>/dev/null && make install 2>/dev/null
+            cd "$APP_DIR"
+            if [ -n "$BT_EXT_DIR" ] && [ -f "${BT_EXT_DIR}${ext}.so" ]; then
+                for _ini in "$BT_PHP_INI" "$BT_PHP_CLI_INI"; do
+                    [ -f "$_ini" ] || continue
+                    grep -qE "^extension\s*=\s*${ext}" "$_ini" 2>/dev/null || echo "extension=${ext}" >> "$_ini"
+                done
+                echo "    ✓ $ext → phpize 编译成功"
+                return 0
+            fi
+        fi
+
+        # 方法6: apt/yum 兜底（非宝塔环境）
+        if [ $IS_BT -eq 0 ]; then
+            local pkg=""
+            case "$ext" in
+                pdo_mysql) pkg="php${PHP_VER}-mysql" ;;
+                dom|xml)   pkg="php${PHP_VER}-xml" ;;
+                mbstring)  pkg="php${PHP_VER}-mbstring" ;;
+                curl)      pkg="php${PHP_VER}-curl" ;;
+                gd)        pkg="php${PHP_VER}-gd" ;;
+                intl)      pkg="php${PHP_VER}-intl" ;;
+                bcmath)    pkg="php${PHP_VER}-bcmath" ;;
+            esac
+            if [ -n "$pkg" ]; then
+                if command -v apt-get &>/dev/null; then
+                    apt-get install -y "$pkg" 2>/dev/null && return 0
+                elif command -v yum &>/dev/null; then
+                    yum install -y "php-${ext}" 2>/dev/null && return 0
+                fi
+            fi
+        fi
+
+        return 1
+    }
+
+    for ext in $MISSING; do
+        bt_install_ext "$ext" || echo "    ⚠ $ext 安装失败"
     done
 
     # 重启 PHP-FPM 使扩展生效
-    /etc/init.d/php-fpm-"${PHP_VER_NUM}" restart 2>/dev/null \
-        || systemctl restart "php${PHP_VER}-fpm" 2>/dev/null \
-        || true
+    if [ $IS_BT -eq 1 ]; then
+        /etc/init.d/php-fpm-"${PHP_VER_NUM}" restart 2>/dev/null || true
+    else
+        systemctl restart "php${PHP_VER}-fpm" 2>/dev/null || true
+    fi
 
-    # 重新验证
+    # 最终验证
     FINAL_MISSING=""
     for ext in $REQUIRED_EXTS; do
-        if ! "$PHP_BIN" -m 2>/dev/null | grep -qi "^${ext}$"; then
+        if ! check_ext "$ext"; then
             FINAL_MISSING="$FINAL_MISSING $ext"
         fi
     done
 
     if [ -n "$FINAL_MISSING" ]; then
         echo ""
-        echo "  ✗ 以下扩展无法自动安装:$FINAL_MISSING"
-        echo "    请手动操作: 宝塔面板 → 软件商店 → PHP $PHP_VER → 安装扩展"
-        echo "    勾选:$FINAL_MISSING"
+        echo "  ⚠ 以下扩展仍缺失:$FINAL_MISSING"
+        echo "    最后手段: 宝塔面板 → 软件商店 → PHP $PHP_VER → 设置 → 安装扩展"
+        echo "    然后重新运行: bash deploy.sh update"
         ERRORS=1
+    else
+        echo "  ✓ 所有扩展安装成功"
     fi
-fi
-
-if [ $ERRORS -eq 0 ]; then
+else
     echo "  ✓ PHP 扩展完整"
 fi
 
