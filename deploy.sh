@@ -607,12 +607,29 @@ if [ "$ACTION" = "nginx" ]; then
 fi
 
 # ========== 前端部署函数 ==========
+# 支持两种模式:
+#   1. standalone 模式（推荐）: 本地构建后 rsync 上传，服务器只需 node
+#   2. 服务器构建模式: 服务器上 npm install + build
 deploy_frontend() {
     echo ""
     echo "━━━ 前端部署 ━━━"
 
-    if [ -z "$NODE_BIN" ] || [ -z "$NPM_BIN" ]; then
+    if [ -z "$NODE_BIN" ]; then
         echo "  ⚠ 跳过前端：Node.js 未安装"
+        return 0
+    fi
+
+    # 检测是否已有 standalone 构建产物（由本地 deploy-frontend.sh 上传）
+    if [ -f "$FRONTEND_DIR/server.js" ]; then
+        echo "  ✓ 检测到 standalone 产物，直接启动"
+        start_frontend_standalone
+        return 0
+    fi
+
+    # 检测是否有 npm（服务器构建模式需要）
+    if [ -z "$NPM_BIN" ]; then
+        echo "  ⚠ npm 不可用，请使用本地构建模式:"
+        echo "    本地执行: bash deploy-frontend.sh root@服务器IP"
         return 0
     fi
 
@@ -624,8 +641,8 @@ deploy_frontend() {
         echo "  → 拉取前端最新代码..."
         cd "$FRONTEND_DIR"
         git config --global --add safe.directory "$FRONTEND_DIR" 2>/dev/null || true
-        git pull --ff-only origin main || echo "  ⚠ pull 失败，尝试 reset"
-        git fetch origin main && git reset --hard origin/main
+        git fetch origin main 2>/dev/null
+        git reset --hard origin/main 2>/dev/null || true
     fi
 
     cd "$FRONTEND_DIR"
@@ -636,46 +653,81 @@ deploy_frontend() {
         local APP_URL=$(grep ^APP_URL "$APP_DIR/.env" | cut -d= -f2)
         [ -n "$APP_URL" ] && BACKEND_URL="$APP_URL"
     fi
-
     echo "NEXT_PUBLIC_API_URL=$BACKEND_URL" > .env.local
     echo "  ✓ .env.local → NEXT_PUBLIC_API_URL=$BACKEND_URL"
 
-    # 依赖安装（hash 检测）
-    local lock_hash=""
-    local saved_hash=""
-    [ -f package-lock.json ] && lock_hash=$(file_sha256 package-lock.json)
-    [ -f node_modules/.lock_hash ] && saved_hash=$(cat node_modules/.lock_hash 2>/dev/null)
-
-    if [ -d node_modules ] && [ -n "$lock_hash" ] && [ "$lock_hash" = "$saved_hash" ]; then
-        echo "  ✓ 前端依赖未变化，跳过 npm install"
-    else
-        echo "  → npm install..."
-        rm -rf node_modules/.cache 2>/dev/null || true
-        "$NPM_BIN" install --omit=optional 2>/dev/null || "$NPM_BIN" install || fail "npm install 失败"
-        [ -n "$lock_hash" ] && echo "$lock_hash" > node_modules/.lock_hash
+    # npm install
+    echo "  → npm install..."
+    "$NPM_BIN" install 2>&1 | tail -3
+    if [ $? -ne 0 ]; then
+        echo "  ⚠ npm install 失败，尝试清除缓存重试..."
+        rm -rf node_modules package-lock.json
+        "$NPM_BIN" install || fail "npm install 失败，建议使用本地构建: bash deploy-frontend.sh"
     fi
 
     # 构建
-    echo "  → npm run build（首次构建需要几分钟）..."
+    echo "  → npm run build（需要几分钟）..."
     NODE_OPTIONS="--max-old-space-size=1024" "$NPM_BIN" run build || fail "前端构建失败"
 
-    # PM2 启动/重启
+    # standalone 产物检测
+    if [ -f ".next/standalone/server.js" ]; then
+        echo "  → 使用 standalone 模式启动"
+        cp -r .next/static .next/standalone/.next/static 2>/dev/null || true
+        [ -d public ] && cp -r public .next/standalone/public 2>/dev/null || true
+        start_frontend_standalone_from ".next/standalone"
+    else
+        start_frontend_npm
+    fi
+
+    cd "$APP_DIR"
+}
+
+# 启动 standalone server.js
+start_frontend_standalone() {
+    cd "$FRONTEND_DIR"
+    # 写启动脚本
+    cat > "$FRONTEND_DIR/start.sh" << 'STARTEOF'
+#!/bin/bash
+export PORT=${PORT:-3000}
+export HOSTNAME=0.0.0.0
+exec node server.js
+STARTEOF
+    chmod +x "$FRONTEND_DIR/start.sh"
+
+    if [ -n "$PM2_BIN" ]; then
+        "$PM2_BIN" delete cang-ai-web 2>/dev/null || true
+        PORT="$FRONTEND_PORT" "$PM2_BIN" start "$FRONTEND_DIR/start.sh" --name "cang-ai-web" --cwd "$FRONTEND_DIR"
+        "$PM2_BIN" save 2>/dev/null || true
+        echo "  ✓ 前端 standalone 运行在 :$FRONTEND_PORT"
+    else
+        echo "  手动启动: cd $FRONTEND_DIR && PORT=$FRONTEND_PORT bash start.sh"
+    fi
+}
+
+# 从构建目录启动 standalone
+start_frontend_standalone_from() {
+    local BUILD_DIR="$1"
+    # 复制到前端根目录
+    cp "$BUILD_DIR/server.js" "$FRONTEND_DIR/server.js" 2>/dev/null || true
+    [ -d "$BUILD_DIR/.next" ] && cp -r "$BUILD_DIR/.next" "$FRONTEND_DIR/" 2>/dev/null || true
+    [ -d "$BUILD_DIR/node_modules" ] && cp -r "$BUILD_DIR/node_modules" "$FRONTEND_DIR/" 2>/dev/null || true
+    start_frontend_standalone
+}
+
+# npm start 模式启动
+start_frontend_npm() {
     if [ -n "$PM2_BIN" ]; then
         if "$PM2_BIN" list 2>/dev/null | grep -q "cang-ai-web"; then
-            echo "  → PM2 重启前端..."
             "$PM2_BIN" restart cang-ai-web
         else
-            echo "  → PM2 启动前端..."
             cd "$FRONTEND_DIR"
             "$PM2_BIN" start "$NPM_BIN" --name "cang-ai-web" --cwd "$FRONTEND_DIR" -- start -- -p "$FRONTEND_PORT"
         fi
         "$PM2_BIN" save 2>/dev/null || true
         echo "  ✓ 前端运行在 :$FRONTEND_PORT"
     else
-        echo "  ⚠ PM2 未安装，请手动启动: cd $FRONTEND_DIR && npm start -- -p $FRONTEND_PORT"
+        echo "  手动启动: cd $FRONTEND_DIR && npm start -- -p $FRONTEND_PORT"
     fi
-
-    cd "$APP_DIR"
 }
 
 # ========== 后端部署函数 ==========
