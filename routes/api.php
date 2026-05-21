@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BillingController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RedeemController;
 use App\Http\Controllers\Api\TemplateController;
@@ -10,6 +11,10 @@ use App\Apps\ImageGen\Controllers\GalleryController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json(['ok' => true]));
+
+// ---- Billing public routes ----
+Route::get('/billing/packages', [BillingController::class, 'packages']);
+Route::post('/payment/notify/{provider}', [BillingController::class, 'notify']);
 
 Route::middleware('throttle:30,1')->get('/download', function (\Illuminate\Http\Request $request) {
     $url = $request->query('url', '');
@@ -211,6 +216,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/me', [UserController::class, 'updateMe']);
     Route::get('/usage', [UserController::class, 'usage']);
     Route::get('/tasks', [UserController::class, 'tasks']);
+
+    // Billing (authenticated)
+    Route::post('/billing/orders', [BillingController::class, 'createOrder']);
+    Route::get('/billing/orders', [BillingController::class, 'userOrders']);
+    Route::get('/billing/orders/{order_no}', [BillingController::class, 'showOrder']);
     Route::delete('/tasks/{taskId}', [UserController::class, 'deleteTask']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);

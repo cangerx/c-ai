@@ -20,13 +20,16 @@ class PlanResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-credit-card';
     protected static ?string $navigationLabel = '套餐管理';
     protected static ?string $modelLabel = '套餐';
+    protected static ?string $pluralModelLabel = '套餐';
     protected static string | UnitEnum | null $navigationGroup = '业务配置';
     protected static ?int $navigationSort = 2;
 
     public static function form(Schema $schema): Schema
     {
         return $schema->schema([
-            Section::make('套餐信息')->schema([
+            Section::make('套餐信息')
+                ->description('统一的付费设置：「一次性」用于个人中心充值，「订阅」用于定价页订阅下单；Redeem Code 也可引用本套餐')
+                ->schema([
                 Forms\Components\TextInput::make('name')->label('名称')->required(),
                 Forms\Components\Select::make('type')->label('类型')
                     ->options(['once' => '一次性', 'subscription' => '订阅'])
