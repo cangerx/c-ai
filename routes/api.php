@@ -94,6 +94,9 @@ Route::get('/config', function (\Illuminate\Http\Request $request) {
             : (int) \App\Models\SiteSetting::get('billing_per_generation', 1);
 
         return [
+            'site_name' => $agentSite?->site_name ?: \App\Models\SiteSetting::get('site_name', 'CANG-AI'),
+            'site_description' => $agentSite?->seo_description ?: \App\Models\SiteSetting::get('site_description', ''),
+            'site_keywords' => $agentSite?->seo_keywords ?: \App\Models\SiteSetting::get('site_keywords', ''),
             'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
             'reverse_prompt_model' => \App\Models\SiteSetting::get('reverse_prompt_model', 'gpt-5.4-mini'),
             'cost_per_generation' => $costPerGeneration,
@@ -104,6 +107,10 @@ Route::get('/config', function (\Illuminate\Http\Request $request) {
                 'github' => \App\Models\SiteSetting::get('login_github_enabled', '0') === '1',
                 'wechat' => \App\Models\SiteSetting::get('login_wechat_enabled', '0') === '1',
             ],
+            'footer_text' => $agentSite?->footer_text ?: \App\Models\SiteSetting::get('footer_text', ''),
+            'footer_icp' => $agentSite?->footer_icp ?: \App\Models\SiteSetting::get('footer_icp', ''),
+            'hero_title' => $agentSite?->hero_title ?: \App\Models\SiteSetting::get('hero_title', ''),
+            'hero_subtitle' => $agentSite?->hero_subtitle ?: \App\Models\SiteSetting::get('hero_subtitle', ''),
         ];
     });
 });
