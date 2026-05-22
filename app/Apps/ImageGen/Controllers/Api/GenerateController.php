@@ -52,10 +52,6 @@ class GenerateController extends Controller
             return response()->json(['error' => '参考图上传失败，请重新上传后再生成'], 422);
         }
 
-        if ($mode !== 'image' && empty($fileUrlsInput) && preg_match('/(参考图|参考图片|上传图|上传图片|提供的图|提供的图片|这[两几]?张图|图片作为基础)/u', $prompt)) {
-            return response()->json(['error' => '未收到参考图片，请重新上传图片后再生成'], 422);
-        }
-
         $count = max(1, min(4, (int) $request->input('count', 1)));
         $model = $request->input('model', 'gpt-image-2');
         $size = $request->input('size', 'auto');
