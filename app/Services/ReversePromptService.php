@@ -22,10 +22,11 @@ class ReversePromptService
 
             for ($attempt = 1; $attempt <= 3; $attempt++) {
                 $released = false;
-                $channel = $dispatcher->acquire('image-gen', $lastExclude, null, $model)
-                    ?? $dispatcher->acquire('image-gen', null, null, $model)
-                    ?? $dispatcher->acquireFallback('image-gen', $lastExclude, $model)
-                    ?? $dispatcher->acquireFallback('image-gen', null, $model);
+                // 不按模型过滤渠道，任何有 base_url + api_key 的渠道都能调 chat/completions
+                $channel = $dispatcher->acquire('image-gen', $lastExclude)
+                    ?? $dispatcher->acquire('image-gen')
+                    ?? $dispatcher->acquireFallback('image-gen', $lastExclude)
+                    ?? $dispatcher->acquireFallback('image-gen');
 
                 if (!$channel) {
                     $lastException = new RuntimeException("模型 {$model} 无可用反推渠道");
@@ -70,43 +71,15 @@ class ReversePromptService
 
     protected function candidateModels(): array
     {
-        $configuredPreferred = (string) SiteSetting::get('reverse_prompt_model', '');
-        $preferred = array_values(array_unique(array_filter([
-            'gpt-5.4-mini',
-            'gpt-5.4',
-            'gpt-5.5',
-            (string) SiteSetting::get('prompt_tool_model', ''),
+        $configured = (string) SiteSetting::get('reverse_prompt_model', '');
+        $fallback = (string) SiteSetting::get('prompt_tool_model', '');
+
+        return array_values(array_unique(array_filter([
+            $configured,
+            $fallback,
+            'gpt-4o-mini',
+            'gpt-4o',
         ])));
-
-        $configured = AiChannel::where('app_name', 'image-gen')
-            ->where('is_active', true)
-            ->whereIn('status', ['active', 'paused'])
-            ->get()
-            ->flatMap(function (AiChannel $channel) {
-                return array_values(array_filter(array_merge($channel->models ?? [], [$channel->model])));
-            })
-            ->filter(fn($model) => is_string($model)
-                && !preg_match('/image/i', $model)
-                && preg_match('/^(gpt|chatgpt|claude|gemini|qwen|deepseek|glm|kimi|doubao|yi|llama)/i', $model))
-            ->unique()
-            ->values()
-            ->all();
-
-        usort($configured, function (string $a, string $b) use ($preferred) {
-            $ai = array_search($a, $preferred, true);
-            $bi = array_search($b, $preferred, true);
-            $ai = $ai === false ? PHP_INT_MAX : $ai;
-            $bi = $bi === false ? PHP_INT_MAX : $bi;
-            return $ai <=> $bi ?: strcmp($a, $b);
-        });
-
-        $models = array_values(array_unique(array_merge($preferred, $configured)));
-
-        if ($configuredPreferred && in_array($configuredPreferred, $configured, true)) {
-            $models = array_values(array_unique(array_merge([$configuredPreferred], $models)));
-        }
-
-        return $models;
     }
 
     protected function callChannel(AiChannel $channel, string $model, string $imageUrl, ?string $userPrompt): string
