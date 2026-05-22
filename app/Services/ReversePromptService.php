@@ -138,6 +138,8 @@ class ReversePromptService
         return str_contains($msg, '余额不足')
             || str_contains($msg, 'insufficient')
             || str_contains($msg, 'model_not_found')
-            || str_contains($msg, 'Invalid model');
+            || str_contains($msg, 'Invalid model')
+            || str_contains($msg, 'images endpoint')
+            || str_contains($msg, 'requires an image model');
     }
 }
