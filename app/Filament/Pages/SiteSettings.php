@@ -46,6 +46,8 @@ class SiteSettings extends Page implements HasForms
         // 模型
         'prompt_tool_model' => 'model',
         'reverse_prompt_model' => 'model',
+        'reverse_prompt_base_url' => 'model',
+        'reverse_prompt_api_key' => 'model',
         // 计费
         'billing_per_generation' => 'billing',
         // 注册赠送
@@ -118,9 +120,17 @@ class SiteSettings extends Page implements HasForms
                         ->placeholder('gpt-5.4-mini')
                         ->helperText('用于提示词优化、翻译等辅助任务的模型 ID'),
                     Forms\Components\TextInput::make('reverse_prompt_model')
-                        ->label('图片反推模型')
-                        ->placeholder('gpt-5.4-mini')
-                        ->helperText('用于图片反推提示词的视觉模型 ID，需绑定到至少一个可用渠道'),
+                        ->label('反推模型')
+                        ->placeholder('gpt-4o-mini')
+                        ->helperText('视觉模型 ID，如 gpt-4o-mini、gpt-4o'),
+                    Forms\Components\TextInput::make('reverse_prompt_base_url')
+                        ->label('反推 API 地址')
+                        ->placeholder('https://api.openai.com')
+                        ->helperText('支持 /v1/chat/completions 的 API 地址（优先于渠道）'),
+                    Forms\Components\TextInput::make('reverse_prompt_api_key')
+                        ->label('反推 API Key')
+                        ->password()
+                        ->helperText('对应 API 地址的密钥'),
                 ])->columns(2),
 
                 Section::make('计费设置')->schema([

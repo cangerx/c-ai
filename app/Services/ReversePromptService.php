@@ -13,6 +13,15 @@ class ReversePromptService
 
     public function analyze(string $imageUrl, ?string $userPrompt = null): array
     {
+        // 优先使用独立配置的反推 API（后台 SiteSettings 配置）
+        $directBaseUrl = trim((string) SiteSetting::get('reverse_prompt_base_url', ''));
+        $directApiKey = trim((string) SiteSetting::get('reverse_prompt_api_key', ''));
+
+        if ($directBaseUrl && $directApiKey) {
+            return $this->callDirect($directBaseUrl, $directApiKey, $imageUrl, $userPrompt);
+        }
+
+        // 回退：用渠道系统
         $models = $this->candidateModels();
         $dispatcher = app(ChannelDispatcher::class);
         $lastException = null;
@@ -22,7 +31,6 @@ class ReversePromptService
 
             for ($attempt = 1; $attempt <= 3; $attempt++) {
                 $released = false;
-                // 不按模型过滤渠道，任何有 base_url + api_key 的渠道都能调 chat/completions
                 $channel = $dispatcher->acquire('image-gen', $lastExclude)
                     ?? $dispatcher->acquire('image-gen')
                     ?? $dispatcher->acquireFallback('image-gen', $lastExclude)
@@ -66,6 +74,31 @@ class ReversePromptService
             }
         }
 
+        throw $lastException ?: new RuntimeException('反推提示词失败，请在后台设置 reverse_prompt_base_url 和 reverse_prompt_api_key');
+    }
+
+    /**
+     * 使用独立配置直接调用 chat/completions API
+     */
+    protected function callDirect(string $baseUrl, string $apiKey, string $imageUrl, ?string $userPrompt): array
+    {
+        $models = $this->candidateModels();
+        $lastException = null;
+
+        foreach ($models as $model) {
+            try {
+                $result = $this->callApi($baseUrl, $apiKey, $model, $imageUrl, $userPrompt);
+                return [
+                    'prompt' => $result,
+                    'model' => $model,
+                    'channel_name' => 'direct',
+                ];
+            } catch (Throwable $e) {
+                $lastException = $e;
+                if ($this->isNonRetryableError($e)) break;
+            }
+        }
+
         throw $lastException ?: new RuntimeException('反推提示词失败');
     }
 
@@ -86,6 +119,13 @@ class ReversePromptService
     {
         $baseUrl = rtrim($channel->base_url, '/');
         $baseUrl = preg_replace('#/v1$#', '', $baseUrl);
+        return $this->callApi($baseUrl, $channel->api_key, $model, $imageUrl, $userPrompt);
+    }
+
+    protected function callApi(string $baseUrl, string $apiKey, string $model, string $imageUrl, ?string $userPrompt): string
+    {
+        $baseUrl = rtrim($baseUrl, '/');
+        $baseUrl = preg_replace('#/v1$#', '', $baseUrl);
         $instruction = trim((string) $userPrompt) ?: self::DEFAULT_INSTRUCTION;
 
         $resp = CurlClient::post($baseUrl . '/v1/chat/completions', [
@@ -104,7 +144,7 @@ class ReversePromptService
                 ],
             ],
         ], [
-            'Authorization' => "Bearer {$channel->api_key}",
+            'Authorization' => "Bearer {$apiKey}",
             'Content-Type' => 'application/json',
         ], 120, 15);
 
