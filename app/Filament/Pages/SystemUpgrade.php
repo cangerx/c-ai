@@ -39,11 +39,19 @@ class SystemUpgrade extends Page
             ? trim(shell_exec("cd {$frontendDir} && git log -1 --format='%ci' 2>/dev/null") ?: '')
             : '';
 
+        $workerCount = trim(shell_exec("pgrep -f 'task:worker' 2>/dev/null | wc -l") ?: '0');
+        $pm2 = $this->findPm2Bin();
+        if ($pm2) {
+            $pm2Online = trim(shell_exec("{$pm2} list 2>/dev/null | grep -c 'online'") ?: '0');
+            $workerCount = $pm2Online;
+        }
+
         return [
             'backend_commit' => $backendCommit,
             'backend_date' => $backendDate,
             'frontend_commit' => $frontendCommit,
             'frontend_date' => $frontendDate,
+            'worker_count' => $workerCount,
         ];
     }
 
@@ -130,8 +138,9 @@ class SystemUpgrade extends Page
         $this->runShell("cd {$appDir} && {$phpBin} artisan config:clear 2>&1");
         $this->runShell("cd {$appDir} && {$phpBin} artisan cache:clear 2>&1");
         $this->runShell("cd {$appDir} && {$phpBin} artisan route:clear 2>&1");
+        $this->runShell("cd {$appDir} && {$phpBin} artisan route:cache 2>&1");
         $this->runShell("cd {$appDir} && {$phpBin} artisan view:clear 2>&1");
-        $this->appendLog('✓ 缓存已清除');
+        $this->appendLog('✓ 缓存已清除并重建');
 
         // 5. Restart workers
         $this->appendLog('→ 重启 Worker...');
