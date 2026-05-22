@@ -77,6 +77,23 @@ class TaskWorkerCommand extends Command
                 continue;
             }
 
+            if (!$this->channelSupportsModel($channel, $task->model)) {
+                $dispatcher->release($channel->id);
+                Log::channel('upstream')->warning('provider_skipped_model_mismatch', [
+                    'task_id' => $taskId,
+                    'attempt' => $attempt,
+                    'channel_id' => $channel->id,
+                    'channel_name' => $channel->display_name ?: $channel->name,
+                    'provider' => $channel->provider,
+                    'task_model' => $task->model,
+                    'channel_model' => $channel->model,
+                    'channel_models' => $channel->models,
+                ]);
+                $lastExclude = $channel->id;
+                $lastException = new RuntimeException("渠道 {$channel->id} 不支持模型 {$task->model}");
+                continue;
+            }
+
             $task->touch();
 
             try {
@@ -150,6 +167,20 @@ class TaskWorkerCommand extends Command
     }
 
     // ─── Provider 分发 ───
+
+    protected function channelSupportsModel(AiChannel $channel, ?string $model): bool
+    {
+        if (!$model) {
+            return false;
+        }
+
+        $models = $channel->models ?? [];
+        if (in_array($model, $models, true)) {
+            return true;
+        }
+
+        return $channel->model === $model;
+    }
 
     protected function getProvider(?string $provider): ImageProviderInterface
     {
