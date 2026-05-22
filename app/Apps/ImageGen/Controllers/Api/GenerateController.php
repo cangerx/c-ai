@@ -55,6 +55,7 @@ class GenerateController extends Controller
         $count = max(1, min(4, (int) $request->input('count', 1)));
         $model = $request->input('model', 'gpt-image-2');
         $requestedSize = $request->input('size', 'auto');
+        $sizeForValidation = $requestedSize;
         $size = $this->normalizeImageSize($requestedSize);
         $agentSite = AgentSite::resolveForHost($request->getHost());
 
@@ -65,10 +66,10 @@ class GenerateController extends Controller
         }
         if ($aiModel) {
             $cfg = $aiModel->config ?? [];
-            if (!empty($cfg['sizes']) && !in_array($size, $cfg['sizes'])) {
+            if (!empty($cfg['sizes']) && !in_array($sizeForValidation, $cfg['sizes'], true)) {
                 return response()->json(['error' => '该模型不支持此尺寸'], 422);
             }
-            if (!empty($cfg['qualities']) && !in_array($quality, $cfg['qualities'])) {
+            if (!empty($cfg['qualities']) && !in_array($quality, $cfg['qualities'], true)) {
                 return response()->json(['error' => '该模型不支持此质量'], 422);
             }
         }

@@ -14,8 +14,10 @@ class PromptAnalysisService
         if ($channelId) {
             $channel = AiChannel::find($channelId);
         } elseif ($model) {
-            // 根据模型名找到包含它的渠道
             $channel = AiChannel::where('is_active', true)
+                ->where(function ($query) {
+                    $query->where('status', 'active')->orWhereNull('status');
+                })
                 ->where('models', 'like', '%"' . $model . '"%')
                 ->orderByDesc('priority')
                 ->first();
@@ -23,6 +25,11 @@ class PromptAnalysisService
 
         if (!isset($channel) || !$channel) {
             $channel = AiChannel::where('is_active', true)
+                ->where(function ($query) {
+                    $query->where('status', 'active')->orWhereNull('status');
+                })
+                ->whereNotNull('api_key')
+                ->whereNotNull('base_url')
                 ->orderByDesc('priority')
                 ->first();
         }
@@ -98,17 +105,83 @@ SYSTEM;
         }
 
         $data = json_decode($result, true);
-        $content = $data['choices'][0]['message']['content'] ?? '';
+        if (!is_array($data)) {
+            throw new \RuntimeException('AI 响应不是有效 JSON');
+        }
 
-        // 去掉 <think>...</think> 思考标签
+        $content = $data['choices'][0]['message']['content'] ?? '';
+        if (!is_string($content) || trim($content) === '') {
+            throw new \RuntimeException('AI 返回内容为空');
+        }
+
         $content = preg_replace('/<think>.*?<\/think>/s', '', $content);
         $content = preg_replace('/^```(?:json)?\s*|\s*```$/s', '', trim($content));
+        if (preg_match('/\{[\s\S]*\}/', $content, $matches)) {
+            $content = $matches[0];
+        }
 
         $parsed = json_decode($content, true);
-        if (!$parsed || !isset($parsed['variables'])) {
+        if (!is_array($parsed) || empty($parsed['variables']) || !is_array($parsed['variables'])) {
             throw new \RuntimeException('AI 返回格式异常');
         }
 
-        return $parsed;
+        return $this->normalizeResult($parsed, $prompt);
+    }
+
+    protected function normalizeResult(array $parsed, string $prompt): array
+    {
+        $variables = [];
+
+        foreach ($parsed['variables'] as $variable) {
+            if (!is_array($variable)) {
+                continue;
+            }
+
+            $name = $this->normalizeVariableName((string) ($variable['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $alternatives = $variable['alternatives'] ?? [];
+            if (is_string($alternatives)) {
+                $alternatives = array_values(array_filter(array_map('trim', preg_split('/[,，、\n]+/u', $alternatives))));
+            }
+            if (!is_array($alternatives)) {
+                $alternatives = [];
+            }
+
+            $variables[] = [
+                'name' => $name,
+                'label' => trim((string) ($variable['label'] ?? $name)) ?: $name,
+                'description' => trim((string) ($variable['description'] ?? '')),
+                'default' => trim((string) ($variable['default'] ?? '')),
+                'alternatives' => array_values(array_filter(array_map(fn ($item) => trim((string) $item), $alternatives))),
+            ];
+        }
+
+        if (empty($variables)) {
+            throw new \RuntimeException('AI 未识别到可用变量');
+        }
+
+        $tags = $parsed['tags'] ?? '';
+        if (is_array($tags)) {
+            $tags = implode(',', array_values(array_filter(array_map(fn ($item) => trim((string) $item), $tags))));
+        }
+
+        return [
+            'title' => mb_substr(trim((string) ($parsed['title'] ?? '')), 0, 100),
+            'tags' => trim((string) $tags),
+            'template_prompt' => trim((string) ($parsed['template_prompt'] ?? '')) ?: $prompt,
+            'variables' => $variables,
+        ];
+    }
+
+    protected function normalizeVariableName(string $name): string
+    {
+        $name = strtolower(trim($name));
+        $name = preg_replace('/[^a-z0-9_]+/', '_', $name) ?: '';
+        $name = trim($name, '_');
+
+        return preg_match('/^[a-z_]/', $name) ? $name : ($name !== '' ? 'var_' . $name : '');
     }
 }
