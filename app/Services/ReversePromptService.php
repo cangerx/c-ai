@@ -110,8 +110,8 @@ class ReversePromptService
         return array_values(array_unique(array_filter([
             $configured,
             $fallback,
-            'gpt-4o-mini',
-            'gpt-4o',
+            'gpt-5.4-mini',
+            'gpt-5.4',
         ])));
     }
 

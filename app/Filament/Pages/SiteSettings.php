@@ -121,8 +121,8 @@ class SiteSettings extends Page implements HasForms
                         ->helperText('用于提示词优化、翻译等辅助任务的模型 ID'),
                     Forms\Components\TextInput::make('reverse_prompt_model')
                         ->label('反推模型')
-                        ->placeholder('gpt-4o-mini')
-                        ->helperText('视觉模型 ID，如 gpt-4o-mini、gpt-4o'),
+                        ->placeholder('gpt-5.4-mini')
+                        ->helperText('视觉模型 ID，如 gpt-5.4-mini、gpt-5.4'),
                     Forms\Components\TextInput::make('reverse_prompt_base_url')
                         ->label('反推 API 地址')
                         ->placeholder('https://api.openai.com')
