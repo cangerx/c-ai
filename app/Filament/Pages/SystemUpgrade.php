@@ -109,6 +109,7 @@ class SystemUpgrade extends Page
     protected function upgradeBackendInternal(): void
     {
         $appDir = base_path();
+        $phpBin = $this->findPhpBin();
 
         $this->appendLog('--- 后端升级 ---');
 
@@ -117,9 +118,8 @@ class SystemUpgrade extends Page
         $result = $this->runShell("cd {$appDir} && git pull origin main 2>&1");
         $this->appendLog($result);
 
-        // 2. Composer install (if needed)
+        // 2. Composer install
         $this->appendLog('→ 检查 PHP 依赖...');
-        $phpBin = $this->findPhpBin();
         $composerBin = $this->findComposerBin();
         if ($phpBin && $composerBin) {
             $result = $this->runShell("{$phpBin} {$composerBin} install --no-dev --optimize-autoloader --no-interaction 2>&1", 120);
@@ -133,21 +133,38 @@ class SystemUpgrade extends Page
         $result = $this->runShell("cd {$appDir} && {$phpBin} artisan migrate --force 2>&1");
         $this->appendLog($result);
 
-        // 4. Clear cache
-        $this->appendLog('→ 清除缓存...');
-        $this->runShell("cd {$appDir} && {$phpBin} artisan config:clear 2>&1");
-        $this->runShell("cd {$appDir} && {$phpBin} artisan cache:clear 2>&1");
-        $this->runShell("cd {$appDir} && {$phpBin} artisan route:clear 2>&1");
-        $this->runShell("cd {$appDir} && {$phpBin} artisan route:cache 2>&1");
-        $this->runShell("cd {$appDir} && {$phpBin} artisan view:clear 2>&1");
+        // 4. Clear ALL caches and rebuild
+        $this->appendLog('→ 清除并重建缓存...');
+        $cacheCommands = [
+            'config:clear', 'cache:clear', 'route:clear', 'view:clear',
+            'event:clear', 'config:cache', 'route:cache', 'view:cache',
+        ];
+        foreach ($cacheCommands as $cmd) {
+            $this->runShell("cd {$appDir} && {$phpBin} artisan {$cmd} 2>&1");
+        }
         $this->appendLog('✓ 缓存已清除并重建');
 
-        // 5. Restart workers
+        // 5. Restart PHP-FPM (critical: ensures new code is loaded)
+        $this->appendLog('→ 重启 PHP-FPM...');
+        $fpmRestarted = false;
+        foreach (['/etc/init.d/php-fpm-83', '/etc/init.d/php-fpm-84', '/etc/init.d/php-fpm-82'] as $initScript) {
+            if (is_executable($initScript)) {
+                $this->runShell("{$initScript} restart 2>&1");
+                $this->appendLog('✓ PHP-FPM 已重启 (' . basename($initScript) . ')');
+                $fpmRestarted = true;
+                break;
+            }
+        }
+        if (!$fpmRestarted) {
+            $this->runShell("systemctl restart php8.3-fpm 2>/dev/null || systemctl restart php-fpm 2>/dev/null || true 2>&1");
+            $this->appendLog('✓ 尝试通过 systemctl 重启 PHP-FPM');
+        }
+
+        // 6. Restart workers
         $this->appendLog('→ 重启 Worker...');
         $result = $this->runShell("cd {$appDir} && {$phpBin} artisan queue:restart 2>&1");
         $this->appendLog($result);
 
-        // Try PM2 restart
         $pm2 = $this->findPm2Bin();
         if ($pm2) {
             $this->runShell("{$pm2} restart cang-ai-worker 2>&1");
@@ -175,30 +192,64 @@ class SystemUpgrade extends Page
         $result = $this->runShell("cd {$frontendDir} && git pull origin main 2>&1");
         $this->appendLog($result);
 
-        // 2. npm install + build
-        $nodeBin = $this->findNodeBin();
         $npmBin = $this->findNpmBin();
-
         if (!$npmBin) {
             $this->appendLog('⚠ npm 未找到，跳过构建');
             return;
         }
 
+        // 2. Install dependencies
         $this->appendLog('→ 安装前端依赖...');
         $result = $this->runShell("cd {$frontendDir} && {$npmBin} install 2>&1", 120);
         $this->appendLog($result);
 
+        // 3. Clean old build to avoid serving stale content
+        $this->appendLog('→ 清理旧构建产物...');
+        $this->runShell("rm -rf {$frontendDir}/.next 2>&1");
+        $this->appendLog('✓ 旧 .next 已清除');
+
+        // 4. Build
         $this->appendLog('→ 构建前端（需要 1-3 分钟）...');
         $result = $this->runShell("cd {$frontendDir} && NODE_OPTIONS='--max-old-space-size=1024' {$npmBin} run build 2>&1", 300);
         $this->appendLog($result);
 
-        // 3. Restart PM2
+        // 5. Verify build succeeded
+        $standaloneDir = "{$frontendDir}/.next/standalone";
+        if (!is_file("{$standaloneDir}/server.js")) {
+            $this->appendLog('✗ 构建失败：standalone/server.js 不存在');
+            Notification::make()->title('前端构建失败')->danger()->send();
+            return;
+        }
+        $this->appendLog('✓ 构建成功');
+
+        // 6. Deploy standalone assets (critical step!)
+        $this->appendLog('→ 部署 standalone 资源...');
+
+        // Copy static files into standalone
+        $this->runShell("cp -r {$frontendDir}/.next/static {$standaloneDir}/.next/static 2>&1");
+        $this->appendLog('  ✓ static 文件已复制');
+
+        // Copy public files into standalone
+        if (is_dir("{$frontendDir}/public")) {
+            $this->runShell("cp -r {$frontendDir}/public {$standaloneDir}/public 2>&1");
+            $this->appendLog('  ✓ public 文件已复制');
+        }
+
+        // Copy server.js to project root (PM2 start.sh uses root server.js)
+        $this->runShell("cp {$standaloneDir}/server.js {$frontendDir}/server.js 2>&1");
+        $this->appendLog('  ✓ server.js 已更新到项目根目录');
+
+        // 7. Restart PM2
         $pm2 = $this->findPm2Bin();
         if ($pm2) {
             $this->appendLog('→ 重启前端服务...');
             $result = $this->runShell("{$pm2} restart cang-ai-web 2>&1");
             $this->appendLog($result);
-            $this->appendLog('✓ 前端服务已重启');
+
+            // Verify process is online
+            sleep(2);
+            $status = trim($this->runShell("{$pm2} show cang-ai-web 2>&1 | grep status"));
+            $this->appendLog('  状态: ' . $status);
         }
 
         $this->appendLog('✓ 前端升级完成');
