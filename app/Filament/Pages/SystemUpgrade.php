@@ -63,17 +63,20 @@ class SystemUpgrade extends Page
         $this->log = '';
         $this->running = true;
 
-        $this->appendLog('=== 开始全栈升级 ===');
-
-        $this->upgradeBackendInternal();
-        $this->upgradeFrontendInternal();
-
-        $this->appendLog('');
-        $this->appendLog('=== 全栈升级完成 ===');
-        $this->versionInfo = $this->loadVersionInfo();
-        $this->running = false;
-
-        Notification::make()->title('全栈升级完成')->success()->send();
+        try {
+            $this->appendLog('=== 开始全栈升级 ===');
+            $this->upgradeBackendInternal();
+            $this->upgradeFrontendInternal();
+            $this->appendLog('');
+            $this->appendLog('=== 全栈升级完成 ===');
+            Notification::make()->title('全栈升级完成')->success()->send();
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 升级失败：' . $e->getMessage());
+            Notification::make()->title('升级失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->versionInfo = $this->loadVersionInfo();
+            $this->running = false;
+        }
     }
 
     /**
@@ -84,11 +87,16 @@ class SystemUpgrade extends Page
         $this->log = '';
         $this->running = true;
 
-        $this->upgradeBackendInternal();
-
-        $this->versionInfo = $this->loadVersionInfo();
-        $this->running = false;
-        Notification::make()->title('后端升级完成')->success()->send();
+        try {
+            $this->upgradeBackendInternal();
+            Notification::make()->title('后端升级完成')->success()->send();
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 后端升级失败：' . $e->getMessage());
+            Notification::make()->title('后端升级失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->versionInfo = $this->loadVersionInfo();
+            $this->running = false;
+        }
     }
 
     /**
@@ -99,11 +107,16 @@ class SystemUpgrade extends Page
         $this->log = '';
         $this->running = true;
 
-        $this->upgradeFrontendInternal();
-
-        $this->versionInfo = $this->loadVersionInfo();
-        $this->running = false;
-        Notification::make()->title('前端升级完成')->success()->send();
+        try {
+            $this->upgradeFrontendInternal();
+            Notification::make()->title('前端升级完成')->success()->send();
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 前端升级失败：' . $e->getMessage());
+            Notification::make()->title('前端升级失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->versionInfo = $this->loadVersionInfo();
+            $this->running = false;
+        }
     }
 
     protected function upgradeBackendInternal(): void
@@ -133,31 +146,28 @@ class SystemUpgrade extends Page
         $result = $this->runShell("cd {$appDir} && {$phpBin} artisan migrate --force 2>&1");
         $this->appendLog($result);
 
-        // 4. Clear ALL caches and rebuild
-        $this->appendLog('→ 清除并重建缓存...');
+        // 4. Clear caches now, rebuild after the Livewire response is sent
+        $this->appendLog('→ 清除缓存...');
         $cacheCommands = [
-            'config:clear', 'cache:clear', 'route:clear', 'view:clear',
-            'event:clear', 'config:cache', 'route:cache', 'view:cache',
+            'config:clear', 'cache:clear', 'route:clear', 'view:clear', 'event:clear',
         ];
         foreach ($cacheCommands as $cmd) {
             $this->runShell("cd {$appDir} && {$phpBin} artisan {$cmd} 2>&1");
         }
-        $this->appendLog('✓ 缓存已清除并重建');
+        $this->appendLog('✓ 缓存已清除');
+
+        if ($this->scheduleCacheRebuild($appDir, $phpBin)) {
+            $this->appendLog('✓ 缓存将在页面响应后自动重建');
+        } else {
+            $this->appendLog('⚠ 缓存重建未能加入后台任务');
+        }
 
         // 5. Restart PHP-FPM (critical: ensures new code is loaded)
-        $this->appendLog('→ 重启 PHP-FPM...');
-        $fpmRestarted = false;
-        foreach (['/etc/init.d/php-fpm-83', '/etc/init.d/php-fpm-84', '/etc/init.d/php-fpm-82'] as $initScript) {
-            if (is_executable($initScript)) {
-                $this->runShell("{$initScript} restart 2>&1");
-                $this->appendLog('✓ PHP-FPM 已重启 (' . basename($initScript) . ')');
-                $fpmRestarted = true;
-                break;
-            }
-        }
-        if (!$fpmRestarted) {
-            $this->runShell("systemctl restart php8.3-fpm 2>/dev/null || systemctl restart php-fpm 2>/dev/null || true 2>&1");
-            $this->appendLog('✓ 尝试通过 systemctl 重启 PHP-FPM');
+        $this->appendLog('→ 安排 PHP-FPM 延迟重启...');
+        if ($this->schedulePhpFpmRestart()) {
+            $this->appendLog('✓ PHP-FPM 将在页面响应后自动重启');
+        } else {
+            $this->appendLog('⚠ PHP-FPM 重启命令未找到，已跳过');
         }
 
         // 6. Restart workers
@@ -260,6 +270,44 @@ class SystemUpgrade extends Page
     protected function appendLog(string $line): void
     {
         $this->log .= $line . "\n";
+    }
+
+    protected function schedulePhpFpmRestart(): bool
+    {
+        $cmd = $this->phpFpmRestartCommand();
+        if (!$cmd) {
+            return false;
+        }
+
+        $output = shell_exec("(sleep 8; {$cmd}) >/dev/null 2>&1 & echo scheduled") ?: '';
+        return trim($output) === 'scheduled';
+    }
+
+    protected function scheduleCacheRebuild(string $appDir, string $phpBin): bool
+    {
+        $commands = [
+            'config:cache',
+            'route:cache',
+            'view:cache',
+        ];
+        $artisanCommands = array_map(
+            fn (string $command): string => escapeshellarg($phpBin) . ' artisan ' . escapeshellarg($command),
+            $commands,
+        );
+        $cmd = 'cd ' . escapeshellarg($appDir) . ' && ' . implode(' && ', $artisanCommands);
+        $output = shell_exec("(sleep 3; {$cmd}) >/dev/null 2>&1 & echo scheduled") ?: '';
+        return trim($output) === 'scheduled';
+    }
+
+    protected function phpFpmRestartCommand(): ?string
+    {
+        foreach (['/etc/init.d/php-fpm-83', '/etc/init.d/php-fpm-84', '/etc/init.d/php-fpm-82'] as $initScript) {
+            if (is_executable($initScript)) {
+                return escapeshellarg($initScript) . ' restart';
+            }
+        }
+
+        return 'systemctl restart php8.3-fpm 2>/dev/null || systemctl restart php-fpm 2>/dev/null || true';
     }
 
     protected function findPhpBin(): string

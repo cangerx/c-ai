@@ -8,5 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('images:clean-expired')->dailyAt('03:00');
+Schedule::command('images:clean-expired --hours=2')->hourly()->withoutOverlapping();
 Schedule::command('generation:recover-stuck')->everyMinute()->withoutOverlapping();

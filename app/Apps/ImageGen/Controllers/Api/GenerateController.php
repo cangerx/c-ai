@@ -8,12 +8,13 @@ use App\Models\AgentSite;
 use App\Models\GenerationTask;
 use App\Services\BillingService;
 use App\Services\ContentFilterService;
+use App\Services\ImageStorageService;
 use Illuminate\Support\Facades\Redis;
 use App\Apps\ImageGen\Controllers\GalleryController;
-use App\Apps\ImageGen\Services\ImageStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GenerateController extends Controller
 {
@@ -41,6 +42,14 @@ class GenerateController extends Controller
         $quality = $request->input('quality', 'medium');
         if (!in_array($quality, ['low', 'medium', 'high'])) {
             return response()->json(['error' => 'Invalid quality'], 422);
+        }
+
+        $mode = $request->input('mode', 'text');
+        $fileUrlsInput = $request->input('file_urls', []);
+        $fileUrlsInput = is_array($fileUrlsInput) ? array_values(array_filter($fileUrlsInput)) : [];
+
+        if ($mode === 'image' && empty($fileUrlsInput) && !$request->hasFile('image')) {
+            return response()->json(['error' => '参考图上传失败，请重新上传后再生成'], 422);
         }
 
         $count = max(1, min(4, (int) $request->input('count', 1)));
@@ -94,18 +103,34 @@ class GenerateController extends Controller
             return response()->json(['error' => $e->getMessage()], 402);
         }
 
-        $mode = $request->input('mode', 'text');
         $files = [];
         if ($mode === 'image') {
             $fileUrls = $request->input('file_urls', []);
+            Log::debug('image-gen file_urls received', [
+                'user_id' => $user->id,
+                'file_urls' => $fileUrls,
+                'request_host' => $request->getHost(),
+                'app_url' => config('app.url'),
+                'storage_url' => \App\Models\SiteSetting::get('storage_url', ''),
+            ]);
             if (!empty($fileUrls) && is_array($fileUrls)) {
                 $storageUrl = \App\Models\SiteSetting::get('storage_url', '');
                 $storageHost = $storageUrl ? (parse_url($storageUrl, PHP_URL_HOST) ?: '') : '';
+                $storageEndpoint = \App\Models\SiteSetting::get('storage_endpoint', '');
+                $endpointHost = $storageEndpoint ? (parse_url($storageEndpoint, PHP_URL_HOST) ?: '') : '';
+                $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
+                $endpointPublicHost = $endpointHost;
+                if ($bucket !== '' && $endpointHost !== '' && !str_starts_with($endpointHost, $bucket . '.')) {
+                    $endpointPublicHost = $bucket . '.' . $endpointHost;
+                }
                 $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?: '';
                 $requestHost = $request->getHost();
-                $allowedHosts = array_filter([$storageHost, $appHost, $requestHost]);
+                $allowedHosts = array_values(array_unique(array_filter([$storageHost, $endpointHost, $endpointPublicHost, $appHost, $requestHost])));
+                $localHosts = ['127.0.0.1', 'localhost', '0.0.0.0'];
+                if (app()->environment('local') || in_array($appHost, $localHosts, true) || in_array($requestHost, $localHosts, true)) {
+                    $allowedHosts = array_values(array_unique(array_merge($allowedHosts, $localHosts)));
+                }
                 foreach (array_slice($fileUrls, 0, 4) as $url) {
-                    // 支持相对路径 /storage/... (本地存储返回的路径)
                     if (preg_match('#^/storage/.+$#', $url)) {
                         $files[] = ['name' => basename($url), 'mime_type' => 'image/png', 'url' => $url];
                         continue;
@@ -130,6 +155,15 @@ class GenerateController extends Controller
                     ];
                 }
             }
+        }
+
+        if ($mode === 'image' && empty($files)) {
+            Log::warning('image-gen rejected empty image files', [
+                'user_id' => $user->id,
+                'file_urls' => $request->input('file_urls', []),
+            ]);
+            $billing->refundLog($usageLog);
+            return response()->json(['error' => '参考图上传失败或地址无效，请重新上传后再生成'], 422);
         }
 
         try {

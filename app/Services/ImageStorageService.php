@@ -27,8 +27,7 @@ class ImageStorageService
         $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
 
         if (in_array($driver, ['oss', 'cos', 'r2'])) {
-            $this->configureDynamicDisk($driver);
-            return Storage::disk('dynamic_s3')->url($key);
+            return $this->publicUrl($driver, $key);
         }
 
         // 本地存储：返回相对路径，避免 APP_URL 配置不一致导致图片无法加载
@@ -38,6 +37,39 @@ class ImageStorageService
     public function delete(string $key): void
     {
         $this->disk()->delete($key);
+    }
+
+    public function keyFromUrl(?string $url): ?string
+    {
+        if (empty($url)) {
+            return null;
+        }
+
+        if (preg_match('#^/storage/(.+)$#', $url, $m)) {
+            return ltrim($m[1], '/');
+        }
+
+        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+            return ltrim($url, '/');
+        }
+
+        $path = parse_url($url, PHP_URL_PATH) ?: '';
+        $key = ltrim($path, '/');
+        if ($key === '') {
+            return null;
+        }
+
+        $customPath = trim(parse_url(\App\Models\SiteSetting::get('storage_url', ''), PHP_URL_PATH) ?: '', '/');
+        if ($customPath !== '' && str_starts_with($key, $customPath . '/')) {
+            $key = substr($key, strlen($customPath) + 1);
+        }
+
+        $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
+        if ($bucket !== '' && str_starts_with($key, $bucket . '/')) {
+            $key = substr($key, strlen($bucket) + 1);
+        }
+
+        return $key !== '' ? $key : null;
     }
 
     public function fetchRemoteImage(string $url): array
@@ -119,7 +151,7 @@ class ImageStorageService
             'url' => $url,
             'key' => $key,
             'final_url' => $this->url($key),
-            'headers' => ['Content-Type' => $mimeType],
+            'headers' => ['Content-Type' => $mimeType, 'x-amz-acl' => 'public-read'],
         ];
     }
 
@@ -148,18 +180,71 @@ class ImageStorageService
     protected function configureDynamicDisk(string $driver): void
     {
         $region = \App\Models\SiteSetting::get('storage_region', 'auto');
+        $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
+        $endpoint = \App\Models\SiteSetting::get('storage_endpoint', '');
         $config = [
             'driver' => 's3',
             'key' => \App\Models\SiteSetting::get('storage_access_key', ''),
             'secret' => \App\Models\SiteSetting::get('storage_secret_key', ''),
             'region' => $region ?: 'auto',
-            'bucket' => \App\Models\SiteSetting::get('storage_bucket', ''),
-            'endpoint' => \App\Models\SiteSetting::get('storage_endpoint', ''),
+            'bucket' => $bucket,
+            'endpoint' => $this->apiEndpoint($driver, $endpoint, $bucket),
             'url' => \App\Models\SiteSetting::get('storage_url', ''),
-            'use_path_style_endpoint' => in_array($driver, ['oss', 'cos']),
+            'use_path_style_endpoint' => $driver === 'r2',
             'throw' => true,
         ];
 
         config(['filesystems.disks.dynamic_s3' => $config]);
+    }
+
+    protected function publicUrl(string $driver, string $key): string
+    {
+        $customUrl = rtrim(\App\Models\SiteSetting::get('storage_url', ''), '/');
+        if ($customUrl !== '') {
+            return $customUrl . '/' . ltrim($key, '/');
+        }
+
+        $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
+        $endpoint = rtrim(\App\Models\SiteSetting::get('storage_endpoint', ''), '/');
+        if ($endpoint === '') {
+            return $key;
+        }
+
+        $parts = parse_url($endpoint);
+        $scheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'] ?? '';
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $path = rtrim($parts['path'] ?? '', '/');
+
+        if ($host === '') {
+            return $endpoint . '/' . ltrim($key, '/');
+        }
+
+        if ($bucket !== '' && in_array($driver, ['oss', 'cos'], true) && !str_starts_with($host, $bucket . '.')) {
+            $host = $bucket . '.' . $host;
+        }
+
+        return "{$scheme}://{$host}{$port}{$path}/" . ltrim($key, '/');
+    }
+
+    protected function apiEndpoint(string $driver, string $endpoint, string $bucket): string
+    {
+        if ($bucket === '' || !in_array($driver, ['oss', 'cos'], true)) {
+            return $endpoint;
+        }
+
+        $parts = parse_url($endpoint);
+        $host = $parts['host'] ?? '';
+        if ($host === '' || !str_starts_with($host, $bucket . '.')) {
+            return $endpoint;
+        }
+
+        $parts['host'] = substr($host, strlen($bucket) + 1);
+
+        $scheme = $parts['scheme'] ?? 'https';
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $path = $parts['path'] ?? '';
+
+        return "{$scheme}://{$parts['host']}{$port}{$path}";
     }
 }
