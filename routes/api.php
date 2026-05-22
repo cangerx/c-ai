@@ -170,7 +170,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/reverse-prompt', function (\Illuminate\Http\Request $request) {
         $data = $request->validate([
-            'image_url' => 'required|string|max:4096',
+            'image_url' => 'required|string|max:20000000',
             'prompt' => 'nullable|string|max:4000',
         ]);
 
