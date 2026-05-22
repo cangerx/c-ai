@@ -94,7 +94,7 @@ Route::get('/config', function (\Illuminate\Http\Request $request) {
             : (int) \App\Models\SiteSetting::get('billing_per_generation', 1);
 
         return [
-            'site_name' => $agentSite?->site_name ?: \App\Models\SiteSetting::get('site_name', 'CANG-AI'),
+            'site_name' => $agentSite?->site_name ?: \App\Models\SiteSetting::get('site_name', 'Visionary AI'),
             'site_description' => $agentSite?->seo_description ?: \App\Models\SiteSetting::get('site_description', ''),
             'site_keywords' => $agentSite?->seo_keywords ?: \App\Models\SiteSetting::get('site_keywords', ''),
             'prompt_tool_model' => \App\Models\SiteSetting::get('prompt_tool_model', 'gpt-5.4-mini'),
