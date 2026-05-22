@@ -4,16 +4,16 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                 <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">后端版本</h3>
-                <p class="text-sm font-mono text-gray-900 dark:text-white">{{ $this->version['backend_commit'] }}</p>
-                @if($this->version['backend_date'])
-                    <p class="text-xs text-gray-400 mt-1">{{ $this->version['backend_date'] }}</p>
+                <p class="text-sm font-mono text-gray-900 dark:text-white">{{ $versionInfo['backend_commit'] ?? '未知' }}</p>
+                @if(!empty($versionInfo['backend_date']))
+                    <p class="text-xs text-gray-400 mt-1">{{ $versionInfo['backend_date'] }}</p>
                 @endif
             </div>
             <div class="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
                 <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">前端版本</h3>
-                <p class="text-sm font-mono text-gray-900 dark:text-white">{{ $this->version['frontend_commit'] }}</p>
-                @if($this->version['frontend_date'])
-                    <p class="text-xs text-gray-400 mt-1">{{ $this->version['frontend_date'] }}</p>
+                <p class="text-sm font-mono text-gray-900 dark:text-white">{{ $versionInfo['frontend_commit'] ?? '未知' }}</p>
+                @if(!empty($versionInfo['frontend_date']))
+                    <p class="text-xs text-gray-400 mt-1">{{ $versionInfo['frontend_date'] }}</p>
                 @endif
             </div>
         </div>

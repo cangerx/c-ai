@@ -6,7 +6,6 @@ use BackedEnum;
 use UnitEnum;
 use Filament\Pages\Page;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\Process;
 
 class SystemUpgrade extends Page
 {
@@ -19,11 +18,14 @@ class SystemUpgrade extends Page
 
     public string $log = '';
     public bool $running = false;
+    public array $versionInfo = [];
 
-    /**
-     * 获取当前版本信息
-     */
-    public function getVersionProperty(): array
+    public function mount(): void
+    {
+        $this->versionInfo = $this->loadVersionInfo();
+    }
+
+    protected function loadVersionInfo(): array
     {
         $appDir = base_path();
         $frontendDir = env('FRONTEND_DIR', dirname($appDir) . '/cang-ai-web');
@@ -60,6 +62,7 @@ class SystemUpgrade extends Page
 
         $this->appendLog('');
         $this->appendLog('=== 全栈升级完成 ===');
+        $this->versionInfo = $this->loadVersionInfo();
         $this->running = false;
 
         Notification::make()->title('全栈升级完成')->success()->send();
@@ -75,6 +78,7 @@ class SystemUpgrade extends Page
 
         $this->upgradeBackendInternal();
 
+        $this->versionInfo = $this->loadVersionInfo();
         $this->running = false;
         Notification::make()->title('后端升级完成')->success()->send();
     }
@@ -89,6 +93,7 @@ class SystemUpgrade extends Page
 
         $this->upgradeFrontendInternal();
 
+        $this->versionInfo = $this->loadVersionInfo();
         $this->running = false;
         Notification::make()->title('前端升级完成')->success()->send();
     }
@@ -192,10 +197,9 @@ class SystemUpgrade extends Page
 
     protected function runShell(string $cmd, int $timeout = 60): string
     {
-        $output = '';
-        $process = Process::timeout($timeout)->run($cmd);
-        $output = trim($process->output() . "\n" . $process->errorOutput());
-        return $output ?: '(无输出)';
+        $fullCmd = "timeout {$timeout} {$cmd}";
+        $output = shell_exec($fullCmd) ?? '';
+        return trim($output) ?: '(无输出)';
     }
 
     protected function appendLog(string $line): void
