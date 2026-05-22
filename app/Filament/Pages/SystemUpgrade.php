@@ -135,7 +135,7 @@ class SystemUpgrade extends Page
         $this->appendLog('→ 检查 PHP 依赖...');
         $composerBin = $this->findComposerBin();
         if ($phpBin && $composerBin) {
-            $result = $this->runShell("{$phpBin} {$composerBin} install --no-dev --optimize-autoloader --no-interaction 2>&1", 120);
+            $result = $this->runShell("cd {$appDir} && {$phpBin} {$composerBin} install --no-dev --optimize-autoloader --no-interaction 2>&1", 120);
             $this->appendLog($result);
         } else {
             $this->appendLog('⚠ PHP/Composer 路径未找到，跳过依赖安装');

@@ -54,7 +54,8 @@ class GenerateController extends Controller
 
         $count = max(1, min(4, (int) $request->input('count', 1)));
         $model = $request->input('model', 'gpt-image-2');
-        $size = $request->input('size', 'auto');
+        $requestedSize = $request->input('size', 'auto');
+        $size = $this->normalizeImageSize($requestedSize);
         $agentSite = AgentSite::resolveForHost($request->getHost());
 
         // 校验模型配置（如果 ai_models 表有记录则验证）
@@ -173,9 +174,9 @@ class GenerateController extends Controller
                 'user_id' => $user->id,
                 'status' => 'pending',
                 'mode' => $mode,
-                'model' => $request->input('model', 'gpt-image-2'),
+                'model' => $model,
                 'prompt' => $prompt,
-                'size' => $request->input('size', 'auto'),
+                'size' => $size,
                 'quality' => $quality,
                 'count' => $count,
                 'is_public' => (bool) $request->input('public', false),
@@ -214,6 +215,28 @@ class GenerateController extends Controller
                 'balance' => $user->balance,
             ],
         ]);
+    }
+
+    protected function normalizeImageSize(string $size): string
+    {
+        $map = [
+            '1:1' => '1024x1024',
+            '3:2' => '1536x1024',
+            '2:3' => '1024x1536',
+            '16:9' => '1824x1024',
+            '9:16' => '1024x1824',
+            '4:3' => '1536x1152',
+            '3:4' => '1152x1536',
+            '5:4' => '1280x1024',
+            '4:5' => '1024x1280',
+            '2:1' => '1536x768',
+            '1:2' => '768x1536',
+            '3:1' => '1536x512',
+            '1:3' => '512x1536',
+            '21:9' => '1792x768',
+        ];
+
+        return $map[$size] ?? $size;
     }
 
     public function status(Request $request): JsonResponse
