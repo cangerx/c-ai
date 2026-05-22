@@ -174,12 +174,16 @@ Route::middleware('auth:sanctum')->group(function () {
             'prompt' => 'nullable|string|max:4000',
         ]);
 
-        $result = app(\App\Services\ReversePromptService::class)->analyze(
-            $data['image_url'],
-            $data['prompt'] ?? null
-        );
-
-        return response()->json($result);
+        try {
+            $result = app(\App\Services\ReversePromptService::class)->analyze(
+                $data['image_url'],
+                $data['prompt'] ?? null
+            );
+            return response()->json($result);
+        } catch (\Throwable $e) {
+            \Log::warning('反推失败', ['error' => $e->getMessage()]);
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     })->middleware('throttle:20,1');
 
     Route::post('/prompt-tool', function (\Illuminate\Http\Request $request) {
