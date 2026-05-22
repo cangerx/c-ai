@@ -203,13 +203,8 @@ class SystemUpgrade extends Page
         $result = $this->runShell("cd {$frontendDir} && {$npmBin} install 2>&1", 120);
         $this->appendLog($result);
 
-        // 3. Clean old build to avoid serving stale content
-        $this->appendLog('→ 清理旧构建产物...');
-        $this->runShell("rm -rf {$frontendDir}/.next 2>&1");
-        $this->appendLog('✓ 旧 .next 已清除');
-
-        // 4. Build
-        $this->appendLog('→ 构建前端（需要 1-3 分钟）...');
+        // 3. Build (next build with cleanDistDir:true will clean .next automatically)
+        $this->appendLog('→ 构建前端（需要 1-3 分钟，期间前端短暂不可用）...');
         $result = $this->runShell("cd {$frontendDir} && NODE_OPTIONS='--max-old-space-size=1024' {$npmBin} run build 2>&1", 300);
         $this->appendLog($result);
 
