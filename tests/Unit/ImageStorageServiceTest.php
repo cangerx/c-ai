@@ -82,6 +82,49 @@ class ImageStorageServiceTest extends TestCase
         $this->assertContains('short-term.oss-cn-hangzhou.aliyuncs.com', $profiles->allowedHosts());
     }
 
+    public function test_key_from_url_respects_storage_purpose_profile(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+        \App\Models\SiteSetting::set('storage_url', 'https://cdn.example.com/media', 'storage');
+
+        \App\Models\SiteSetting::set('storage_temp_driver', 'oss', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_access_key', 'temp-key', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_secret_key', 'temp-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_bucket', 'short-term', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_endpoint', 'https://oss-cn-hangzhou.aliyuncs.com', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_url', 'https://tmp.example.com/temp-media', 'storage');
+
+        $this->assertSame(
+            'images/20260523/result.png',
+            $this->service->keyFromUrl('https://cdn.example.com/media/images/20260523/result.png', StorageProfileService::PURPOSE_GENERATED),
+        );
+
+        $this->assertSame(
+            'uploads/20260523/input.png',
+            $this->service->keyFromUrl('https://tmp.example.com/temp-media/uploads/20260523/input.png', StorageProfileService::PURPOSE_UPLOAD),
+        );
+    }
+
+    public function test_generated_public_url_uses_bucket_endpoint_when_no_cdn_url(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'oss', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://oss-cn-hangzhou.aliyuncs.com', 'storage');
+
+        $url = app(StorageProfileService::class)->publicUrl(
+            StorageProfileService::PURPOSE_GENERATED,
+            'images/20260523/result.png',
+        );
+
+        $this->assertSame('https://long-term.oss-cn-hangzhou.aliyuncs.com/images/20260523/result.png', $url);
+    }
+
     public function test_backup_profile_does_not_fall_back_to_default_storage(): void
     {
         \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');

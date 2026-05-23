@@ -248,19 +248,30 @@ class SystemBackupService
             'driver' => $profiles->driverForPurpose(StorageProfileService::PURPOSE_BACKUP),
             'uploaded_at' => now()->toDateTimeString(),
         ];
-        $this->rewriteManifest($path, $manifest);
+
+        $uploadPath = $this->copyWithManifest($path, $manifest);
 
         $disk = $profiles->disk(StorageProfileService::PURPOSE_BACKUP);
-        $stream = fopen($path, 'rb');
+        $stream = fopen($uploadPath, 'rb');
         if ($stream === false) {
+            @unlink($uploadPath);
             throw new RuntimeException('无法读取本地备份文件用于远端同步');
         }
 
         try {
             $disk->put($key, $stream, ['ContentType' => 'application/gzip', 'visibility' => 'private']);
+            fclose($stream);
+            $stream = null;
+
+            if (!rename($uploadPath, $path)) {
+                throw new RuntimeException('远端备份已上传，但本地备份清单更新失败');
+            }
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
+            }
+            if (is_file($uploadPath)) {
+                @unlink($uploadPath);
             }
         }
 
@@ -287,15 +298,27 @@ class SystemBackupService
 
     protected function rewriteManifest(string $archive, array $manifest): void
     {
+        $rewritten = $this->copyWithManifest($archive, $manifest);
+        if (!rename($rewritten, $archive)) {
+            @unlink($rewritten);
+            throw new RuntimeException('备份清单更新失败');
+        }
+    }
+
+    protected function copyWithManifest(string $archive, array $manifest): string
+    {
         $this->ensureCommandExists('tar');
 
         $workDir = sys_get_temp_dir() . '/cang-ai-backup-manifest-' . bin2hex(random_bytes(3));
+        $target = sys_get_temp_dir() . '/cang-ai-backup-rewrite-' . bin2hex(random_bytes(3)) . '.tar.gz';
         $this->ensureDirectory($workDir);
 
         try {
             $this->run('tar -xzf ' . escapeshellarg($archive) . ' -C ' . escapeshellarg($workDir) . ' 2>&1', 300);
             file_put_contents($workDir . '/manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-            $this->run('cd ' . escapeshellarg($workDir) . ' && tar -czf ' . escapeshellarg($archive) . ' . 2>&1', 300);
+            $this->run('cd ' . escapeshellarg($workDir) . ' && tar -czf ' . escapeshellarg($target) . ' . 2>&1', 300);
+
+            return $target;
         } finally {
             $this->run('rm -rf ' . escapeshellarg($workDir), 60, false);
         }

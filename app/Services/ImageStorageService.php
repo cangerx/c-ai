@@ -32,37 +32,13 @@ class ImageStorageService
         $this->disk($purpose)->delete($key);
     }
 
-    public function keyFromUrl(?string $url): ?string
+    public function keyFromUrl(?string $url, string $purpose = StorageProfileService::PURPOSE_GENERATED): ?string
     {
         if (empty($url)) {
             return null;
         }
 
-        if (preg_match('#^/storage/(.+)$#', $url, $m)) {
-            return ltrim($m[1], '/');
-        }
-
-        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
-            return ltrim($url, '/');
-        }
-
-        $path = parse_url($url, PHP_URL_PATH) ?: '';
-        $key = ltrim($path, '/');
-        if ($key === '') {
-            return null;
-        }
-
-        $customPath = trim(parse_url(\App\Models\SiteSetting::get('storage_url', ''), PHP_URL_PATH) ?: '', '/');
-        if ($customPath !== '' && str_starts_with($key, $customPath . '/')) {
-            $key = substr($key, strlen($customPath) + 1);
-        }
-
-        $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
-        if ($bucket !== '' && str_starts_with($key, $bucket . '/')) {
-            $key = substr($key, strlen($bucket) + 1);
-        }
-
-        return $key !== '' ? $key : null;
+        return app(StorageProfileService::class)->keyFromUrl($purpose, $url);
     }
 
     public function fetchRemoteImage(string $url): array
@@ -127,13 +103,20 @@ class ImageStorageService
         config(['filesystems.disks.dynamic_s3_upload_presign' => $config]);
         $client = Storage::disk('dynamic_s3_upload_presign')->getClient();
         $bucket = $config['bucket'] ?? '';
+        $driver = app(StorageProfileService::class)->driverForPurpose(StorageProfileService::PURPOSE_UPLOAD);
 
-        $cmd = $client->getCommand('PutObject', [
+        $putObject = [
             'Bucket' => $bucket,
             'Key' => $key,
             'ContentType' => $mimeType,
-            'ACL' => 'public-read',
-        ]);
+        ];
+        $headers = ['Content-Type' => $mimeType];
+        if ($driver !== 'r2') {
+            $putObject['ACL'] = 'public-read';
+            $headers['x-amz-acl'] = 'public-read';
+        }
+
+        $cmd = $client->getCommand('PutObject', $putObject);
 
         $presigned = $client->createPresignedRequest($cmd, '+5 minutes');
         $url = (string) $presigned->getUri();
@@ -144,7 +127,7 @@ class ImageStorageService
             'url' => $url,
             'key' => $key,
             'final_url' => $this->url($key, StorageProfileService::PURPOSE_UPLOAD),
-            'headers' => ['Content-Type' => $mimeType, 'x-amz-acl' => 'public-read'],
+            'headers' => $headers,
         ];
     }
 

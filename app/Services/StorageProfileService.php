@@ -79,12 +79,57 @@ class StorageProfileService
         return "{$scheme}://{$host}{$port}{$path}/" . ltrim($key, '/');
     }
 
+    public function keyFromUrl(string $purpose, string $url): ?string
+    {
+        if ($url === '') {
+            return null;
+        }
+
+        if (preg_match('#^/storage/(.+)$#', $url, $m)) {
+            return ltrim($m[1], '/');
+        }
+
+        if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+            return ltrim($url, '/');
+        }
+
+        $profile = $this->profileForPurpose($purpose);
+        $key = ltrim(parse_url($url, PHP_URL_PATH) ?: '', '/');
+        if ($key === '') {
+            return null;
+        }
+
+        foreach (['url', 'endpoint'] as $field) {
+            $basePath = trim(parse_url($this->setting($profile, $field), PHP_URL_PATH) ?: '', '/');
+            if ($basePath !== '' && str_starts_with($key, $basePath . '/')) {
+                $key = substr($key, strlen($basePath) + 1);
+                break;
+            }
+        }
+
+        $bucket = $this->setting($profile, 'bucket');
+        if ($bucket !== '' && str_starts_with($key, $bucket . '/')) {
+            $key = substr($key, strlen($bucket) + 1);
+        }
+
+        return $key !== '' ? $key : null;
+    }
+
     public function s3ConfigForPurpose(string $purpose): array
     {
         $profile = $this->profileForPurpose($purpose);
         $driver = $this->driver($profile);
 
         return $this->s3Config($profile, $driver);
+    }
+
+    public function testWrite(string $purpose): void
+    {
+        $disk = $this->disk($purpose);
+        $key = 'test/' . bin2hex(random_bytes(4)) . '.txt';
+
+        $disk->put($key, 'connection-test');
+        $disk->delete($key);
     }
 
     public function allowedHosts(array $profiles = ['default', 'temp']): array

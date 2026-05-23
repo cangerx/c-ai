@@ -40,11 +40,12 @@ class CleanExpiredImages extends Command
                     continue;
                 }
 
-                $key = $item['key'] ?? $storage->keyFromUrl($item['url'] ?? null);
+                $purpose = $item['purpose'] ?? StorageProfileService::PURPOSE_GENERATED;
+                $key = $item['key'] ?? $storage->keyFromUrl($item['url'] ?? null, $purpose);
                 if ($key) {
                     $objects[] = [
                         'key' => $key,
-                        'purpose' => $item['purpose'] ?? StorageProfileService::PURPOSE_GENERATED,
+                        'purpose' => $purpose,
                     ];
                 }
             }

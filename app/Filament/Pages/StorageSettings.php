@@ -17,7 +17,8 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Support\Facades\Storage;
+use App\Services\ImageStorageService;
+use App\Services\StorageProfileService;
 
 class StorageSettings extends Page implements HasForms
 {
@@ -461,25 +462,47 @@ class StorageSettings extends Page implements HasForms
             ->icon('heroicon-o-signal')
             ->color('info')
             ->action(function () {
-                $driver = SiteSetting::get('storage_driver', 'local');
-                if (!in_array($driver, ['oss', 'cos', 'r2'])) {
+                $profiles = app(StorageProfileService::class);
+                $checks = [
+                    '长期生成图片' => StorageProfileService::PURPOSE_GENERATED,
+                    '上传/下载临时图' => StorageProfileService::PURPOSE_UPLOAD,
+                    '系统备份' => StorageProfileService::PURPOSE_BACKUP,
+                ];
+                $tested = [];
+
+                foreach ($checks as $label => $purpose) {
+                    if (!$profiles->isCloud($purpose)) {
+                        continue;
+                    }
+
+                    $profile = $profiles->profileForPurpose($purpose);
+                    if (isset($tested[$profile])) {
+                        continue;
+                    }
+
+                    $tested[$profile] = ['label' => $label, 'purpose' => $purpose];
+                }
+
+                if (empty($tested)) {
                     Notification::make()
-                        ->title('当前驱动无需测试')
-                        ->body('本地存储不需要连接测试。')
+                        ->title('当前配置无需测试')
+                        ->body('当前没有启用远端对象存储，本地存储不需要连接测试。')
                         ->warning()
                         ->send();
                     return;
                 }
                 try {
-                    $disk = $this->buildDynamicDisk($driver);
-                    $key = 'test/' . bin2hex(random_bytes(4)) . '.txt';
-                    $disk->put($key, 'connection-test');
-                    $disk->delete($key);
+                    foreach ($tested as $test) {
+                        $profiles->testWrite($test['purpose']);
+                    }
+
+                    $labels = array_column($tested, 'label');
+
                     SiteSetting::set('storage_last_test_at', now()->toDateTimeString(), 'storage');
                     SiteSetting::set('storage_last_test_ok', '1', 'storage');
-                    SiteSetting::set('storage_last_test_msg', '连接正常', 'storage');
+                    SiteSetting::set('storage_last_test_msg', '连接正常：' . implode('、', $labels), 'storage');
                     $this->refreshSummary();
-                    Notification::make()->title('连接测试成功')->body('存储服务可用。')->success()->send();
+                    Notification::make()->title('连接测试成功')->body('已验证：' . implode('、', $labels))->success()->send();
                 } catch (\Throwable $e) {
                     SiteSetting::set('storage_last_test_at', now()->toDateTimeString(), 'storage');
                     SiteSetting::set('storage_last_test_ok', '0', 'storage');
@@ -497,21 +520,12 @@ class StorageSettings extends Page implements HasForms
             ->icon('heroicon-o-photo')
             ->color('gray')
             ->action(function () {
-                $driver = SiteSetting::get('storage_driver', 'local');
                 try {
-                    // 生成一张 1×1 的 PNG（base64 解出）
                     $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
-                    $key = 'probe/probe-' . date('YmdHis') . '-' . bin2hex(random_bytes(3)) . '.png';
-
-                    if ($driver === 'local') {
-                        Storage::disk('public')->put($key, $png);
-                        $url = Storage::disk('public')->url($key);
-                    } else {
-                        $disk = $this->buildDynamicDisk($driver);
-                        $disk->put($key, $png);
-                        $base = rtrim(SiteSetting::get('storage_url', '') ?: SiteSetting::get('storage_endpoint', ''), '/');
-                        $url = $base ? ($base . '/' . ltrim($key, '/')) : $key;
-                    }
+                    $storage = app(ImageStorageService::class);
+                    $purpose = StorageProfileService::PURPOSE_GENERATED;
+                    $key = $storage->store($png, 'image/png', $purpose);
+                    $url = $storage->url($key, $purpose);
 
                     Notification::make()
                         ->title('测试图片已上传')
@@ -527,36 +541,5 @@ class StorageSettings extends Page implements HasForms
                         ->send();
                 }
             });
-    }
-
-    private function buildDynamicDisk(string $driver)
-    {
-        $key      = SiteSetting::get('storage_access_key', '');
-        $secret   = SiteSetting::get('storage_secret_key', '');
-        $bucket   = SiteSetting::get('storage_bucket', '');
-        $endpoint = SiteSetting::get('storage_endpoint', '');
-
-        $missing = [];
-        if (!filled($key)) $missing[] = 'Access Key';
-        if (!filled($secret)) $missing[] = 'Secret';
-        if (!filled($bucket)) $missing[] = 'Bucket';
-        if (!filled($endpoint)) $missing[] = 'Endpoint';
-        if ($missing) {
-            throw new \RuntimeException('凭证不完整，缺少：' . implode('、', $missing));
-        }
-
-        $config = [
-            'driver' => 's3',
-            'key' => $key,
-            'secret' => $secret,
-            'region' => SiteSetting::get('storage_region', 'auto') ?: 'auto',
-            'bucket' => $bucket,
-            'endpoint' => $endpoint,
-            'url' => SiteSetting::get('storage_url', ''),
-            'use_path_style_endpoint' => in_array($driver, ['oss', 'cos']),
-            'throw' => true,
-        ];
-        config(['filesystems.disks.dynamic_s3_test' => $config]);
-        return Storage::disk('dynamic_s3_test');
     }
 }
