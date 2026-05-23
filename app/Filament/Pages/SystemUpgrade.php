@@ -4,11 +4,17 @@ namespace App\Filament\Pages;
 
 use BackedEnum;
 use UnitEnum;
+use App\Services\System\SystemBackupService;
+use App\Services\System\SystemRestoreService;
+use App\Services\System\VersionCheckService;
 use Filament\Pages\Page;
 use Filament\Notifications\Notification;
+use Livewire\WithFileUploads;
 
 class SystemUpgrade extends Page
 {
+    use WithFileUploads;
+
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-arrow-path';
     protected static ?string $navigationLabel = '系统升级';
     protected static ?string $title = '系统升级';
@@ -19,26 +25,20 @@ class SystemUpgrade extends Page
     public string $log = '';
     public bool $running = false;
     public array $versionInfo = [];
+    public array $backups = [];
+    public mixed $backupUpload = null;
+    public string $backupImportPath = '';
 
     public function mount(): void
     {
-        $this->versionInfo = $this->loadVersionInfo();
+        $this->refreshState();
     }
 
-    protected function loadVersionInfo(): array
+    protected function refreshState(?VersionCheckService $versions = null, ?SystemBackupService $backups = null, bool $forceVersions = false): void
     {
-        $appDir = base_path();
-        $frontendDir = env('FRONTEND_DIR', dirname($appDir) . '/cang-ai-web');
-
-        $backendCommit = trim(shell_exec("cd {$appDir} && git log -1 --format='%h %s' 2>/dev/null") ?: '未知');
-        $backendDate = trim(shell_exec("cd {$appDir} && git log -1 --format='%ci' 2>/dev/null") ?: '');
-        $frontendCommit = is_dir($frontendDir)
-            ? trim(shell_exec("cd {$frontendDir} && git log -1 --format='%h %s' 2>/dev/null") ?: '未知')
-            : '未部署';
-        $frontendDate = is_dir($frontendDir)
-            ? trim(shell_exec("cd {$frontendDir} && git log -1 --format='%ci' 2>/dev/null") ?: '')
-            : '';
-
+        $versions ??= app(VersionCheckService::class);
+        $backups ??= app(SystemBackupService::class);
+        $info = $versions->load($forceVersions);
         $workerCount = trim(shell_exec("pgrep -f 'task:worker' 2>/dev/null | wc -l") ?: '0');
         $pm2 = $this->findPm2Bin();
         if ($pm2) {
@@ -46,13 +46,109 @@ class SystemUpgrade extends Page
             $workerCount = $pm2Online;
         }
 
-        return [
-            'backend_commit' => $backendCommit,
-            'backend_date' => $backendDate,
-            'frontend_commit' => $frontendCommit,
-            'frontend_date' => $frontendDate,
-            'worker_count' => $workerCount,
-        ];
+        $info['worker_count'] = $workerCount;
+        $this->versionInfo = $info;
+        $this->backups = $backups->list();
+    }
+
+    public function refreshVersions(): void
+    {
+        $this->refreshState(forceVersions: true);
+        Notification::make()->title('版本检测已刷新')->success()->send();
+    }
+
+    public function createBackup(): void
+    {
+        $backups = app(SystemBackupService::class);
+        $this->log = '';
+        $this->running = true;
+
+        try {
+            $this->appendLog('=== 开始系统备份 ===');
+            $backup = $backups->create('manual');
+            $this->appendLog("✓ 备份完成: {$backup['filename']} ({$backup['size_human']})");
+            $this->refreshState(backups: $backups);
+            Notification::make()->title('备份完成')->body($backup['filename'])->success()->send();
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 备份失败：' . $e->getMessage());
+            Notification::make()->title('备份失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->running = false;
+        }
+    }
+
+    public function deleteBackup(string $filename): void
+    {
+        $backups = app(SystemBackupService::class);
+
+        try {
+            $backups->delete($filename);
+            $this->refreshState(backups: $backups);
+            Notification::make()->title('备份已删除')->success()->send();
+        } catch (\Throwable $e) {
+            Notification::make()->title('删除失败')->body($e->getMessage())->danger()->send();
+        }
+    }
+
+    public function restoreBackup(string $filename): void
+    {
+        $backups = app(SystemBackupService::class);
+        $restore = app(SystemRestoreService::class);
+        $this->log = '';
+        $this->running = true;
+
+        try {
+            $this->appendLog('=== 开始恢复备份 ===');
+            $this->appendLog('→ 备份文件: ' . $filename);
+            $restore->restore($backups->pathFor($filename), fn (string $line) => $this->appendLog($line));
+            $this->appendLog('✓ 备份恢复完成');
+            $this->refreshState(backups: $backups);
+            Notification::make()->title('恢复完成')->success()->send();
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 恢复失败：' . $e->getMessage());
+            Notification::make()->title('恢复失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->running = false;
+        }
+    }
+
+    public function importBackup(): void
+    {
+        $this->log = '';
+        $this->running = true;
+
+        try {
+            $this->appendLog('=== 开始导入备份 ===');
+
+            if ($this->backupUpload) {
+                $this->validate([
+                    'backupUpload' => ['required', 'file', 'max:' . $this->maxUploadKilobytes()],
+                ]);
+
+                $backup = app(SystemBackupService::class)->import(
+                    $this->backupUpload->getRealPath(),
+                    $this->backupUpload->getClientOriginalName(),
+                );
+            } else {
+                $path = trim($this->backupImportPath);
+                if ($path === '') {
+                    throw new \RuntimeException('请选择上传文件，或填写服务器备份包路径');
+                }
+
+                $backup = app(SystemBackupService::class)->import($path, basename($path));
+            }
+
+            $this->appendLog("✓ 备份导入完成: {$backup['filename']} ({$backup['size_human']})");
+            $this->backupUpload = null;
+            $this->backupImportPath = '';
+            $this->refreshState(backups: app(SystemBackupService::class));
+            Notification::make()->title('备份导入完成')->body($backup['filename'])->success()->send();
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 导入失败：' . $e->getMessage());
+            Notification::make()->title('导入失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->running = false;
+        }
     }
 
     /**
@@ -65,6 +161,7 @@ class SystemUpgrade extends Page
 
         try {
             $this->appendLog('=== 开始全栈升级 ===');
+            $this->createPreUpgradeBackup();
             $this->upgradeBackendInternal();
             $this->upgradeFrontendInternal();
             $this->appendLog('');
@@ -74,7 +171,7 @@ class SystemUpgrade extends Page
             $this->appendLog('✗ 升级失败：' . $e->getMessage());
             Notification::make()->title('升级失败')->body($e->getMessage())->danger()->send();
         } finally {
-            $this->versionInfo = $this->loadVersionInfo();
+            $this->refreshState();
             $this->running = false;
         }
     }
@@ -88,13 +185,14 @@ class SystemUpgrade extends Page
         $this->running = true;
 
         try {
+            $this->createPreUpgradeBackup();
             $this->upgradeBackendInternal();
             Notification::make()->title('后端升级完成')->success()->send();
         } catch (\Throwable $e) {
             $this->appendLog('✗ 后端升级失败：' . $e->getMessage());
             Notification::make()->title('后端升级失败')->body($e->getMessage())->danger()->send();
         } finally {
-            $this->versionInfo = $this->loadVersionInfo();
+            $this->refreshState();
             $this->running = false;
         }
     }
@@ -108,14 +206,30 @@ class SystemUpgrade extends Page
         $this->running = true;
 
         try {
+            $this->createPreUpgradeBackup();
             $this->upgradeFrontendInternal();
             Notification::make()->title('前端升级完成')->success()->send();
         } catch (\Throwable $e) {
             $this->appendLog('✗ 前端升级失败：' . $e->getMessage());
             Notification::make()->title('前端升级失败')->body($e->getMessage())->danger()->send();
         } finally {
-            $this->versionInfo = $this->loadVersionInfo();
+            $this->refreshState();
             $this->running = false;
+        }
+    }
+
+    protected function createPreUpgradeBackup(): void
+    {
+        try {
+            $this->appendLog('→ 升级前自动备份...');
+            $backup = app(SystemBackupService::class)->create('pre-upgrade');
+            $this->appendLog("✓ 自动备份完成: {$backup['filename']} ({$backup['size_human']})");
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 自动备份失败：' . $e->getMessage());
+            if (!config('system.allow_upgrade_without_backup')) {
+                throw $e;
+            }
+            $this->appendLog('⚠ 已配置允许无备份升级，继续执行');
         }
     }
 
@@ -123,6 +237,7 @@ class SystemUpgrade extends Page
     {
         $appDir = base_path();
         $phpBin = $this->findPhpBin();
+        $release = $this->versionInfo['backend'] ?? [];
 
         $this->appendLog('--- 后端升级 ---');
 
@@ -141,7 +256,10 @@ class SystemUpgrade extends Page
         $this->appendLog('→ 检查 PHP 依赖...');
         $composerBin = $this->findComposerBin();
         if ($phpBin && $composerBin) {
-            $result = $this->runShell("cd {$appDir} && {$phpBin} {$composerBin} install --no-dev --optimize-autoloader --no-interaction 2>&1", 120);
+            $result = $this->runShell(
+                'cd ' . escapeshellarg($appDir) . ' && ' . escapeshellarg($phpBin) . ' ' . escapeshellarg($composerBin) . ' install --no-dev --optimize-autoloader --no-interaction 2>&1',
+                120,
+            );
             $this->appendLog($result);
         } else {
             $this->appendLog('⚠ PHP/Composer 路径未找到，跳过依赖安装');
@@ -149,7 +267,7 @@ class SystemUpgrade extends Page
 
         // 3. Migrate
         $this->appendLog('→ 数据库迁移...');
-        $result = $this->runShell("cd {$appDir} && {$phpBin} artisan migrate --force 2>&1");
+        $result = $this->runShell('cd ' . escapeshellarg($appDir) . ' && ' . escapeshellarg($phpBin) . ' artisan migrate --force 2>&1');
         $this->appendLog($result);
 
         // 4. Clear caches now, rebuild after the Livewire response is sent
@@ -158,7 +276,7 @@ class SystemUpgrade extends Page
             'config:clear', 'cache:clear', 'route:clear', 'view:clear', 'event:clear',
         ];
         foreach ($cacheCommands as $cmd) {
-            $this->runShell("cd {$appDir} && {$phpBin} artisan {$cmd} 2>&1", 60, false);
+            $this->runShell('cd ' . escapeshellarg($appDir) . ' && ' . escapeshellarg($phpBin) . ' artisan ' . escapeshellarg($cmd) . ' 2>&1', 60, false);
         }
         $this->appendLog('✓ 缓存已清除');
 
@@ -178,16 +296,17 @@ class SystemUpgrade extends Page
 
         // 6. Restart workers
         $this->appendLog('→ 重启 Worker...');
-        $result = $this->runShell("cd {$appDir} && {$phpBin} artisan queue:restart 2>&1");
+        $result = $this->runShell('cd ' . escapeshellarg($appDir) . ' && ' . escapeshellarg($phpBin) . ' artisan queue:restart 2>&1');
         $this->appendLog($result);
 
         $pm2 = $this->findPm2Bin();
         if ($pm2) {
-            $this->runShell("{$pm2} restart cang-ai-worker 2>&1", 60, false);
-            $this->runShell("{$pm2} restart cang-ai-worker-2 2>&1", 60, false);
+            $this->runShell(escapeshellarg($pm2) . ' restart cang-ai-worker 2>&1', 60, false);
+            $this->runShell(escapeshellarg($pm2) . ' restart cang-ai-worker-2 2>&1', 60, false);
             $this->appendLog('✓ PM2 Worker 已重启');
         }
 
+        app(VersionCheckService::class)->markInstalled('backend', $release);
         $this->appendLog('✓ 后端升级完成');
     }
 
@@ -195,6 +314,7 @@ class SystemUpgrade extends Page
     {
         $appDir = base_path();
         $frontendDir = env('FRONTEND_DIR', dirname($appDir) . '/cang-ai-web');
+        $release = $this->versionInfo['frontend'] ?? [];
 
         $this->appendLog('--- 前端升级 ---');
 
@@ -202,6 +322,8 @@ class SystemUpgrade extends Page
             $this->appendLog('⚠ 前端目录不存在: ' . $frontendDir);
             return;
         }
+
+        $this->backupFrontendDirectory($frontendDir);
 
         $this->appendLog('→ 当前目录: ' . $frontendDir);
         $this->appendLog('→ 升级来源: ' . $this->frontendReleaseUrl());
@@ -223,12 +345,12 @@ class SystemUpgrade extends Page
 
         // 2. Install dependencies
         $this->appendLog('→ 安装前端依赖...');
-        $result = $this->runShell("cd {$frontendDir} && {$npmBin} install 2>&1", 120);
+        $result = $this->runShell('cd ' . escapeshellarg($frontendDir) . ' && ' . escapeshellarg($npmBin) . ' install 2>&1', 120);
         $this->appendLog($result);
 
         // 3. Build (next build with cleanDistDir:true will clean .next automatically)
         $this->appendLog('→ 构建前端（需要 1-3 分钟，期间前端短暂不可用）...');
-        $result = $this->runShell("cd {$frontendDir} && NODE_OPTIONS='--max-old-space-size=1024' {$npmBin} run build 2>&1", 300);
+        $result = $this->runShell('cd ' . escapeshellarg($frontendDir) . ' && NODE_OPTIONS=' . escapeshellarg('--max-old-space-size=1024') . ' ' . escapeshellarg($npmBin) . ' run build 2>&1', 300);
         $this->appendLog($result);
 
         // 5. Verify build succeeded
@@ -242,38 +364,183 @@ class SystemUpgrade extends Page
         $this->appendLog('→ 部署 standalone 资源...');
 
         // Copy static files into standalone
-        $this->runShell("cp -r {$frontendDir}/.next/static {$standaloneDir}/.next/static 2>&1", 60, false);
+        $this->runShell('mkdir -p ' . escapeshellarg($standaloneDir . '/.next') . ' && rm -rf ' . escapeshellarg($standaloneDir . '/.next/static') . ' && cp -R ' . escapeshellarg($frontendDir . '/.next/static') . ' ' . escapeshellarg($standaloneDir . '/.next/static') . ' 2>&1');
         $this->appendLog('  ✓ static 文件已复制');
 
         // Copy public files into standalone
         if (is_dir("{$frontendDir}/public")) {
-            $this->runShell("cp -r {$frontendDir}/public {$standaloneDir}/public 2>&1", 60, false);
+            $this->runShell('rm -rf ' . escapeshellarg($standaloneDir . '/public') . ' && cp -R ' . escapeshellarg($frontendDir . '/public') . ' ' . escapeshellarg($standaloneDir . '/public') . ' 2>&1');
             $this->appendLog('  ✓ public 文件已复制');
         }
 
         // Copy server.js to project root (PM2 start.sh uses root server.js)
-        $this->runShell("cp {$standaloneDir}/server.js {$frontendDir}/server.js 2>&1");
+        $this->runShell('cp ' . escapeshellarg($standaloneDir . '/server.js') . ' ' . escapeshellarg($frontendDir . '/server.js') . ' 2>&1');
         $this->appendLog('  ✓ server.js 已更新到项目根目录');
 
-        // 7. Restart PM2
-        $pm2 = $this->findPm2Bin();
-        if ($pm2) {
-            $this->appendLog('→ 重启前端服务...');
-            $result = $this->runShell("{$pm2} restart cang-ai-web 2>&1");
-            $this->appendLog($result);
+        // 7. Restart or start PM2
+        $this->restartOrStartFrontend($frontendDir);
 
-            // Verify process is online
-            sleep(2);
-            $status = trim($this->runShell("{$pm2} show cang-ai-web 2>&1 | grep status", 60, false));
-            $this->appendLog('  状态: ' . $status);
+        app(VersionCheckService::class)->markInstalled('frontend', $release);
+        $this->appendLog('✓ 前端升级完成');
+    }
+
+    protected function backupFrontendDirectory(string $frontendDir): void
+    {
+        $this->ensureCommandExists('tar');
+
+        $backupDir = storage_path('app/private/frontend-backups');
+        if (!is_dir($backupDir) && !mkdir($backupDir, 0755, true) && !is_dir($backupDir)) {
+            throw new \RuntimeException('无法创建前端备份目录: ' . $backupDir);
         }
 
-        $this->appendLog('✓ 前端升级完成');
+        $filename = 'cang-ai-frontend-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.tar.gz';
+        $path = $backupDir . '/' . $filename;
+        $excludes = [
+            '--exclude=' . escapeshellarg('node_modules'),
+            '--exclude=' . escapeshellarg('.next/cache'),
+        ];
+        $cmd = 'cd ' . escapeshellarg(dirname($frontendDir)) .
+            ' && tar -czf ' . escapeshellarg($path) . ' ' .
+            implode(' ', $excludes) . ' ' .
+            escapeshellarg(basename($frontendDir)) . ' 2>&1';
+
+        $this->appendLog('→ 前端目录安全备份...');
+        $this->runShell($cmd, 300);
+        $this->pruneFrontendBackups($backupDir);
+        $this->appendLog('✓ 前端目录备份完成: ' . basename($path));
+    }
+
+    protected function pruneFrontendBackups(string $backupDir): void
+    {
+        $keep = max(1, (int) config('system.frontend_backup_keep', 3));
+        $files = glob(rtrim($backupDir, '/') . '/cang-ai-frontend-*.tar.gz') ?: [];
+        rsort($files);
+
+        foreach (array_slice($files, $keep) as $file) {
+            @unlink($file);
+        }
+    }
+
+    protected function restartOrStartFrontend(string $frontendDir): void
+    {
+        $pm2 = $this->findPm2Bin();
+        $node = $this->findNodeBin();
+        $processName = $this->frontendPm2Name();
+        $port = $this->frontendPort();
+
+        if (!$pm2) {
+            $this->appendLog('⚠ pm2 未找到，前端已构建但未自动重启');
+            $this->appendLog("  手动启动: cd {$frontendDir} && PORT={$port} node server.js");
+            return;
+        }
+
+        if (!$node) {
+            $this->appendLog('⚠ node 未找到，前端已构建但未自动重启');
+            return;
+        }
+
+        $this->writeFrontendStartScript($frontendDir, $node, $port);
+
+        $this->appendLog('→ 重启前端服务...');
+        if ($this->pm2ProcessExists($pm2, $processName)) {
+            $result = $this->runShell(
+                'PORT=' . escapeshellarg((string) $port) . ' ' .
+                escapeshellarg($pm2) . ' restart ' . escapeshellarg($processName) . ' --update-env 2>&1',
+                60,
+            );
+            $this->appendLog($result);
+        } else {
+            $this->appendLog("  未找到 PM2 进程 {$processName}，改为自动创建");
+            $result = $this->runShell(
+                'PORT=' . escapeshellarg((string) $port) . ' ' .
+                escapeshellarg($pm2) . ' start ' . escapeshellarg($frontendDir . '/start.sh') .
+                ' --name ' . escapeshellarg($processName) .
+                ' --cwd ' . escapeshellarg($frontendDir) . ' 2>&1',
+                60,
+            );
+            $this->appendLog($result);
+        }
+
+        $this->runShell(escapeshellarg($pm2) . ' save 2>&1', 60, false);
+
+        sleep(2);
+        $status = trim($this->runShell(escapeshellarg($pm2) . ' show ' . escapeshellarg($processName) . ' 2>&1 | grep status', 60, false));
+        $this->appendLog('  状态: ' . ($status ?: '未获取到状态'));
+
+        if (!$this->pm2ProcessOnline($pm2, $processName)) {
+            throw new \RuntimeException("前端 PM2 进程 {$processName} 未处于 online 状态");
+        }
+    }
+
+    protected function writeFrontendStartScript(string $frontendDir, string $node, int $port): void
+    {
+        $node = addcslashes($node, '"\\');
+        $script = implode("\n", [
+            '#!/bin/bash',
+            'cd "$(dirname "$0")"',
+            'export HOSTNAME="${HOSTNAME:-0.0.0.0}"',
+            'export PORT="${PORT:-' . $port . '}"',
+            'exec "' . $node . '" server.js',
+        ]);
+
+        file_put_contents(rtrim($frontendDir, '/') . '/start.sh', $script . "\n");
+        @chmod(rtrim($frontendDir, '/') . '/start.sh', 0755);
+    }
+
+    protected function pm2ProcessExists(string $pm2, string $processName): bool
+    {
+        $list = $this->runShell(escapeshellarg($pm2) . ' jlist 2>/dev/null', 60, false);
+        $processes = json_decode($list, true);
+
+        if (is_array($processes)) {
+            foreach ($processes as $process) {
+                if (($process['name'] ?? null) === $processName) {
+                    return true;
+                }
+            }
+        }
+
+        $plainList = $this->runShell(escapeshellarg($pm2) . ' list 2>/dev/null', 60, false);
+        return str_contains($plainList, $processName);
+    }
+
+    protected function pm2ProcessOnline(string $pm2, string $processName): bool
+    {
+        $list = $this->runShell(escapeshellarg($pm2) . ' jlist 2>/dev/null', 60, false);
+        $processes = json_decode($list, true);
+
+        if (!is_array($processes)) {
+            return false;
+        }
+
+        foreach ($processes as $process) {
+            if (($process['name'] ?? null) === $processName) {
+                return ($process['pm2_env']['status'] ?? null) === 'online';
+            }
+        }
+
+        return false;
+    }
+
+    protected function frontendPm2Name(): string
+    {
+        return config('system.frontend_pm2_name', 'cang-ai-web');
+    }
+
+    protected function frontendPort(): int
+    {
+        return (int) config('system.frontend_port', 3000);
+    }
+
+    protected function maxUploadKilobytes(): int
+    {
+        return max(1, (int) config('system.backup_upload_max_mb', 512)) * 1024;
     }
 
     protected function runShell(string $cmd, int $timeout = 60, bool $throwOnFailure = true): string
     {
-        $fullCmd = "timeout {$timeout} bash -lc " . escapeshellarg($cmd);
+        $timeoutBin = $this->timeoutBin();
+        $fullCmd = ($timeoutBin ? escapeshellcmd($timeoutBin) . " {$timeout} " : '') . 'bash -lc ' . escapeshellarg($cmd);
         $lines = [];
         $exitCode = 0;
         exec($fullCmd, $lines, $exitCode);
@@ -286,6 +553,19 @@ class SystemUpgrade extends Page
         return $output ?: '(无输出)';
     }
 
+    protected function timeoutBin(): ?string
+    {
+        static $bin = false;
+
+        if ($bin !== false) {
+            return $bin ?: null;
+        }
+
+        $bin = trim((string) shell_exec('command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null'));
+
+        return $bin ?: null;
+    }
+
     protected function appendLog(string $line): void
     {
         $this->log .= $line . "\n";
@@ -293,11 +573,19 @@ class SystemUpgrade extends Page
 
     protected function backendReleaseUrl(): string
     {
+        if (empty(env('BACKEND_RELEASE_ZIP_URL')) && !empty($this->versionInfo['backend']['latest_url'])) {
+            return $this->versionInfo['backend']['latest_url'];
+        }
+
         return env('BACKEND_RELEASE_ZIP_URL', 'https://github.com/cangerx/c-ai/archive/refs/heads/main.zip');
     }
 
     protected function frontendReleaseUrl(): string
     {
+        if (empty(env('FRONTEND_RELEASE_ZIP_URL')) && !empty($this->versionInfo['frontend']['latest_url'])) {
+            return $this->versionInfo['frontend']['latest_url'];
+        }
+
         return env('FRONTEND_RELEASE_ZIP_URL', 'https://github.com/cangerx/cang-ai-web/archive/refs/heads/main.zip');
     }
 

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\SubSiteController;
+use App\Services\System\SystemBackupService;
 use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Route;
 
@@ -78,3 +79,10 @@ Route::get('/register', [AuthController::class, 'showRegister'])->name('register
 Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+Route::middleware(['auth', 'role:admin'])->get('/admin/system/backups/{filename}/download', function (string $filename, SystemBackupService $backups) {
+    $path = $backups->pathFor($filename);
+
+    return response()->download($path, $filename, [
+        'Content-Type' => 'application/gzip',
+    ]);
+})->name('admin.system.backups.download');

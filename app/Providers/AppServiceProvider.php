@@ -26,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $loader = $this->app->make(AppLoader::class);
         View::share('appMenuGroups', $loader->getMenuItems());
+        $this->configureLivewireUploads();
 
         // 动态加载邮件配置
         try {
@@ -53,5 +54,17 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(3)->by($request->ip())
                 ->response(fn () => response()->json(['message' => '操作过于频繁，请稍后再试'], 429))
         );
+    }
+
+    protected function configureLivewireUploads(): void
+    {
+        $maxKilobytes = max(1, (int) config('system.backup_upload_max_mb', 512)) * 1024;
+
+        Config::set('livewire.temporary_file_upload.rules', [
+            'required',
+            'file',
+            'max:' . $maxKilobytes,
+        ]);
+        Config::set('livewire.temporary_file_upload.max_upload_time', (int) env('SYSTEM_BACKUP_UPLOAD_MAX_TIME', 30));
     }
 }
