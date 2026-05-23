@@ -128,7 +128,7 @@ class GenerationTaskResource extends Resource
                     ->size('sm')->color('gray'),
 
                 Tables\Columns\TextColumn::make('created_at')->label('创建时间')
-                    ->dateTime('m-d H:i:s')->sortable()->size('sm')->color('gray'),
+                    ->dateTime('m-d H:i:s', config('app.display_timezone'))->sortable()->size('sm')->color('gray'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->label('状态')

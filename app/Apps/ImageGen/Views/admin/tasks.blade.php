@@ -72,6 +72,7 @@
 @endpush
 
 @section('content')
+    @php($displayTimezone = config('app.display_timezone'))
     {{-- 统计看板 --}}
     <div class="stats-grid">
         <div class="stat-card"><div class="stat-label">总任务</div><div class="stat-value">{{ number_format($stats['total']) }}</div></div>
@@ -179,7 +180,7 @@
                                 @endif
                             </td>
                             <td style="font-size:12px; white-space:nowrap; color:var(--text-secondary);">{{ $elapsed }}</td>
-                            <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">{{ $task->created_at?->format('m-d H:i:s') }}</td>
+                            <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">{{ $task->created_at?->timezone($displayTimezone)->format('m-d H:i:s') }}</td>
                             <td><a href="{{ route('admin.image-gen.tasks.show', $task->task_id) }}" class="detail-link">详情 →</a></td>
                         </tr>
                     @empty

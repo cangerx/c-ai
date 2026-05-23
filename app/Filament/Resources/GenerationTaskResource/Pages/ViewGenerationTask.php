@@ -53,9 +53,10 @@ class ViewGenerationTask extends ViewRecord
                 TextEntry::make('input_count')->label('输入图数')->default('0'),
                 TextEntry::make('is_public')->label('公开')
                     ->formatStateUsing(fn ($state) => $state ? '是' : '否'),
-                TextEntry::make('created_at')->label('创建时间')->dateTime('Y-m-d H:i:s'),
+                TextEntry::make('created_at')->label('创建时间')
+                    ->dateTime('Y-m-d H:i:s', config('app.display_timezone')),
                 TextEntry::make('completed_at')->label('完成时间')
-                    ->dateTime('Y-m-d H:i:s')
+                    ->dateTime('Y-m-d H:i:s', config('app.display_timezone'))
                     ->placeholder('—'),
                 TextEntry::make('duration')->label('耗时')
                     ->state(function ($record) {

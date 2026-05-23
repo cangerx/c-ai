@@ -53,6 +53,7 @@
 @endpush
 
 @section('content')
+    @php($displayTimezone = config('app.display_timezone'))
     @if (session('success')) <div class="alert alert-success" style="margin-bottom: 16px;">{{ session('success') }}</div> @endif
     @if (session('error'))   <div class="alert alert-danger"  style="margin-bottom: 16px;">{{ session('error') }}</div>   @endif
 
@@ -196,7 +197,7 @@
                         <div class="col-row"><span class="label">扣次数</span><span class="value">{{ $usageLog->cost_credits }}</span></div>
                         <div class="col-row"><span class="label">扣额度</span><span class="value">¥{{ number_format($usageLog->cost_balance, 2) }}</span></div>
                         <div class="col-row"><span class="label">退款</span><span class="value">
-                            @if($usageLog->refunded_at) <span class="badge badge-success">已退款</span> {{ $usageLog->refunded_at->format('m-d H:i') }}
+                            @if($usageLog->refunded_at) <span class="badge badge-success">已退款</span> {{ $usageLog->refunded_at->timezone($displayTimezone)->format('m-d H:i') }}
                             @else <span class="badge badge-secondary">未退款</span> @endif
                         </span></div>
                     @else
@@ -207,9 +208,9 @@
             <div>
                 <div class="col-inner">
                     <div class="col-title">时间线</div>
-                    <div class="col-row"><span class="label">创建</span><span class="value">{{ $task->created_at->format('m-d H:i:s') }}</span></div>
-                    <div class="col-row"><span class="label">更新</span><span class="value">{{ $task->updated_at->format('m-d H:i:s') }}</span></div>
-                    <div class="col-row"><span class="label">完成</span><span class="value">{{ $task->completed_at ? $task->completed_at->format('m-d H:i:s') : '—' }}</span></div>
+                    <div class="col-row"><span class="label">创建</span><span class="value">{{ $task->created_at->timezone($displayTimezone)->format('m-d H:i:s') }}</span></div>
+                    <div class="col-row"><span class="label">更新</span><span class="value">{{ $task->updated_at->timezone($displayTimezone)->format('m-d H:i:s') }}</span></div>
+                    <div class="col-row"><span class="label">完成</span><span class="value">{{ $task->completed_at ? $task->completed_at->timezone($displayTimezone)->format('m-d H:i:s') : '—' }}</span></div>
                     <div class="col-row"><span class="label">重试</span><span class="value">{{ $task->attempts ?? 0 }} 次</span></div>
                 </div>
             </div>
