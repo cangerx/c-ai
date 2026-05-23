@@ -620,9 +620,10 @@ deploy_frontend() {
     fi
 
     # 检测是否已有 standalone 构建产物（由本地 deploy-frontend.sh 上传）
-    if [ -f "$FRONTEND_DIR/server.js" ]; then
+    if [ -f "$FRONTEND_DIR/.next/standalone/server.js" ]; then
         echo "  ✓ 检测到 standalone 产物，直接启动"
-        start_frontend_standalone
+        prepare_frontend_standalone "$FRONTEND_DIR/.next/standalone"
+        start_frontend_standalone "$FRONTEND_DIR/.next/standalone"
         return 0
     fi
 
@@ -672,9 +673,8 @@ deploy_frontend() {
     # standalone 产物检测
     if [ -f ".next/standalone/server.js" ]; then
         echo "  → 使用 standalone 模式启动"
-        cp -r .next/static .next/standalone/.next/static 2>/dev/null || true
-        [ -d public ] && cp -r public .next/standalone/public 2>/dev/null || true
-        start_frontend_standalone_from ".next/standalone"
+        prepare_frontend_standalone ".next/standalone"
+        start_frontend_standalone ".next/standalone"
     else
         start_frontend_npm
     fi
@@ -682,36 +682,43 @@ deploy_frontend() {
     cd "$APP_DIR"
 }
 
-# 启动 standalone server.js
-start_frontend_standalone() {
-    cd "$FRONTEND_DIR"
-    # 写启动脚本
-    cat > "$FRONTEND_DIR/start.sh" << 'STARTEOF'
-#!/bin/bash
-export PORT=${PORT:-3000}
-export HOSTNAME=0.0.0.0
-exec node server.js
-STARTEOF
-    chmod +x "$FRONTEND_DIR/start.sh"
+prepare_frontend_standalone() {
+    local BUILD_DIR="$1"
 
-    if [ -n "$PM2_BIN" ]; then
-        "$PM2_BIN" delete cang-ai-web 2>/dev/null || true
-        PORT="$FRONTEND_PORT" "$PM2_BIN" start "$FRONTEND_DIR/start.sh" --name "cang-ai-web" --cwd "$FRONTEND_DIR"
-        "$PM2_BIN" save 2>/dev/null || true
-        echo "  ✓ 前端 standalone 运行在 :$FRONTEND_PORT"
-    else
-        echo "  手动启动: cd $FRONTEND_DIR && PORT=$FRONTEND_PORT bash start.sh"
+    rm -rf "$BUILD_DIR/.next/static"
+    mkdir -p "$BUILD_DIR/.next"
+    cp -R "$FRONTEND_DIR/.next/static" "$BUILD_DIR/.next/static" || fail "复制前端 static 失败"
+
+    rm -rf "$BUILD_DIR/public"
+    [ -d "$FRONTEND_DIR/public" ] && cp -R "$FRONTEND_DIR/public" "$BUILD_DIR/public"
+
+    if [ ! -d "$BUILD_DIR/.next/static/chunks" ] || [ -z "$(find "$BUILD_DIR/.next/static/chunks" -name '*.js' -type f | head -1)" ]; then
+        fail "standalone 缺少 static chunks，前端构建产物不完整"
     fi
 }
 
-# 从构建目录启动 standalone
-start_frontend_standalone_from() {
+# 启动 standalone server.js
+start_frontend_standalone() {
     local BUILD_DIR="$1"
-    # 复制到前端根目录
-    cp "$BUILD_DIR/server.js" "$FRONTEND_DIR/server.js" 2>/dev/null || true
-    [ -d "$BUILD_DIR/.next" ] && cp -r "$BUILD_DIR/.next" "$FRONTEND_DIR/" 2>/dev/null || true
-    [ -d "$BUILD_DIR/node_modules" ] && cp -r "$BUILD_DIR/node_modules" "$FRONTEND_DIR/" 2>/dev/null || true
-    start_frontend_standalone
+    cd "$BUILD_DIR"
+    # 写启动脚本
+    cat > "$BUILD_DIR/start.sh" << 'STARTEOF'
+#!/bin/bash
+cd "$(dirname "$0")"
+export PORT=${PORT:-3000}
+export HOSTNAME=${HOSTNAME:-0.0.0.0}
+exec node server.js
+STARTEOF
+    chmod +x "$BUILD_DIR/start.sh"
+
+    if [ -n "$PM2_BIN" ]; then
+        "$PM2_BIN" delete cang-ai-web 2>/dev/null || true
+        PORT="$FRONTEND_PORT" "$PM2_BIN" start "$BUILD_DIR/start.sh" --name "cang-ai-web" --cwd "$BUILD_DIR" || fail "前端 PM2 启动失败"
+        "$PM2_BIN" save 2>/dev/null || true
+        echo "  ✓ 前端 standalone 运行在 :$FRONTEND_PORT"
+    else
+        echo "  手动启动: cd $BUILD_DIR && PORT=$FRONTEND_PORT bash start.sh"
+    fi
 }
 
 # npm start 模式启动
