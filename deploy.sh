@@ -619,18 +619,16 @@ deploy_frontend() {
         return 0
     fi
 
-    # 检测是否已有 standalone 构建产物（由本地 deploy-frontend.sh 上传）
-    if [ -f "$FRONTEND_DIR/.next/standalone/server.js" ]; then
-        echo "  ✓ 检测到 standalone 产物，直接启动"
-        prepare_frontend_standalone "$FRONTEND_DIR/.next/standalone"
-        start_frontend_standalone "$FRONTEND_DIR/.next/standalone"
-        return 0
-    fi
-
     # 检测是否有 npm（服务器构建模式需要）
     if [ -z "$NPM_BIN" ]; then
-        echo "  ⚠ npm 不可用，请使用本地构建模式:"
-        echo "    本地执行: bash deploy-frontend.sh root@服务器IP"
+        if [ -f "$FRONTEND_DIR/.next/standalone/server.js" ]; then
+            echo "  ⚠ npm 不可用，使用现有 standalone 产物重新启动"
+            prepare_frontend_standalone "$FRONTEND_DIR/.next/standalone"
+            start_frontend_standalone "$FRONTEND_DIR/.next/standalone"
+            return 0
+        fi
+
+        echo "  ⚠ npm 不可用，且没有可用 standalone 产物"
         return 0
     fi
 
