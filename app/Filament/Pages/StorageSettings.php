@@ -129,6 +129,12 @@ class StorageSettings extends Page implements HasForms
         if (!$settings['storage_driver']) {
             $settings['storage_driver'] = 'local';
         }
+        if (!$settings['storage_temp_driver']) {
+            $settings['storage_temp_driver'] = 'default';
+        }
+        if (!$settings['storage_backup_driver']) {
+            $settings['storage_backup_driver'] = 'local';
+        }
         $this->form->fill($settings);
         $this->refreshSummary();
         $this->refreshDiagnostics();
@@ -367,20 +373,27 @@ class StorageSettings extends Page implements HasForms
     private function stepRouting(): Step
     {
         return Step::make('用途分流')
-            ->description('长期图、上传图、备份图分开存储')
+            ->description('按用途直接选择存储')
             ->icon('heroicon-o-adjustments-horizontal')
             ->schema([
                 Forms\Components\Placeholder::make('routing_tip')
                     ->label('')
-                    ->content('默认存储用于长期生成图片，建议配置 R2。上传/下载临时图建议配置 OSS/COS 并设置生命周期；系统备份可配置 R2/OSS/COS，留空则只保留本地备份。'),
+                    ->content('先选用途，再选存储。选择“复用默认长期存储”会直接使用第 1、2 步已配置的存储，不需要重复填写。'),
 
                 Grid::make(2)->schema([
                     Forms\Components\Select::make('storage_temp_driver')
                         ->label('上传/下载临时存储')
-                        ->options(collect(self::DRIVERS)->mapWithKeys(fn ($v, $k) => [$k => $v['label']])->all())
-                        ->default('local')
-                        ->helperText('留 local 表示复用默认长期存储')
-                        ->live(),
+                        ->options($this->routingDriverOptions('temp'))
+                        ->default('default')
+                        ->helperText('选择“复用默认长期存储”会直接沿用长期图配置；切换到云厂商会使用独立临时存储。')
+                        ->live()
+                        ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                            $this->applyPurposePreset($set, $get, 'storage_temp', (string) $state);
+                        }),
+                    Forms\Components\Placeholder::make('temp_route_hint')
+                        ->label('')
+                        ->content('这类图片会优先走独立临时桶，方便设置生命周期和自动清理。')
+                        ->columnSpanFull(),
 
                     Forms\Components\TextInput::make('storage_temp_ttl_days')
                         ->label('临时图保留天数')
@@ -396,10 +409,13 @@ class StorageSettings extends Page implements HasForms
 
                 Forms\Components\Select::make('storage_backup_driver')
                     ->label('系统备份远端存储')
-                    ->options(collect(self::DRIVERS)->mapWithKeys(fn ($v, $k) => [$k => $v['label']])->all())
+                    ->options($this->routingDriverOptions('backup'))
                     ->default('local')
-                    ->helperText('配置后，系统备份 tar.gz 会在本地生成后同步到远端')
-                    ->live(),
+                    ->helperText('可复用默认长期存储，也可以选择独立云厂商；如果只想保留本地备份，就保持“本地备份”。')
+                    ->live()
+                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                        $this->applyPurposePreset($set, $get, 'storage_backup', (string) $state);
+                    }),
 
                 Grid::make(2)
                     ->visible(fn (Get $get) => in_array($get('storage_backup_driver'), ['oss', 'cos', 'r2'], true))
@@ -412,23 +428,28 @@ class StorageSettings extends Page implements HasForms
         return [
             Forms\Components\TextInput::make("{$prefix}_access_key")
                 ->label("{$labelPrefix} Access Key")
-                ->prefixIcon('heroicon-o-key'),
+                ->prefixIcon('heroicon-o-key')
+                ->required(fn (Get $get) => in_array($get("{$prefix}_driver"), ['oss', 'cos', 'r2'], true)),
             Forms\Components\TextInput::make("{$prefix}_secret_key")
                 ->label("{$labelPrefix} Secret")
                 ->password()
                 ->revealable()
                 ->dehydrated(fn ($state) => filled($state))
-                ->helperText('留空则保留原值'),
+                ->helperText('留空则保留原值')
+                ->required(fn (Get $get) => in_array($get("{$prefix}_driver"), ['oss', 'cos', 'r2'], true) && !$this->hasStoredSecret($prefix)),
             Forms\Components\TextInput::make("{$prefix}_bucket")
                 ->label("{$labelPrefix} Bucket")
-                ->prefixIcon('heroicon-o-archive-box'),
+                ->prefixIcon('heroicon-o-archive-box')
+                ->required(fn (Get $get) => in_array($get("{$prefix}_driver"), ['oss', 'cos', 'r2'], true)),
             Forms\Components\TextInput::make("{$prefix}_region")
                 ->label("{$labelPrefix} Region")
-                ->prefixIcon('heroicon-o-map-pin'),
+                ->prefixIcon('heroicon-o-map-pin')
+                ->required(fn (Get $get) => in_array($get("{$prefix}_driver"), ['oss', 'cos', 'r2'], true)),
             Forms\Components\TextInput::make("{$prefix}_endpoint")
                 ->label("{$labelPrefix} Endpoint")
                 ->url()
                 ->prefixIcon('heroicon-o-link')
+                ->required(fn (Get $get) => in_array($get("{$prefix}_driver"), ['oss', 'cos', 'r2'], true))
                 ->columnSpanFull(),
             Forms\Components\TextInput::make("{$prefix}_url")
                 ->label("{$labelPrefix} CDN 域名")
@@ -436,6 +457,71 @@ class StorageSettings extends Page implements HasForms
                 ->prefixIcon('heroicon-o-globe-alt')
                 ->columnSpanFull(),
         ];
+    }
+
+    private function routingDriverOptions(string $purpose): array
+    {
+        $options = [
+            'default' => '复用默认长期存储',
+            'local' => $purpose === 'backup' ? '本地备份' : '本地临时存储',
+            'oss' => self::DRIVERS['oss']['label'],
+            'cos' => self::DRIVERS['cos']['label'],
+            'r2' => self::DRIVERS['r2']['label'],
+        ];
+
+        if ($purpose !== 'backup') {
+            unset($options['local']);
+        }
+
+        return $options;
+    }
+
+    private function applyPurposePreset(Set $set, Get $get, string $targetPrefix, string $driver): void
+    {
+        if (in_array($driver, ['default', 'local'], true) || !isset(self::DRIVERS[$driver])) {
+            return;
+        }
+
+        $defaultDriver = (string) ($get('storage_driver') ?: 'local');
+        $defaultFields = [
+            'access_key' => (string) $get('storage_access_key'),
+            'bucket' => (string) $get('storage_bucket'),
+            'region' => (string) $get('storage_region'),
+            'endpoint' => (string) $get('storage_endpoint'),
+            'url' => (string) $get('storage_url'),
+        ];
+        $sampleFields = [
+            'bucket' => self::SAMPLES[$driver]['storage_bucket'] ?? '',
+            'region' => self::SAMPLES[$driver]['storage_region'] ?? '',
+            'endpoint' => self::SAMPLES[$driver]['storage_endpoint'] ?? '',
+        ];
+
+        foreach (['access_key', 'secret_key', 'bucket', 'region', 'endpoint', 'url'] as $field) {
+            if ($field === 'secret_key') {
+                continue;
+            }
+
+            $targetKey = "{$targetPrefix}_{$field}";
+            if (filled($get($targetKey))) {
+                continue;
+            }
+
+            $value = '';
+            if ($driver === $defaultDriver) {
+                $value = $defaultFields[$field] ?? '';
+            } elseif (isset($sampleFields[$field])) {
+                $value = $sampleFields[$field];
+            }
+
+            if ($value !== '') {
+                $set($targetKey, $value);
+            }
+        }
+    }
+
+    private function hasStoredSecret(string $prefix): bool
+    {
+        return filled(SiteSetting::get("{$prefix}_secret_key", ''));
     }
 
     public function save(): void

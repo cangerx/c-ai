@@ -229,10 +229,21 @@ class StorageProfileService
     public function profileForPurpose(string $purpose): string
     {
         return match ($purpose) {
-            self::PURPOSE_UPLOAD, self::PURPOSE_DOWNLOAD => $this->isConfigured('temp') ? 'temp' : 'default',
-            self::PURPOSE_BACKUP => 'backup',
+            self::PURPOSE_UPLOAD, self::PURPOSE_DOWNLOAD => $this->routedProfile('temp'),
+            self::PURPOSE_BACKUP => $this->routedProfile('backup'),
             default => 'default',
         };
+    }
+
+    protected function routedProfile(string $profile): string
+    {
+        $driver = $this->driver($profile);
+
+        if ($driver === 'default' || ($profile === 'temp' && $driver === 'local')) {
+            return 'default';
+        }
+
+        return $profile;
     }
 
     protected function isConfigured(string $profile): bool
@@ -276,12 +287,17 @@ class StorageProfileService
     {
         $driver = $this->setting($profile, 'driver') ?: 'local';
 
+        if ($profile !== 'default' && $driver === 'default') {
+            return 'default';
+        }
+
         return in_array($driver, ['local', 'oss', 'cos', 'r2'], true) ? $driver : 'local';
     }
 
     protected function driverLabel(string $driver): string
     {
         return match ($driver) {
+            'default' => '复用默认长期存储',
             'oss' => '阿里云 OSS',
             'cos' => '腾讯云 COS',
             'r2' => 'Cloudflare R2',

@@ -317,8 +317,8 @@
         <div class="ss-hero" style="margin-top:-.5rem;">
             <div class="ss-hero-top" style="align-items:flex-start;">
                 <div>
-                    <div style="font-size:15px;font-weight:700;color:#111827">用途分流诊断</div>
-                    <div class="ss-hero-sub">长期图、临时图、系统备份的实际落点和配置完整性</div>
+                    <div style="font-size:15px;font-weight:700;color:#111827">用途池概览</div>
+                    <div class="ss-hero-sub">看每个用途当前实际落到哪个存储池，以及是否已配置完成</div>
                 </div>
             </div>
             <div class="ss-summary">

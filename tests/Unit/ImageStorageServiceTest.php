@@ -166,4 +166,51 @@ class ImageStorageServiceTest extends TestCase
         $this->assertTrue($profiles->isCloud(StorageProfileService::PURPOSE_BACKUP));
         $this->assertSame('backup-bucket', $profiles->s3ConfigForPurpose(StorageProfileService::PURPOSE_BACKUP)['bucket']);
     }
+
+    public function test_temp_profile_reuses_default_bucket_when_selected(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_driver', 'default', 'storage');
+
+        $profiles = app(StorageProfileService::class);
+
+        $this->assertSame('default', $profiles->profileForPurpose(StorageProfileService::PURPOSE_GENERATED));
+        $this->assertSame('default', $profiles->profileForPurpose(StorageProfileService::PURPOSE_UPLOAD));
+        $this->assertSame('long-term', $profiles->s3ConfigForPurpose(StorageProfileService::PURPOSE_UPLOAD)['bucket']);
+    }
+
+    public function test_legacy_local_temp_profile_still_reuses_default_bucket(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_driver', 'local', 'storage');
+
+        $profiles = app(StorageProfileService::class);
+
+        $this->assertSame('default', $profiles->profileForPurpose(StorageProfileService::PURPOSE_UPLOAD));
+        $this->assertSame('long-term', $profiles->s3ConfigForPurpose(StorageProfileService::PURPOSE_UPLOAD)['bucket']);
+    }
+
+    public function test_backup_profile_can_reuse_default_bucket_when_selected(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+        \App\Models\SiteSetting::set('storage_backup_driver', 'default', 'storage');
+
+        $profiles = app(StorageProfileService::class);
+
+        $this->assertSame('default', $profiles->profileForPurpose(StorageProfileService::PURPOSE_BACKUP));
+        $this->assertTrue($profiles->isCloud(StorageProfileService::PURPOSE_BACKUP));
+        $this->assertSame('long-term', $profiles->s3ConfigForPurpose(StorageProfileService::PURPOSE_BACKUP)['bucket']);
+    }
 }
