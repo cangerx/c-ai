@@ -126,9 +126,10 @@ class SystemUpgrade extends Page
 
         $this->appendLog('--- 后端升级 ---');
 
-        // 1. Git pull
+        $this->appendLog('→ 当前目录: ' . $appDir);
+        $this->appendLog('→ 当前版本: ' . $this->runShell("cd {$appDir} && git log -1 --oneline 2>&1", 30, false));
         $this->appendLog('→ 拉取最新代码...');
-        $result = $this->runShell("cd {$appDir} && git pull origin main 2>&1");
+        $result = $this->runShell("cd {$appDir} && git fetch origin main 2>&1 && git merge --ff-only origin/main 2>&1 && git log -1 --oneline 2>&1");
         $this->appendLog($result);
 
         // 2. Composer install
@@ -152,7 +153,7 @@ class SystemUpgrade extends Page
             'config:clear', 'cache:clear', 'route:clear', 'view:clear', 'event:clear',
         ];
         foreach ($cacheCommands as $cmd) {
-            $this->runShell("cd {$appDir} && {$phpBin} artisan {$cmd} 2>&1");
+            $this->runShell("cd {$appDir} && {$phpBin} artisan {$cmd} 2>&1", 60, false);
         }
         $this->appendLog('✓ 缓存已清除');
 
@@ -177,8 +178,8 @@ class SystemUpgrade extends Page
 
         $pm2 = $this->findPm2Bin();
         if ($pm2) {
-            $this->runShell("{$pm2} restart cang-ai-worker 2>&1");
-            $this->runShell("{$pm2} restart cang-ai-worker-2 2>&1");
+            $this->runShell("{$pm2} restart cang-ai-worker 2>&1", 60, false);
+            $this->runShell("{$pm2} restart cang-ai-worker-2 2>&1", 60, false);
             $this->appendLog('✓ PM2 Worker 已重启');
         }
 
@@ -197,9 +198,10 @@ class SystemUpgrade extends Page
             return;
         }
 
-        // 1. Git pull
+        $this->appendLog('→ 当前目录: ' . $frontendDir);
+        $this->appendLog('→ 当前版本: ' . $this->runShell("cd {$frontendDir} && git log -1 --oneline 2>&1", 30, false));
         $this->appendLog('→ 拉取前端代码...');
-        $result = $this->runShell("cd {$frontendDir} && git pull origin main 2>&1");
+        $result = $this->runShell("cd {$frontendDir} && git fetch origin main 2>&1 && git merge --ff-only origin/main 2>&1 && git log -1 --oneline 2>&1");
         $this->appendLog($result);
 
         $npmBin = $this->findNpmBin();
@@ -221,9 +223,7 @@ class SystemUpgrade extends Page
         // 5. Verify build succeeded
         $standaloneDir = "{$frontendDir}/.next/standalone";
         if (!is_file("{$standaloneDir}/server.js")) {
-            $this->appendLog('✗ 构建失败：standalone/server.js 不存在');
-            Notification::make()->title('前端构建失败')->danger()->send();
-            return;
+            throw new \RuntimeException('前端构建失败：standalone/server.js 不存在');
         }
         $this->appendLog('✓ 构建成功');
 
@@ -231,12 +231,12 @@ class SystemUpgrade extends Page
         $this->appendLog('→ 部署 standalone 资源...');
 
         // Copy static files into standalone
-        $this->runShell("cp -r {$frontendDir}/.next/static {$standaloneDir}/.next/static 2>&1");
+        $this->runShell("cp -r {$frontendDir}/.next/static {$standaloneDir}/.next/static 2>&1", 60, false);
         $this->appendLog('  ✓ static 文件已复制');
 
         // Copy public files into standalone
         if (is_dir("{$frontendDir}/public")) {
-            $this->runShell("cp -r {$frontendDir}/public {$standaloneDir}/public 2>&1");
+            $this->runShell("cp -r {$frontendDir}/public {$standaloneDir}/public 2>&1", 60, false);
             $this->appendLog('  ✓ public 文件已复制');
         }
 
@@ -253,18 +253,26 @@ class SystemUpgrade extends Page
 
             // Verify process is online
             sleep(2);
-            $status = trim($this->runShell("{$pm2} show cang-ai-web 2>&1 | grep status"));
+            $status = trim($this->runShell("{$pm2} show cang-ai-web 2>&1 | grep status", 60, false));
             $this->appendLog('  状态: ' . $status);
         }
 
         $this->appendLog('✓ 前端升级完成');
     }
 
-    protected function runShell(string $cmd, int $timeout = 60): string
+    protected function runShell(string $cmd, int $timeout = 60, bool $throwOnFailure = true): string
     {
-        $fullCmd = "timeout {$timeout} {$cmd}";
-        $output = shell_exec($fullCmd) ?? '';
-        return trim($output) ?: '(无输出)';
+        $fullCmd = "timeout {$timeout} bash -lc " . escapeshellarg($cmd);
+        $lines = [];
+        $exitCode = 0;
+        exec($fullCmd, $lines, $exitCode);
+        $output = trim(implode("\n", $lines));
+
+        if ($throwOnFailure && $exitCode !== 0) {
+            throw new \RuntimeException("命令执行失败({$exitCode}): {$cmd}\n" . ($output ?: '(无输出)'));
+        }
+
+        return $output ?: '(无输出)';
     }
 
     protected function appendLog(string $line): void
