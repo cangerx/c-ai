@@ -199,6 +199,7 @@ class SystemUpgrade extends Page
 
         try {
             $this->appendLog('=== 开始全栈升级 ===');
+            $this->prepareRuntimeForUpgrade();
             $this->createPreUpgradeBackup();
             $this->upgradeBackendInternal();
             $this->upgradeFrontendInternal();
@@ -223,6 +224,7 @@ class SystemUpgrade extends Page
         $this->running = true;
 
         try {
+            $this->prepareRuntimeForUpgrade();
             $this->createPreUpgradeBackup();
             $this->upgradeBackendInternal();
             Notification::make()->title('后端升级完成')->success()->send();
@@ -244,6 +246,7 @@ class SystemUpgrade extends Page
         $this->running = true;
 
         try {
+            $this->prepareRuntimeForUpgrade();
             $this->upgradeFrontendInternal();
             Notification::make()->title('前端升级完成')->success()->send();
         } catch (\Throwable $e) {
@@ -264,11 +267,64 @@ class SystemUpgrade extends Page
             $this->appendRemoteBackupLog($backup);
         } catch (\Throwable $e) {
             $this->appendLog('✗ 自动备份失败：' . $e->getMessage());
-            if (!config('system.allow_upgrade_without_backup')) {
+            if (!$this->allowUpgradeWithoutBackup()) {
                 throw $e;
             }
             $this->appendLog('⚠ 已配置允许无备份升级，继续执行');
         }
+    }
+
+    protected function prepareRuntimeForUpgrade(): void
+    {
+        $appDir = base_path();
+        $phpBin = $this->findPhpBin();
+        if (!$phpBin) {
+            return;
+        }
+
+        $this->appendLog('→ 刷新升级运行缓存...');
+        $result = $this->runShell(
+            'cd ' . escapeshellarg($appDir) . ' && ' . escapeshellarg($phpBin) . ' artisan optimize:clear 2>&1',
+            60,
+            false,
+        );
+        $this->appendLog($result);
+    }
+
+    protected function allowUpgradeWithoutBackup(): bool
+    {
+        if (config('system.allow_upgrade_without_backup')) {
+            return true;
+        }
+
+        $value = strtolower(trim((string) $this->readEnvValue('UPGRADE_ALLOW_WITHOUT_BACKUP')));
+
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
+    }
+
+    protected function readEnvValue(string $key): ?string
+    {
+        $envPath = base_path('.env');
+        if (!is_file($envPath)) {
+            return null;
+        }
+
+        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+                continue;
+            }
+
+            [$name, $value] = array_map('trim', explode('=', $line, 2));
+            if ($name !== $key) {
+                continue;
+            }
+
+            return trim($value, " \t\n\r\0\x0B\"'");
+        }
+
+        return null;
     }
 
     protected function upgradeBackendInternal(): void
