@@ -373,12 +373,10 @@ class SystemUpgrade extends Page
             $this->appendLog('  ✓ public 文件已复制');
         }
 
-        // Copy server.js to project root (PM2 start.sh uses root server.js)
-        $this->runShell('cp ' . escapeshellarg($standaloneDir . '/server.js') . ' ' . escapeshellarg($frontendDir . '/server.js') . ' 2>&1');
-        $this->appendLog('  ✓ server.js 已更新到项目根目录');
+        $this->assertFrontendStaticAssetsReady($standaloneDir);
 
         // 7. Restart or start PM2
-        $this->restartOrStartFrontend($frontendDir);
+        $this->restartOrStartFrontend($frontendDir, $standaloneDir);
 
         app(VersionCheckService::class)->markInstalled('frontend', $release);
         $this->appendLog('✓ 前端升级完成');
@@ -421,7 +419,21 @@ class SystemUpgrade extends Page
         }
     }
 
-    protected function restartOrStartFrontend(string $frontendDir): void
+    protected function assertFrontendStaticAssetsReady(string $standaloneDir): void
+    {
+        if (!is_dir($standaloneDir . '/.next/static/chunks')) {
+            throw new \RuntimeException('前端构建失败：standalone 缺少 .next/static/chunks');
+        }
+
+        $chunks = glob($standaloneDir . '/.next/static/chunks/*.js') ?: [];
+        if (empty($chunks)) {
+            throw new \RuntimeException('前端构建失败：standalone 没有可用 chunk 文件');
+        }
+
+        $this->appendLog('  ✓ static chunks 校验通过');
+    }
+
+    protected function restartOrStartFrontend(string $frontendDir, string $standaloneDir): void
     {
         $pm2 = $this->findPm2Bin();
         $node = $this->findNodeBin();
@@ -430,7 +442,7 @@ class SystemUpgrade extends Page
 
         if (!$pm2) {
             $this->appendLog('⚠ pm2 未找到，前端已构建但未自动重启');
-            $this->appendLog("  手动启动: cd {$frontendDir} && PORT={$port} node server.js");
+            $this->appendLog("  手动启动: cd {$standaloneDir} && PORT={$port} node server.js");
             return;
         }
 
@@ -439,27 +451,22 @@ class SystemUpgrade extends Page
             return;
         }
 
-        $this->writeFrontendStartScript($frontendDir, $node, $port);
+        $this->writeFrontendStartScript($standaloneDir, $node, $port);
 
-        $this->appendLog('→ 重启前端服务...');
+        $this->appendLog('→ 重建前端 PM2 服务...');
         if ($this->pm2ProcessExists($pm2, $processName)) {
-            $result = $this->runShell(
-                'PORT=' . escapeshellarg((string) $port) . ' ' .
-                escapeshellarg($pm2) . ' restart ' . escapeshellarg($processName) . ' --update-env 2>&1',
-                60,
-            );
-            $this->appendLog($result);
-        } else {
-            $this->appendLog("  未找到 PM2 进程 {$processName}，改为自动创建");
-            $result = $this->runShell(
-                'PORT=' . escapeshellarg((string) $port) . ' ' .
-                escapeshellarg($pm2) . ' start ' . escapeshellarg($frontendDir . '/start.sh') .
-                ' --name ' . escapeshellarg($processName) .
-                ' --cwd ' . escapeshellarg($frontendDir) . ' 2>&1',
-                60,
-            );
+            $result = $this->runShell(escapeshellarg($pm2) . ' delete ' . escapeshellarg($processName) . ' 2>&1', 60, false);
             $this->appendLog($result);
         }
+
+        $result = $this->runShell(
+            'PORT=' . escapeshellarg((string) $port) . ' ' .
+            escapeshellarg($pm2) . ' start ' . escapeshellarg($standaloneDir . '/start.sh') .
+            ' --name ' . escapeshellarg($processName) .
+            ' --cwd ' . escapeshellarg($standaloneDir) . ' 2>&1',
+            60,
+        );
+        $this->appendLog($result);
 
         $this->runShell(escapeshellarg($pm2) . ' save 2>&1', 60, false);
 
