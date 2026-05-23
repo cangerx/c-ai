@@ -127,6 +127,7 @@ class SystemUpgrade extends Page
         $this->appendLog('--- 后端升级 ---');
 
         $this->appendLog('→ 当前目录: ' . $appDir);
+        $this->trustGitDirectory($appDir);
         $this->appendLog('→ 当前版本: ' . $this->runShell("cd {$appDir} && git log -1 --oneline 2>&1", 30, false));
         $this->appendLog('→ 拉取最新代码...');
         $result = $this->runShell("cd {$appDir} && git fetch origin main 2>&1 && git merge --ff-only origin/main 2>&1 && git log -1 --oneline 2>&1");
@@ -199,6 +200,7 @@ class SystemUpgrade extends Page
         }
 
         $this->appendLog('→ 当前目录: ' . $frontendDir);
+        $this->trustGitDirectory($frontendDir);
         $this->appendLog('→ 当前版本: ' . $this->runShell("cd {$frontendDir} && git log -1 --oneline 2>&1", 30, false));
         $this->appendLog('→ 拉取前端代码...');
         $result = $this->runShell("cd {$frontendDir} && git fetch origin main 2>&1 && git merge --ff-only origin/main 2>&1 && git log -1 --oneline 2>&1");
@@ -278,6 +280,12 @@ class SystemUpgrade extends Page
     protected function appendLog(string $line): void
     {
         $this->log .= $line . "\n";
+    }
+
+    protected function trustGitDirectory(string $directory): void
+    {
+        $path = realpath($directory) ?: $directory;
+        $this->runShell('git config --global --add safe.directory ' . escapeshellarg($path) . ' 2>&1', 30, false);
     }
 
     protected function schedulePhpFpmRestart(): bool
