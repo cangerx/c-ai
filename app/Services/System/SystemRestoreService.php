@@ -93,6 +93,7 @@ class SystemRestoreService
             $defaultsFile = $this->writeMysqlDefaultsFile($workDir, $config);
             $cmd = implode(' ', array_filter([
                 'mysql',
+                '--no-defaults',
                 '--defaults-extra-file=' . escapeshellarg($defaultsFile),
                 escapeshellarg((string) ($config['database'] ?? '')),
                 '< ' . escapeshellarg($dump),

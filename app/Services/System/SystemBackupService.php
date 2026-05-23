@@ -125,10 +125,12 @@ class SystemBackupService
             try {
                 $cmd = implode(' ', array_filter([
                     'mysqldump',
+                    '--no-defaults',
                     '--defaults-extra-file=' . escapeshellarg($defaultsFile),
                     '--single-transaction',
                     '--quick',
                     '--skip-lock-tables',
+                    '--no-tablespaces',
                     escapeshellarg((string) ($config['database'] ?? '')),
                     '2>&1',
                     '> ' . escapeshellarg($workDir . '/database/database.sql'),

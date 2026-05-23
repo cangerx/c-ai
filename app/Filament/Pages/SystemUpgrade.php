@@ -206,7 +206,6 @@ class SystemUpgrade extends Page
         $this->running = true;
 
         try {
-            $this->createPreUpgradeBackup();
             $this->upgradeFrontendInternal();
             Notification::make()->title('前端升级完成')->success()->send();
         } catch (\Throwable $e) {
