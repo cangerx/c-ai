@@ -195,9 +195,39 @@ class TaskWorkerCommand extends Command
     protected function extractItems(array $response): array
     {
         $items = $response['data'] ?? [];
-        return array_values(array_filter($items, fn($item) =>
-            is_array($item) && (!empty($item['b64_json']) || !empty($item['url']))
-        ));
+        return array_values(array_filter(array_map(fn ($item) => $this->normalizeImageItem($item), $items)));
+    }
+
+    protected function normalizeImageItem(mixed $item): ?array
+    {
+        if (!is_array($item)) {
+            return null;
+        }
+
+        if (!empty($item['b64_json'])) {
+            return ['b64_json' => $item['b64_json']];
+        }
+
+        foreach (['url', 'image_url', 'imageUrl', 'result_url', 'resultUrl', 'output_url', 'outputUrl', 'download_url', 'downloadUrl'] as $key) {
+            if (!empty($item[$key]) && is_string($item[$key])) {
+                return ['url' => $item[$key]];
+            }
+        }
+
+        foreach (['base64', 'image_base64', 'imageBase64', 'data'] as $key) {
+            if (!empty($item[$key]) && is_string($item[$key])) {
+                if (str_starts_with($item[$key], 'data:image/')) {
+                    $parts = explode(',', $item[$key], 2);
+                    return !empty($parts[1]) ? ['b64_json' => $parts[1]] : null;
+                }
+
+                if (strlen($item[$key]) > 200 && !preg_match('/^https?:\/\//', $item[$key])) {
+                    return ['b64_json' => preg_replace('/\s+/', '', $item[$key])];
+                }
+            }
+        }
+
+        return null;
     }
 
     protected function storeItem(array $item, GenerationTask $task, ImageStorageService $storage): array
@@ -208,6 +238,12 @@ class TaskWorkerCommand extends Command
             $binary = base64_decode($item['b64_json'], true);
             if ($binary === false) throw new RuntimeException('Failed to decode image data.');
             $mimeType = $storage->detectMimeFromBinary($binary);
+        } elseif (!empty($originUrl) && str_starts_with($originUrl, 'data:image/')) {
+            [$meta, $data] = array_pad(explode(',', $originUrl, 2), 2, '');
+            $binary = base64_decode($data, true);
+            if ($binary === false) throw new RuntimeException('Failed to decode data URI image.');
+            $mimeType = preg_match('#^data:(image/[^;]+);base64#', $meta, $m) ? $m[1] : $storage->detectMimeFromBinary($binary);
+            $originUrl = null;
         } elseif (!empty($originUrl)) {
             [$binary, $mimeType] = $storage->fetchRemoteImage($originUrl);
         } else {

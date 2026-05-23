@@ -152,18 +152,9 @@ class NanoBananaProvider implements ImageProviderInterface
             }
 
             if (in_array($status, ['succeeded', 'completed', 'success'])) {
-                $images = $inner['data']['images'] ?? [];
+                $images = $this->extractImageItems($result);
                 if (!empty($images)) {
-                    return ['data' => array_map(fn($img) => ['url' => $img['url'] ?? ''], $images)];
-                }
-                if (!empty($inner['url'])) {
-                    return ['data' => [['url' => $inner['url']]]];
-                }
-                if (!empty($inner['image_url'])) {
-                    return ['data' => [['url' => $inner['image_url']]]];
-                }
-                if (!empty($result['url'])) {
-                    return ['data' => [['url' => $result['url']]]];
+                    return ['data' => $images];
                 }
                 throw new RuntimeException('Nano-Banana 任务完成但无法解析图片: ' . json_encode($result, JSON_UNESCAPED_UNICODE));
             }
@@ -172,9 +163,91 @@ class NanoBananaProvider implements ImageProviderInterface
         throw new RuntimeException('Nano-Banana 异步任务超时：轮询 10 分钟未获得结果');
     }
 
+    protected function extractImageItems(array $payload): array
+    {
+        $items = [];
+        $stack = [$payload];
+        $urlKeys = ['url', 'image_url', 'imageUrl', 'result_url', 'resultUrl', 'output_url', 'outputUrl', 'download_url', 'downloadUrl'];
+        $base64Keys = ['b64_json', 'base64', 'image_base64', 'imageBase64', 'data'];
+
+        while ($stack) {
+            $current = array_pop($stack);
+            if (!is_array($current)) {
+                continue;
+            }
+
+            foreach ($urlKeys as $key) {
+                if (!empty($current[$key]) && is_string($current[$key]) && $this->looksLikeImageUrl($current[$key])) {
+                    $items[] = ['url' => $current[$key]];
+                }
+            }
+
+            foreach ($base64Keys as $key) {
+                if (!empty($current[$key]) && is_string($current[$key])) {
+                    $base64 = $this->normalizeBase64Image($current[$key]);
+                    if ($base64) {
+                        $items[] = ['b64_json' => $base64];
+                    }
+                }
+            }
+
+            foreach ($current as $value) {
+                if (is_array($value)) {
+                    $stack[] = $value;
+                } elseif (is_string($value) && $this->looksLikeImageUrl($value)) {
+                    $items[] = ['url' => $value];
+                }
+            }
+        }
+
+        $unique = [];
+        foreach ($items as $item) {
+            $key = $item['url'] ?? ('b64:' . md5($item['b64_json'] ?? ''));
+            if ($key !== 'b64:' && !isset($unique[$key])) {
+                $unique[$key] = $item;
+            }
+        }
+
+        return array_values($unique);
+    }
+
+    protected function looksLikeImageUrl(string $value): bool
+    {
+        if (str_starts_with($value, 'data:image/')) {
+            return true;
+        }
+
+        if (!filter_var($value, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $path = parse_url($value, PHP_URL_PATH) ?: '';
+        if (preg_match('/\.(png|jpe?g|webp|gif|bmp)(?:$|\?)/i', $path)) {
+            return true;
+        }
+
+        return str_contains($value, 'image') || str_contains($value, 'cdn') || str_contains($value, 'storage');
+    }
+
+    protected function normalizeBase64Image(string $value): ?string
+    {
+        if (str_starts_with($value, 'data:image/')) {
+            $parts = explode(',', $value, 2);
+            return $parts[1] ?? null;
+        }
+
+        if (strlen($value) < 200 || preg_match('/^https?:\/\//', $value)) {
+            return null;
+        }
+
+        return preg_match('/^[A-Za-z0-9+\/\r\n=]+$/', $value) ? preg_replace('/\s+/', '', $value) : null;
+    }
+
     protected function mapAspectRatio(?string $size): string
     {
-        if (!$size || $size === 'auto') {
+        $size = trim((string) $size);
+
+        if ($size === '' || $size === 'auto') {
             return 'auto';
         }
 
