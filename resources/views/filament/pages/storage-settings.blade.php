@@ -312,6 +312,43 @@
         </div>
     </div>
 
+    {{-- 用途诊断 --}}
+    @if(!empty($diagnostics['profiles']))
+        <div class="ss-hero" style="margin-top:-.5rem;">
+            <div class="ss-hero-top" style="align-items:flex-start;">
+                <div>
+                    <div style="font-size:15px;font-weight:700;color:#111827">用途分流诊断</div>
+                    <div class="ss-hero-sub">长期图、临时图、系统备份的实际落点和配置完整性</div>
+                </div>
+            </div>
+            <div class="ss-summary">
+                @foreach($diagnostics['profiles'] as $profile)
+                    <div class="ss-cell {{ $profile['status'] === 'ready' ? 'ss-bd-emerald' : ($profile['status'] === 'local' ? 'ss-bd-gray' : 'ss-bd-amber') }}">
+                        <div class="ss-cell-label">{{ $profile['label'] }}</div>
+                        <div class="ss-cell-value">
+                            {{ $profile['driver_label'] }}
+                            @if($profile['status'] === 'ready')
+                                <span class="ss-tag ss-tag-gray">已配置</span>
+                            @elseif($profile['status'] === 'incomplete')
+                                <span class="ss-tag ss-tag-amber">不完整</span>
+                            @else
+                                <span class="ss-tag ss-tag-gray">本地</span>
+                            @endif
+                        </div>
+                        <div class="ss-cell-hint">
+                            用途：{{ !empty($profile['active_purposes']) ? implode('、', $profile['active_purposes']) : '未启用' }}
+                        </div>
+                        @if(!empty($profile['bucket']) || !empty($profile['endpoint']))
+                            <div class="ss-cell-hint mono" title="{{ $profile['endpoint'] }}">
+                                {{ $profile['bucket'] ?: '—' }} · {{ \Illuminate\Support\Str::limit($profile['url'] ?: $profile['endpoint'], 54) }}
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- 表单（Wizard） --}}
     <form wire:submit="save" style="padding-bottom:6rem;">
         {{ $this->form }}

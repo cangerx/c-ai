@@ -110,6 +110,7 @@ class StorageSettings extends Page implements HasForms
 
     public ?array $data = [];
     public array $summary = [];
+    public array $diagnostics = [];
 
     public function mount(): void
     {
@@ -130,6 +131,7 @@ class StorageSettings extends Page implements HasForms
         }
         $this->form->fill($settings);
         $this->refreshSummary();
+        $this->refreshDiagnostics();
     }
 
     private function refreshSummary(): void
@@ -147,6 +149,11 @@ class StorageSettings extends Page implements HasForms
             'last_test_ok'  => SiteSetting::get('storage_last_test_ok', '') === '1',
             'last_test_msg' => SiteSetting::get('storage_last_test_msg', ''),
         ];
+    }
+
+    private function refreshDiagnostics(): void
+    {
+        $this->diagnostics = app(\App\Services\StorageProfileService::class)->diagnostics();
     }
 
     public function form(Schema $schema): Schema
@@ -447,6 +454,7 @@ class StorageSettings extends Page implements HasForms
         }
 
         $this->refreshSummary();
+        $this->refreshDiagnostics();
 
         Notification::make()
             ->title('配置已保存')
@@ -502,12 +510,14 @@ class StorageSettings extends Page implements HasForms
                     SiteSetting::set('storage_last_test_ok', '1', 'storage');
                     SiteSetting::set('storage_last_test_msg', '连接正常：' . implode('、', $labels), 'storage');
                     $this->refreshSummary();
+                    $this->refreshDiagnostics();
                     Notification::make()->title('连接测试成功')->body('已验证：' . implode('、', $labels))->success()->send();
                 } catch (\Throwable $e) {
                     SiteSetting::set('storage_last_test_at', now()->toDateTimeString(), 'storage');
                     SiteSetting::set('storage_last_test_ok', '0', 'storage');
                     SiteSetting::set('storage_last_test_msg', $e->getMessage(), 'storage');
                     $this->refreshSummary();
+                    $this->refreshDiagnostics();
                     Notification::make()->title('连接测试失败')->body($e->getMessage())->danger()->send();
                 }
             });

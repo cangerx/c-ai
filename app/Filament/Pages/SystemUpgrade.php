@@ -27,6 +27,7 @@ class SystemUpgrade extends Page
     public bool $running = false;
     public array $versionInfo = [];
     public array $backups = [];
+    public array $remoteBackups = [];
     public mixed $backupUpload = null;
     public string $backupImportPath = '';
 
@@ -50,6 +51,11 @@ class SystemUpgrade extends Page
         $info['worker_count'] = $workerCount;
         $this->versionInfo = $info;
         $this->backups = $backups->list();
+        try {
+            $this->remoteBackups = $backups->listRemote();
+        } catch (\Throwable) {
+            $this->remoteBackups = [];
+        }
     }
 
     public function refreshVersions(): void
@@ -68,6 +74,7 @@ class SystemUpgrade extends Page
             $this->appendLog('=== 开始系统备份 ===');
             $backup = $backups->create('manual');
             $this->appendLog("✓ 备份完成: {$backup['filename']} ({$backup['size_human']})");
+            $this->appendRemoteBackupLog($backup);
             $this->refreshState(backups: $backups);
             Notification::make()->title('备份完成')->body($backup['filename'])->success()->send();
         } catch (\Throwable $e) {
@@ -152,6 +159,36 @@ class SystemUpgrade extends Page
         }
     }
 
+    public function refreshRemoteBackups(): void
+    {
+        try {
+            $this->remoteBackups = app(SystemBackupService::class)->listRemote();
+            Notification::make()->title('远端备份已刷新')->success()->send();
+        } catch (\Throwable $e) {
+            Notification::make()->title('刷新远端备份失败')->body($e->getMessage())->danger()->send();
+        }
+    }
+
+    public function importRemoteBackup(string $key): void
+    {
+        $this->log = '';
+        $this->running = true;
+
+        try {
+            $this->appendLog('=== 开始拉取远端备份 ===');
+            $this->appendLog('→ 远端 Key: ' . $key);
+            $backup = app(SystemBackupService::class)->importRemote($key);
+            $this->appendLog("✓ 远端备份已导入本地: {$backup['filename']} ({$backup['size_human']})");
+            $this->refreshState(backups: app(SystemBackupService::class));
+            Notification::make()->title('远端备份已导入')->body($backup['filename'])->success()->send();
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 远端备份导入失败：' . $e->getMessage());
+            Notification::make()->title('远端备份导入失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->running = false;
+        }
+    }
+
     /**
      * 一键升级全部
      */
@@ -224,6 +261,7 @@ class SystemUpgrade extends Page
             $this->appendLog('→ 升级前自动备份...');
             $backup = app(SystemBackupService::class)->create('pre-upgrade');
             $this->appendLog("✓ 自动备份完成: {$backup['filename']} ({$backup['size_human']})");
+            $this->appendRemoteBackupLog($backup);
         } catch (\Throwable $e) {
             $this->appendLog('✗ 自动备份失败：' . $e->getMessage());
             if (!config('system.allow_upgrade_without_backup')) {
@@ -432,6 +470,15 @@ class SystemUpgrade extends Page
         }
 
         $this->appendLog('  ✓ 已同步到远端备份存储: ' . $key);
+    }
+
+    protected function appendRemoteBackupLog(array $backup): void
+    {
+        if (!empty($backup['remote']['key'])) {
+            $this->appendLog('  ✓ 远端备份: ' . strtoupper($backup['remote']['driver'] ?? 'cloud') . ' · ' . $backup['remote']['key']);
+        } else {
+            $this->appendLog('  远端备份: 未配置，已仅保留本地备份');
+        }
     }
 
     protected function pruneFrontendBackups(string $backupDir): void

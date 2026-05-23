@@ -14,6 +14,19 @@ class StorageProfileService
     public const PURPOSE_DOWNLOAD = 'download';
     public const PURPOSE_BACKUP = 'backup';
 
+    private const PROFILE_LABELS = [
+        'default' => '默认长期存储',
+        'temp' => '上传/下载临时存储',
+        'backup' => '系统备份远端存储',
+    ];
+
+    private const PURPOSE_LABELS = [
+        self::PURPOSE_GENERATED => '长期生成图片',
+        self::PURPOSE_UPLOAD => '上传参考图',
+        self::PURPOSE_DOWNLOAD => '下载临时图',
+        self::PURPOSE_BACKUP => '系统备份',
+    ];
+
     public function disk(string $purpose): Filesystem
     {
         $profile = $this->profileForPurpose($purpose);
@@ -160,6 +173,59 @@ class StorageProfileService
         return array_values(array_unique(array_filter($hosts)));
     }
 
+    public function diagnostics(): array
+    {
+        $activePurposes = [];
+        foreach (array_keys(self::PURPOSE_LABELS) as $purpose) {
+            $activePurposes[$purpose] = $this->profileForPurpose($purpose);
+        }
+
+        $profiles = [];
+        foreach (array_keys(self::PROFILE_LABELS) as $profile) {
+            $purposes = array_keys(array_filter($activePurposes, fn (string $activeProfile): bool => $activeProfile === $profile));
+            $profiles[$profile] = $this->profileDiagnostics($profile, $purposes);
+        }
+
+        return [
+            'purposes' => collect($activePurposes)
+                ->map(fn (string $profile, string $purpose): array => [
+                    'purpose' => $purpose,
+                    'label' => self::PURPOSE_LABELS[$purpose] ?? $purpose,
+                    'profile' => $profile,
+                    'profile_label' => self::PROFILE_LABELS[$profile] ?? $profile,
+                ])
+                ->values()
+                ->all(),
+            'profiles' => $profiles,
+        ];
+    }
+
+    public function profileDiagnostics(string $profile, array $purposes = []): array
+    {
+        $driver = $this->driver($profile);
+        $isCloud = in_array($driver, ['oss', 'cos', 'r2'], true);
+        $configured = $this->isConfigured($profile);
+
+        return [
+            'profile' => $profile,
+            'label' => self::PROFILE_LABELS[$profile] ?? $profile,
+            'driver' => $driver,
+            'driver_label' => $this->driverLabel($driver),
+            'is_cloud' => $isCloud,
+            'configured' => $configured,
+            'status' => $isCloud ? ($configured ? 'ready' : 'incomplete') : 'local',
+            'bucket' => $this->setting($profile, 'bucket'),
+            'endpoint' => $this->setting($profile, 'endpoint'),
+            'url' => $this->setting($profile, 'url'),
+            'region' => $this->setting($profile, 'region'),
+            'has_secret' => $this->setting($profile, 'secret_key') !== '',
+            'active_purposes' => array_values(array_map(
+                fn (string $purpose): string => self::PURPOSE_LABELS[$purpose] ?? $purpose,
+                $purposes,
+            )),
+        ];
+    }
+
     public function profileForPurpose(string $purpose): string
     {
         return match ($purpose) {
@@ -211,6 +277,16 @@ class StorageProfileService
         $driver = $this->setting($profile, 'driver') ?: 'local';
 
         return in_array($driver, ['local', 'oss', 'cos', 'r2'], true) ? $driver : 'local';
+    }
+
+    protected function driverLabel(string $driver): string
+    {
+        return match ($driver) {
+            'oss' => '阿里云 OSS',
+            'cos' => '腾讯云 COS',
+            'r2' => 'Cloudflare R2',
+            default => '本地存储',
+        };
     }
 
     protected function setting(string $profile, string $field): string

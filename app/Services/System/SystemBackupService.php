@@ -49,6 +49,53 @@ class SystemBackupService
         return array_map(fn (string $path): array => $this->fileInfo($path), $files);
     }
 
+    public function listRemote(): array
+    {
+        $profiles = app(StorageProfileService::class);
+        if (!$profiles->isCloud(StorageProfileService::PURPOSE_BACKUP)) {
+            return [];
+        }
+
+        $disk = $profiles->disk(StorageProfileService::PURPOSE_BACKUP);
+        $files = $disk->allFiles('system-backups');
+        rsort($files);
+
+        return array_values(array_filter(array_map(function (string $key) use ($disk, $profiles): ?array {
+            if (!str_ends_with($key, '.tar.gz')) {
+                return null;
+            }
+
+            $filename = basename($key);
+            if (!$this->isValidBackupFilename($filename)) {
+                return null;
+            }
+
+            $modified = null;
+            try {
+                $modified = $disk->lastModified($key);
+            } catch (\Throwable) {
+                $modified = null;
+            }
+
+            $size = 0;
+            try {
+                $size = (int) $disk->size($key);
+            } catch (\Throwable) {
+                $size = 0;
+            }
+
+            return [
+                'key' => $key,
+                'filename' => $filename,
+                'driver' => $profiles->driverForPurpose(StorageProfileService::PURPOSE_BACKUP),
+                'size' => $size,
+                'size_human' => $this->humanSize($size),
+                'created_at' => $modified ? date('Y-m-d H:i:s', $modified) : '',
+                'local_exists' => is_file($this->backupDir() . '/' . $filename),
+            ];
+        }, $files)));
+    }
+
     public function delete(string $filename): void
     {
         $path = $this->pathFor($filename);
@@ -73,8 +120,12 @@ class SystemBackupService
         }
 
         $this->ensureDirectory($this->backupDir());
-        $filename = 'cang-ai-backup-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.tar.gz';
+        $filename = $this->safeImportFilename($originalName);
         $target = $this->backupDir() . '/' . $filename;
+        if (is_file($target)) {
+            $filename = 'cang-ai-backup-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.tar.gz';
+            $target = $this->backupDir() . '/' . $filename;
+        }
 
         if (!copy($sourcePath, $target)) {
             throw new RuntimeException('备份包导入失败');
@@ -86,9 +137,69 @@ class SystemBackupService
         return $this->fileInfo($target);
     }
 
+    public function importRemote(string $key): array
+    {
+        if (!preg_match('#^system-backups/\d{8}/cang-ai-backup-\d{8}-\d{6}(-[a-f0-9]{6})?\.tar\.gz$#', $key)) {
+            throw new RuntimeException('非法远端备份 Key');
+        }
+
+        $profiles = app(StorageProfileService::class);
+        if (!$profiles->isCloud(StorageProfileService::PURPOSE_BACKUP)) {
+            throw new RuntimeException('未配置系统备份远端存储');
+        }
+
+        $disk = $profiles->disk(StorageProfileService::PURPOSE_BACKUP);
+        if (!$disk->exists($key)) {
+            throw new RuntimeException('远端备份不存在');
+        }
+
+        $tempPath = sys_get_temp_dir() . '/cang-ai-remote-backup-' . bin2hex(random_bytes(4)) . '.tar.gz';
+        $stream = $disk->readStream($key);
+        if ($stream === false) {
+            throw new RuntimeException('无法读取远端备份');
+        }
+
+        $target = fopen($tempPath, 'wb');
+        if ($target === false) {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            throw new RuntimeException('无法创建远端备份临时文件');
+        }
+
+        try {
+            stream_copy_to_stream($stream, $target);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            if (is_resource($target)) {
+                fclose($target);
+            }
+        }
+
+        try {
+            $info = $this->import($tempPath, basename($key));
+        } finally {
+            @unlink($tempPath);
+        }
+
+        return $info;
+    }
+
+    protected function safeImportFilename(?string $originalName): string
+    {
+        $name = $originalName ? basename($originalName) : '';
+        if ($name !== '' && $this->isValidBackupFilename($name)) {
+            return $name;
+        }
+
+        return 'cang-ai-backup-' . date('Ymd-His') . '-' . bin2hex(random_bytes(3)) . '.tar.gz';
+    }
+
     public function pathFor(string $filename): string
     {
-        if (!preg_match('/^cang-ai-backup-\d{8}-\d{6}(-[a-f0-9]{6})?\.tar\.gz$/', $filename)) {
+        if (!$this->isValidBackupFilename($filename)) {
             throw new RuntimeException('非法备份文件名');
         }
 
@@ -99,6 +210,11 @@ class SystemBackupService
         }
 
         return $path;
+    }
+
+    protected function isValidBackupFilename(string $filename): bool
+    {
+        return (bool) preg_match('/^cang-ai-backup-\d{8}-\d{6}(-[a-f0-9]{6})?\.tar\.gz$/', $filename);
     }
 
     protected function backupEnv(string $workDir): void

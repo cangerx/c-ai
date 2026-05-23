@@ -82,6 +82,25 @@ class ImageStorageServiceTest extends TestCase
         $this->assertContains('short-term.oss-cn-hangzhou.aliyuncs.com', $profiles->allowedHosts());
     }
 
+    public function test_storage_diagnostics_reports_active_profiles(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_driver', 'local', 'storage');
+        \App\Models\SiteSetting::set('storage_backup_driver', 'local', 'storage');
+
+        $diagnostics = app(StorageProfileService::class)->diagnostics();
+
+        $this->assertSame('default', $diagnostics['purposes'][0]['profile']);
+        $this->assertSame('长期生成图片', $diagnostics['purposes'][0]['label']);
+        $this->assertSame('ready', $diagnostics['profiles']['default']['status']);
+        $this->assertContains('长期生成图片', $diagnostics['profiles']['default']['active_purposes']);
+        $this->assertSame('local', $diagnostics['profiles']['backup']['status']);
+    }
+
     public function test_key_from_url_respects_storage_purpose_profile(): void
     {
         \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');

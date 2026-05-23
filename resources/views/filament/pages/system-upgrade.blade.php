@@ -201,7 +201,8 @@
                     <div style="font-size:15px;font-weight:700;color:#111827">系统备份 / 迁移</div>
                     <div class="su-date">升级前会自动备份；也可以手动创建、下载或恢复备份。</div>
                 </div>
-                <button wire:click="createBackup" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary" style="margin-left:auto">创建备份</button>
+                <button wire:click="refreshRemoteBackups" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, importRemoteBackup, restoreBackup" class="su-btn-secondary" style="margin-left:auto">刷新远端</button>
+                <button wire:click="createBackup" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, importRemoteBackup, restoreBackup" class="su-btn-secondary">创建备份</button>
             </div>
             <div style="display:grid;grid-template-columns:minmax(180px, 1fr) minmax(220px, 1.2fr) auto;gap:10px;align-items:end;margin-bottom:14px">
                 <div>
@@ -216,6 +217,34 @@
                 <button wire:click="importBackup" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">导入备份</button>
             </div>
             <div wire:loading wire:target="backupUpload" style="font-size:12px;color:#6b7280;margin:-6px 0 12px">正在上传备份包...</div>
+            @if(!empty($remoteBackups))
+                <div style="margin-bottom:14px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px">
+                        <thead style="background:#f9fafb;color:#6b7280">
+                            <tr>
+                                <th style="text-align:left;padding:10px">远端备份</th>
+                                <th style="text-align:left;padding:10px">大小</th>
+                                <th style="text-align:left;padding:10px">时间</th>
+                                <th style="text-align:left;padding:10px">状态</th>
+                                <th style="text-align:right;padding:10px">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($remoteBackups as $remote)
+                                <tr style="border-top:1px solid #e5e7eb">
+                                    <td style="padding:10px;font-family:ui-monospace,monospace;color:#111827" title="{{ $remote['key'] }}">{{ $remote['filename'] }}</td>
+                                    <td style="padding:10px;color:#374151">{{ $remote['size_human'] }}</td>
+                                    <td style="padding:10px;color:#6b7280">{{ $remote['created_at'] ?: '—' }}</td>
+                                    <td style="padding:10px;color:#374151">{{ $remote['local_exists'] ? '已在本地' : strtoupper($remote['driver']) }}</td>
+                                    <td style="padding:10px;text-align:right;white-space:nowrap">
+                                        <button wire:click="importRemoteBackup(@js($remote['key']))" wire:loading.attr="disabled" class="su-btn-secondary" style="padding:6px 10px">拉取到本地</button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
             <div style="overflow:auto;border:1px solid #e5e7eb;border-radius:10px">
                 <table style="width:100%;border-collapse:collapse;font-size:12px">
                     <thead style="background:#f9fafb;color:#6b7280">
