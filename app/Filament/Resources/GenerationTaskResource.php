@@ -70,8 +70,8 @@ class GenerationTaskResource extends Resource
                     ->tooltip(fn ($record) => $record->task_id)
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('user.nickname')->label('用户')
-                    ->formatStateUsing(fn ($record) => $record->user?->nickname ?: $record->user?->email ?: '—')
+                Tables\Columns\TextColumn::make('user_display')->label('用户')
+                    ->state(fn (GenerationTask $record) => $record->user?->nickname ?: $record->user?->name ?: $record->user?->email ?: '—')
                     ->searchable(query: function ($query, string $search) {
                         $query->whereHas('user', function ($u) use ($search) {
                             $u->where('email', 'like', "%{$search}%")

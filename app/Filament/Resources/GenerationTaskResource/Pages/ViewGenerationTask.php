@@ -41,8 +41,8 @@ class ViewGenerationTask extends ViewRecord
                     }),
                 TextEntry::make('task_id')->label('Task ID')
                     ->fontFamily('mono')->copyable(),
-                TextEntry::make('user.nickname')->label('用户')
-                    ->formatStateUsing(fn ($record) => $record->user?->nickname ?: $record->user?->email ?: '—'),
+                TextEntry::make('user_display')->label('用户')
+                    ->state(fn (GenerationTask $record) => $record->user?->nickname ?: $record->user?->name ?: $record->user?->email ?: '—'),
                 TextEntry::make('model')->label('模型')
                     ->formatStateUsing(fn (?string $state) => $state ? (AiModel::where('model_id', $state)->value('display_name') ?: $state) : '—'),
                 TextEntry::make('mode')->label('模式')->default('—'),
