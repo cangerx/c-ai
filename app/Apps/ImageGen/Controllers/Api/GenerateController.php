@@ -7,6 +7,7 @@ use App\Models\AiChannel;
 use App\Models\AgentSite;
 use App\Models\GenerationTask;
 use App\Services\BillingService;
+use App\Services\ChannelDispatcher;
 use App\Services\ContentFilterService;
 use App\Services\ImageStorageService;
 use Illuminate\Support\Facades\Redis;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 
 class GenerateController extends Controller
 {
-    public function submit(Request $request, BillingService $billing): JsonResponse
+    public function submit(Request $request, BillingService $billing, ChannelDispatcher $dispatcher): JsonResponse
     {
         $user = $request->user();
 
@@ -87,7 +88,8 @@ class GenerateController extends Controller
             })
             ->orderBy('priority', 'desc')
             ->inRandomOrder()
-            ->first();
+            ->get()
+            ->first(fn (AiChannel $channel) => $dispatcher->supportsRequestedModel($channel, $model));
 
         if (!$channel) {
             return response()->json(['error' => '暂无可用渠道，请联系管理员'], 503);

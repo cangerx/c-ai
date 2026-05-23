@@ -64,6 +64,54 @@ class GenerateTest extends TestCase
         ]);
     }
 
+    public function test_gemini_generation_submission_records_nano_banana_channel(): void
+    {
+        $user = User::factory()->create(['credits' => 10, 'balance' => 5.00]);
+        $openAiChannel = AiChannel::create([
+            'name' => 'openai-compatible',
+            'provider' => 'openai',
+            'base_url' => 'https://api.test.com',
+            'api_key' => 'sk-test',
+            'app_name' => 'image-gen',
+            'status' => 'active',
+            'priority' => 100,
+            'model' => 'gemini-3-pro-image-preview',
+            'models' => ['gemini-3-pro-image-preview'],
+        ]);
+        $nanoBananaChannel = AiChannel::create([
+            'name' => 'nano-banana',
+            'provider' => 'nano-banana',
+            'base_url' => 'https://api.test.com',
+            'api_key' => 'sk-test',
+            'app_name' => 'image-gen',
+            'status' => 'active',
+            'priority' => 1,
+            'model' => 'gemini-3-pro-image-preview',
+            'models' => ['gemini-3-pro-image-preview'],
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/apps/image-gen/generate', [
+                'prompt' => 'a beautiful sunset',
+                'quality' => 'medium',
+                'model' => 'gemini-3-pro-image-preview',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertDatabaseHas('usage_logs', [
+            'user_id' => $user->id,
+            'app_name' => 'image-gen',
+            'model' => 'gemini-3-pro-image-preview',
+            'channel_id' => $nanoBananaChannel->id,
+        ]);
+        $this->assertDatabaseMissing('usage_logs', [
+            'user_id' => $user->id,
+            'channel_id' => $openAiChannel->id,
+        ]);
+    }
+
     // 未登录用户无法生成
     public function test_generation_requires_auth(): void
     {

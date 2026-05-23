@@ -78,10 +78,35 @@ class ChannelDispatcher
             : $this->getAvailableChannels($appName, $excludeId);
 
         if ($model) {
-            $channels = $channels->filter(fn($ch) => in_array($model, $ch->models ?? []) || $ch->model === $model)->values();
+            $channels = $channels
+                ->filter(fn($ch) => $this->supportsRequestedModel($ch, $model))
+                ->values();
         }
 
         return $channels;
+    }
+
+    public function supportsRequestedModel(AiChannel $channel, string $model): bool
+    {
+        if ($this->isNanoBananaModel($model) && $channel->provider !== 'nano-banana') {
+            return false;
+        }
+
+        $models = $channel->models ?? [];
+        if (empty($models) && empty($channel->model)) {
+            return true;
+        }
+
+        if (in_array($model, $models, true)) {
+            return true;
+        }
+
+        return $channel->model === $model;
+    }
+
+    protected function isNanoBananaModel(string $model): bool
+    {
+        return preg_match('/(^|[\/:_-])(gemini|nano[-_]?banana)(?:[\/:_-]|$)/i', $model) === 1;
     }
 
     /**

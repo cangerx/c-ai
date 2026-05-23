@@ -174,12 +174,7 @@ class TaskWorkerCommand extends Command
             return false;
         }
 
-        $models = $channel->models ?? [];
-        if (in_array($model, $models, true)) {
-            return true;
-        }
-
-        return $channel->model === $model;
+        return app(ChannelDispatcher::class)->supportsRequestedModel($channel, $model);
     }
 
     protected function getProvider(?string $provider): ImageProviderInterface
