@@ -127,11 +127,15 @@ class SystemUpgrade extends Page
         $this->appendLog('--- 后端升级 ---');
 
         $this->appendLog('→ 当前目录: ' . $appDir);
-        $this->trustGitDirectory($appDir);
-        $this->appendLog('→ 当前版本: ' . $this->runShell("cd {$appDir} && git log -1 --oneline 2>&1", 30, false));
-        $this->appendLog('→ 拉取最新代码...');
-        $result = $this->runShell("cd {$appDir} && git fetch origin main 2>&1 && git merge --ff-only origin/main 2>&1 && git log -1 --oneline 2>&1");
-        $this->appendLog($result);
+        $this->appendLog('→ 升级来源: ' . $this->backendReleaseUrl());
+        $this->downloadAndOverlayRelease($this->backendReleaseUrl(), $appDir, 'c-ai', [
+            '.env',
+            '.git',
+            'storage',
+            'bootstrap/cache',
+            'vendor',
+            'public/storage',
+        ]);
 
         // 2. Composer install
         $this->appendLog('→ 检查 PHP 依赖...');
@@ -200,11 +204,16 @@ class SystemUpgrade extends Page
         }
 
         $this->appendLog('→ 当前目录: ' . $frontendDir);
-        $this->trustGitDirectory($frontendDir);
-        $this->appendLog('→ 当前版本: ' . $this->runShell("cd {$frontendDir} && git log -1 --oneline 2>&1", 30, false));
-        $this->appendLog('→ 拉取前端代码...');
-        $result = $this->runShell("cd {$frontendDir} && git fetch origin main 2>&1 && git merge --ff-only origin/main 2>&1 && git log -1 --oneline 2>&1");
-        $this->appendLog($result);
+        $this->appendLog('→ 升级来源: ' . $this->frontendReleaseUrl());
+        $this->downloadAndOverlayRelease($this->frontendReleaseUrl(), $frontendDir, 'cang-ai-web', [
+            '.env',
+            '.env.local',
+            '.env.production',
+            '.git',
+            'node_modules',
+            '.next',
+            'server.js',
+        ]);
 
         $npmBin = $this->findNpmBin();
         if (!$npmBin) {
@@ -280,6 +289,72 @@ class SystemUpgrade extends Page
     protected function appendLog(string $line): void
     {
         $this->log .= $line . "\n";
+    }
+
+    protected function backendReleaseUrl(): string
+    {
+        return env('BACKEND_RELEASE_ZIP_URL', 'https://github.com/cangerx/c-ai/archive/refs/heads/main.zip');
+    }
+
+    protected function frontendReleaseUrl(): string
+    {
+        return env('FRONTEND_RELEASE_ZIP_URL', 'https://github.com/cangerx/cang-ai-web/archive/refs/heads/main.zip');
+    }
+
+    protected function downloadAndOverlayRelease(string $url, string $targetDir, string $projectHint, array $excludes): void
+    {
+        $this->ensureCommandExists('curl');
+        $this->ensureCommandExists('unzip');
+        $this->ensureCommandExists('rsync');
+
+        $targetDir = rtrim($targetDir, '/');
+        $workDir = sys_get_temp_dir() . '/cang-upgrade-' . date('YmdHis') . '-' . bin2hex(random_bytes(3));
+        $zipFile = $workDir . '/release.zip';
+        $extractDir = $workDir . '/extract';
+
+        $this->runShell('mkdir -p ' . escapeshellarg($extractDir));
+
+        try {
+            $this->appendLog('→ 下载发版压缩包...');
+            $this->runShell('curl -L --fail --connect-timeout 15 --max-time 180 -o ' . escapeshellarg($zipFile) . ' ' . escapeshellarg($url) . ' 2>&1', 210);
+
+            $this->appendLog('→ 解压发版包...');
+            $this->runShell('unzip -q ' . escapeshellarg($zipFile) . ' -d ' . escapeshellarg($extractDir) . ' 2>&1', 120);
+
+            $sourceDir = $this->findExtractedProjectDir($extractDir, $projectHint);
+            $this->appendLog('→ 覆盖代码: ' . $sourceDir);
+
+            $excludeArgs = implode(' ', array_map(fn (string $item): string => '--exclude=' . escapeshellarg($item), $excludes));
+            $cmd = 'rsync -a --delete ' . $excludeArgs . ' ' . escapeshellarg(rtrim($sourceDir, '/') . '/') . ' ' . escapeshellarg($targetDir . '/') . ' 2>&1';
+            $this->runShell($cmd, 180);
+            $this->appendLog('✓ 代码覆盖完成');
+        } finally {
+            $this->runShell('rm -rf ' . escapeshellarg($workDir), 60, false);
+        }
+    }
+
+    protected function findExtractedProjectDir(string $extractDir, string $projectHint): string
+    {
+        $dirs = array_values(array_filter(glob(rtrim($extractDir, '/') . '/*') ?: [], 'is_dir'));
+        if (empty($dirs)) {
+            throw new \RuntimeException('发版包解压后没有找到项目目录');
+        }
+
+        foreach ($dirs as $dir) {
+            if (str_contains(basename($dir), $projectHint)) {
+                return $dir;
+            }
+        }
+
+        return $dirs[0];
+    }
+
+    protected function ensureCommandExists(string $command): void
+    {
+        $path = trim($this->runShell('command -v ' . escapeshellarg($command), 30, false));
+        if ($path === '' || $path === '(无输出)') {
+            throw new \RuntimeException("服务器缺少命令: {$command}");
+        }
     }
 
     protected function trustGitDirectory(string $directory): void
