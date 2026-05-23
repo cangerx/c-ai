@@ -2,6 +2,7 @@
 
 namespace App\Services\System;
 
+use App\Services\StorageProfileService;
 use RuntimeException;
 
 class SystemBackupService
@@ -31,8 +32,13 @@ class SystemBackupService
         }
 
         $this->prune();
+        $info = $this->fileInfo($path);
+        $remote = $this->uploadRemoteBackup($path, $info['filename']);
+        if ($remote) {
+            $info['remote'] = $remote;
+        }
 
-        return $this->fileInfo($path);
+        return $info;
     }
 
     public function list(): array
@@ -224,7 +230,41 @@ class SystemBackupService
             'version' => $manifest['version'] ?? '',
             'commit' => $manifest['commit'] ?? '',
             'reason' => $manifest['reason'] ?? '',
+            'remote' => $manifest['remote'] ?? null,
         ];
+    }
+
+    protected function uploadRemoteBackup(string $path, string $filename): ?array
+    {
+        $profiles = app(StorageProfileService::class);
+        if (!$profiles->isCloud(StorageProfileService::PURPOSE_BACKUP)) {
+            return null;
+        }
+
+        $key = 'system-backups/' . date('Ymd') . '/' . $filename;
+        $manifest = $this->readManifest($path);
+        $manifest['remote'] = [
+            'key' => $key,
+            'driver' => $profiles->driverForPurpose(StorageProfileService::PURPOSE_BACKUP),
+            'uploaded_at' => now()->toDateTimeString(),
+        ];
+        $this->rewriteManifest($path, $manifest);
+
+        $disk = $profiles->disk(StorageProfileService::PURPOSE_BACKUP);
+        $stream = fopen($path, 'rb');
+        if ($stream === false) {
+            throw new RuntimeException('无法读取本地备份文件用于远端同步');
+        }
+
+        try {
+            $disk->put($key, $stream, ['ContentType' => 'application/gzip', 'visibility' => 'private']);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        return $manifest['remote'];
     }
 
     protected function readManifest(string $archive): array
@@ -243,6 +283,22 @@ class SystemBackupService
         }
 
         return [];
+    }
+
+    protected function rewriteManifest(string $archive, array $manifest): void
+    {
+        $this->ensureCommandExists('tar');
+
+        $workDir = sys_get_temp_dir() . '/cang-ai-backup-manifest-' . bin2hex(random_bytes(3));
+        $this->ensureDirectory($workDir);
+
+        try {
+            $this->run('tar -xzf ' . escapeshellarg($archive) . ' -C ' . escapeshellarg($workDir) . ' 2>&1', 300);
+            file_put_contents($workDir . '/manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $this->run('cd ' . escapeshellarg($workDir) . ' && tar -czf ' . escapeshellarg($archive) . ' . 2>&1', 300);
+        } finally {
+            $this->run('rm -rf ' . escapeshellarg($workDir), 60, false);
+        }
     }
 
     protected function assertArchiveIsSafe(string $archive): void

@@ -13,6 +13,7 @@ use App\Services\ImageProviders\NanoBananaProvider;
 use App\Services\ImageProviders\OpenAiProvider;
 use App\Services\BillingService;
 use App\Services\ImageStorageService;
+use App\Services\StorageProfileService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -248,9 +249,15 @@ class TaskWorkerCommand extends Command
         $targetSize = $task->size ?: 'auto';
         $binary = $this->enforceSize($binary, $targetSize);
 
-        $key = $storage->store($binary, $mimeType);
+        $key = $storage->store($binary, $mimeType, StorageProfileService::PURPOSE_GENERATED);
 
-        $result = ['key' => $key, 'url' => $storage->url($key), 'mime_type' => $mimeType, 'size' => strlen($binary)];
+        $result = [
+            'key' => $key,
+            'url' => $storage->url($key, StorageProfileService::PURPOSE_GENERATED),
+            'purpose' => StorageProfileService::PURPOSE_GENERATED,
+            'mime_type' => $mimeType,
+            'size' => strlen($binary),
+        ];
         if ($originUrl) $result['origin_url'] = $originUrl;
 
         return $result;

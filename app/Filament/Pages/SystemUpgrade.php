@@ -7,6 +7,7 @@ use UnitEnum;
 use App\Services\System\SystemBackupService;
 use App\Services\System\SystemRestoreService;
 use App\Services\System\VersionCheckService;
+use App\Services\StorageProfileService;
 use Filament\Pages\Page;
 use Filament\Notifications\Notification;
 use Livewire\WithFileUploads;
@@ -403,8 +404,34 @@ class SystemUpgrade extends Page
 
         $this->appendLog('→ 前端目录安全备份...');
         $this->runShell($cmd, 300);
+        $this->uploadBackupArchiveToRemote($path, 'frontend-backups/' . date('Ymd') . '/' . basename($path));
         $this->pruneFrontendBackups($backupDir);
         $this->appendLog('✓ 前端目录备份完成: ' . basename($path));
+    }
+
+    protected function uploadBackupArchiveToRemote(string $path, string $key): void
+    {
+        $profiles = app(StorageProfileService::class);
+        if (!$profiles->isCloud(StorageProfileService::PURPOSE_BACKUP)) {
+            return;
+        }
+
+        $stream = fopen($path, 'rb');
+        if ($stream === false) {
+            throw new \RuntimeException('无法读取备份文件用于远端同步');
+        }
+
+        try {
+            $profiles
+                ->disk(StorageProfileService::PURPOSE_BACKUP)
+                ->put($key, $stream, ['ContentType' => 'application/gzip', 'visibility' => 'private']);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        $this->appendLog('  ✓ 已同步到远端备份存储: ' . $key);
     }
 
     protected function pruneFrontendBackups(string $backupDir): void

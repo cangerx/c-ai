@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\GenerationTask;
 use App\Services\ImageStorageService;
+use App\Services\StorageProfileService;
 use Illuminate\Console\Command;
 
 class CleanExpiredImages extends Command
@@ -32,7 +33,7 @@ class CleanExpiredImages extends Command
             }
 
             $allDeleted = true;
-            $keys = [];
+            $objects = [];
 
             foreach (array_merge($items, $task->files ?? []) as $item) {
                 if (!is_array($item)) {
@@ -41,17 +42,27 @@ class CleanExpiredImages extends Command
 
                 $key = $item['key'] ?? $storage->keyFromUrl($item['url'] ?? null);
                 if ($key) {
-                    $keys[] = $key;
+                    $objects[] = [
+                        'key' => $key,
+                        'purpose' => $item['purpose'] ?? StorageProfileService::PURPOSE_GENERATED,
+                    ];
                 }
             }
 
-            foreach (array_values(array_unique($keys)) as $key) {
+            $seen = [];
+            foreach ($objects as $object) {
+                $dedupeKey = $object['purpose'] . ':' . $object['key'];
+                if (isset($seen[$dedupeKey])) {
+                    continue;
+                }
+                $seen[$dedupeKey] = true;
+
                 try {
-                    $storage->delete($key);
+                    $storage->delete($object['key'], $object['purpose']);
                     $deleted++;
                 } catch (\Throwable $e) {
                     $allDeleted = false;
-                    $this->warn("删除失败: {$key} — {$e->getMessage()}");
+                    $this->warn("删除失败: {$object['key']} — {$e->getMessage()}");
                 }
             }
 

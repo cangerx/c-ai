@@ -118,31 +118,25 @@ class GenerateController extends Controller
                 'storage_url' => \App\Models\SiteSetting::get('storage_url', ''),
             ]);
             if (!empty($fileUrls) && is_array($fileUrls)) {
-                $storageUrl = \App\Models\SiteSetting::get('storage_url', '');
-                $storageHost = $storageUrl ? (parse_url($storageUrl, PHP_URL_HOST) ?: '') : '';
-                $storageEndpoint = \App\Models\SiteSetting::get('storage_endpoint', '');
-                $endpointHost = $storageEndpoint ? (parse_url($storageEndpoint, PHP_URL_HOST) ?: '') : '';
-                $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
-                $endpointPublicHost = $endpointHost;
-                if ($bucket !== '' && $endpointHost !== '' && !str_starts_with($endpointHost, $bucket . '.')) {
-                    $endpointPublicHost = $bucket . '.' . $endpointHost;
-                }
                 $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?: '';
                 $requestHost = $request->getHost();
-                $allowedHosts = array_values(array_unique(array_filter([$storageHost, $endpointHost, $endpointPublicHost, $appHost, $requestHost])));
+                $allowedHosts = array_values(array_unique(array_filter(array_merge(
+                    [$appHost, $requestHost],
+                    app(\App\Services\StorageProfileService::class)->allowedHosts(),
+                ))));
                 $localHosts = ['127.0.0.1', 'localhost', '0.0.0.0'];
                 if (app()->environment('local') || in_array($appHost, $localHosts, true) || in_array($requestHost, $localHosts, true)) {
                     $allowedHosts = array_values(array_unique(array_merge($allowedHosts, $localHosts)));
                 }
                 foreach (array_slice($fileUrls, 0, 4) as $url) {
                     if (preg_match('#^/storage/.+$#', $url)) {
-                        $files[] = ['name' => basename($url), 'mime_type' => 'image/png', 'url' => $url];
+                        $files[] = ['name' => basename($url), 'mime_type' => 'image/png', 'url' => $url, 'purpose' => \App\Services\StorageProfileService::PURPOSE_UPLOAD];
                         continue;
                     }
                     if (!filter_var($url, FILTER_VALIDATE_URL)) continue;
                     $host = parse_url($url, PHP_URL_HOST) ?: '';
                     if (empty($allowedHosts) || !in_array($host, $allowedHosts, true)) continue;
-                    $files[] = ['name' => basename(parse_url($url, PHP_URL_PATH)), 'mime_type' => 'image/png', 'url' => $url];
+                    $files[] = ['name' => basename(parse_url($url, PHP_URL_PATH)), 'mime_type' => 'image/png', 'url' => $url, 'purpose' => \App\Services\StorageProfileService::PURPOSE_UPLOAD];
                 }
             } elseif ($request->hasFile('image')) {
                 $uploadedFiles = $request->file('image');
@@ -151,11 +145,14 @@ class GenerateController extends Controller
 
                 foreach ($uploadedFiles as $file) {
                     $binary = file_get_contents($file->getRealPath());
-                    $key = $storage->store($binary, $file->getMimeType());
+                    $key = $storage->store($binary, $file->getMimeType(), \App\Services\StorageProfileService::PURPOSE_UPLOAD);
                     $files[] = [
                         'name' => $file->getClientOriginalName(),
                         'mime_type' => $file->getMimeType(),
-                        'url' => $storage->url($key),
+                        'url' => $storage->url($key, \App\Services\StorageProfileService::PURPOSE_UPLOAD),
+                        'key' => $key,
+                        'purpose' => \App\Services\StorageProfileService::PURPOSE_UPLOAD,
+                        'expires_at' => now()->addDays((int) \App\Models\SiteSetting::get('storage_temp_ttl_days', 7))->toDateTimeString(),
                     ];
                 }
             }

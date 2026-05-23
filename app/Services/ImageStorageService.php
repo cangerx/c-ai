@@ -7,36 +7,29 @@ use RuntimeException;
 
 class ImageStorageService
 {
-    public function store(string $binary, string $mimeType): string
+    public function store(string $binary, string $mimeType, string $purpose = StorageProfileService::PURPOSE_GENERATED): string
     {
         $extension = $this->extensionFromMime($mimeType);
-        $key = $this->buildKey($extension);
+        $key = $this->buildKey($extension, $purpose);
 
-        $disk = $this->disk();
+        $disk = $this->disk($purpose);
         $disk->put($key, $binary, ['ContentType' => $mimeType, 'visibility' => 'public']);
 
         return $key;
     }
 
-    public function url(string $key): string
+    public function url(string $key, string $purpose = StorageProfileService::PURPOSE_GENERATED): string
     {
         if (str_starts_with($key, 'http://') || str_starts_with($key, 'https://')) {
             return $key;
         }
 
-        $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
-
-        if (in_array($driver, ['oss', 'cos', 'r2'])) {
-            return $this->publicUrl($driver, $key);
-        }
-
-        // 本地存储：返回相对路径，避免 APP_URL 配置不一致导致图片无法加载
-        return '/storage/' . ltrim($key, '/');
+        return app(StorageProfileService::class)->publicUrl($purpose, $key);
     }
 
-    public function delete(string $key): void
+    public function delete(string $key, string $purpose = StorageProfileService::PURPOSE_GENERATED): void
     {
-        $this->disk()->delete($key);
+        $this->disk($purpose)->delete($key);
     }
 
     public function keyFromUrl(?string $url): ?string
@@ -123,17 +116,17 @@ class ImageStorageService
 
     public function generatePresign(string $mimeType): ?array
     {
-        $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
-        if (!in_array($driver, ['oss', 'cos', 'r2'])) {
+        if (!app(StorageProfileService::class)->isCloud(StorageProfileService::PURPOSE_UPLOAD)) {
             return null;
         }
 
         $extension = $this->extensionFromMime($mimeType);
-        $key = $this->buildKey($extension);
-        $this->configureDynamicDisk($driver);
+        $key = $this->buildKey($extension, StorageProfileService::PURPOSE_UPLOAD);
 
-        $client = Storage::disk('dynamic_s3')->getClient();
-        $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
+        $config = app(StorageProfileService::class)->s3ConfigForPurpose(StorageProfileService::PURPOSE_UPLOAD);
+        config(['filesystems.disks.dynamic_s3_upload_presign' => $config]);
+        $client = Storage::disk('dynamic_s3_upload_presign')->getClient();
+        $bucket = $config['bucket'] ?? '';
 
         $cmd = $client->getCommand('PutObject', [
             'Bucket' => $bucket,
@@ -150,53 +143,34 @@ class ImageStorageService
             'method' => 'PUT',
             'url' => $url,
             'key' => $key,
-            'final_url' => $this->url($key),
+            'final_url' => $this->url($key, StorageProfileService::PURPOSE_UPLOAD),
             'headers' => ['Content-Type' => $mimeType, 'x-amz-acl' => 'public-read'],
         ];
     }
 
-    protected function buildKey(string $extension): string
+    protected function buildKey(string $extension, string $purpose = StorageProfileService::PURPOSE_GENERATED): string
     {
-        $prefix = config('services.image_storage.prefix', 'images');
+        $prefix = match ($purpose) {
+            StorageProfileService::PURPOSE_UPLOAD => 'uploads',
+            StorageProfileService::PURPOSE_DOWNLOAD => 'downloads',
+            StorageProfileService::PURPOSE_BACKUP => 'backups',
+            default => config('services.image_storage.prefix', 'images'),
+        };
         $date = now()->format('Ymd');
         $hash = bin2hex(random_bytes(8));
 
         return "{$prefix}/{$date}/{$hash}.{$extension}";
     }
 
-    protected function disk(): \Illuminate\Contracts\Filesystem\Filesystem
+    protected function disk(string $purpose = StorageProfileService::PURPOSE_GENERATED): \Illuminate\Contracts\Filesystem\Filesystem
     {
-        $driver = \App\Models\SiteSetting::get('storage_driver', 'local');
-
-        if (in_array($driver, ['oss', 'cos', 'r2'])) {
-            $this->configureDynamicDisk($driver);
-            return Storage::disk('dynamic_s3');
-        }
-
-        $diskName = config('services.image_storage.disk', 'public');
-        return Storage::disk($diskName);
+        return app(StorageProfileService::class)->disk($purpose);
     }
 
-    protected function configureDynamicDisk(string $driver): void
-    {
-        $region = \App\Models\SiteSetting::get('storage_region', 'auto');
-        $bucket = \App\Models\SiteSetting::get('storage_bucket', '');
-        $endpoint = \App\Models\SiteSetting::get('storage_endpoint', '');
-        $config = [
-            'driver' => 's3',
-            'key' => \App\Models\SiteSetting::get('storage_access_key', ''),
-            'secret' => \App\Models\SiteSetting::get('storage_secret_key', ''),
-            'region' => $region ?: 'auto',
-            'bucket' => $bucket,
-            'endpoint' => $this->apiEndpoint($driver, $endpoint, $bucket),
-            'url' => \App\Models\SiteSetting::get('storage_url', ''),
-            'use_path_style_endpoint' => $driver === 'r2',
-            'throw' => true,
-        ];
-
-        config(['filesystems.disks.dynamic_s3' => $config]);
-    }
-
+    /*
+     * Kept for compatibility with older callers that may still normalize keys
+     * from the default storage URL.
+     */
     protected function publicUrl(string $driver, string $key): string
     {
         $customUrl = rtrim(\App\Models\SiteSetting::get('storage_url', ''), '/');

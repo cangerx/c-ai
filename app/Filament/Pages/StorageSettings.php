@@ -38,6 +38,21 @@ class StorageSettings extends Page implements HasForms
         'storage_endpoint',
         'storage_region',
         'storage_url',
+        'storage_temp_driver',
+        'storage_temp_access_key',
+        'storage_temp_secret_key',
+        'storage_temp_bucket',
+        'storage_temp_endpoint',
+        'storage_temp_region',
+        'storage_temp_url',
+        'storage_temp_ttl_days',
+        'storage_backup_driver',
+        'storage_backup_access_key',
+        'storage_backup_secret_key',
+        'storage_backup_bucket',
+        'storage_backup_endpoint',
+        'storage_backup_region',
+        'storage_backup_url',
     ];
 
     public const DRIVERS = [
@@ -103,6 +118,10 @@ class StorageSettings extends Page implements HasForms
                 $settings[$key] = '';
                 continue;
             }
+            if (in_array($key, ['storage_temp_secret_key', 'storage_backup_secret_key'], true)) {
+                $settings[$key] = '';
+                continue;
+            }
             $settings[$key] = SiteSetting::get($key);
         }
         if (!$settings['storage_driver']) {
@@ -139,6 +158,7 @@ class StorageSettings extends Page implements HasForms
         return Wizard::make([
             $this->stepDriver(),
             $this->stepCredentials(),
+            $this->stepRouting(),
             $this->stepReview(),
         ])
             ->skippable()
@@ -336,6 +356,80 @@ class StorageSettings extends Page implements HasForms
             ]);
     }
 
+    private function stepRouting(): Step
+    {
+        return Step::make('用途分流')
+            ->description('长期图、上传图、备份图分开存储')
+            ->icon('heroicon-o-adjustments-horizontal')
+            ->schema([
+                Forms\Components\Placeholder::make('routing_tip')
+                    ->label('')
+                    ->content('默认存储用于长期生成图片，建议配置 R2。上传/下载临时图建议配置 OSS/COS 并设置生命周期；系统备份可配置 R2/OSS/COS，留空则只保留本地备份。'),
+
+                Grid::make(2)->schema([
+                    Forms\Components\Select::make('storage_temp_driver')
+                        ->label('上传/下载临时存储')
+                        ->options(collect(self::DRIVERS)->mapWithKeys(fn ($v, $k) => [$k => $v['label']])->all())
+                        ->default('local')
+                        ->helperText('留 local 表示复用默认长期存储')
+                        ->live(),
+
+                    Forms\Components\TextInput::make('storage_temp_ttl_days')
+                        ->label('临时图保留天数')
+                        ->numeric()
+                        ->minValue(1)
+                        ->maxValue(30)
+                        ->default(7),
+                ]),
+
+                Grid::make(2)
+                    ->visible(fn (Get $get) => in_array($get('storage_temp_driver'), ['oss', 'cos', 'r2'], true))
+                    ->schema($this->profileFields('storage_temp', '临时')),
+
+                Forms\Components\Select::make('storage_backup_driver')
+                    ->label('系统备份远端存储')
+                    ->options(collect(self::DRIVERS)->mapWithKeys(fn ($v, $k) => [$k => $v['label']])->all())
+                    ->default('local')
+                    ->helperText('配置后，系统备份 tar.gz 会在本地生成后同步到远端')
+                    ->live(),
+
+                Grid::make(2)
+                    ->visible(fn (Get $get) => in_array($get('storage_backup_driver'), ['oss', 'cos', 'r2'], true))
+                    ->schema($this->profileFields('storage_backup', '备份')),
+            ]);
+    }
+
+    private function profileFields(string $prefix, string $labelPrefix): array
+    {
+        return [
+            Forms\Components\TextInput::make("{$prefix}_access_key")
+                ->label("{$labelPrefix} Access Key")
+                ->prefixIcon('heroicon-o-key'),
+            Forms\Components\TextInput::make("{$prefix}_secret_key")
+                ->label("{$labelPrefix} Secret")
+                ->password()
+                ->revealable()
+                ->dehydrated(fn ($state) => filled($state))
+                ->helperText('留空则保留原值'),
+            Forms\Components\TextInput::make("{$prefix}_bucket")
+                ->label("{$labelPrefix} Bucket")
+                ->prefixIcon('heroicon-o-archive-box'),
+            Forms\Components\TextInput::make("{$prefix}_region")
+                ->label("{$labelPrefix} Region")
+                ->prefixIcon('heroicon-o-map-pin'),
+            Forms\Components\TextInput::make("{$prefix}_endpoint")
+                ->label("{$labelPrefix} Endpoint")
+                ->url()
+                ->prefixIcon('heroicon-o-link')
+                ->columnSpanFull(),
+            Forms\Components\TextInput::make("{$prefix}_url")
+                ->label("{$labelPrefix} CDN 域名")
+                ->url()
+                ->prefixIcon('heroicon-o-globe-alt')
+                ->columnSpanFull(),
+        ];
+    }
+
     public function save(): void
     {
         $data = $this->form->getState();
@@ -345,7 +439,7 @@ class StorageSettings extends Page implements HasForms
                 continue;
             }
             $value = $data[$key];
-            if ($key === 'storage_secret_key' && !filled($value)) {
+            if (in_array($key, ['storage_secret_key', 'storage_temp_secret_key', 'storage_backup_secret_key'], true) && !filled($value)) {
                 continue;
             }
             SiteSetting::set($key, (string) ($value ?? ''), 'storage');

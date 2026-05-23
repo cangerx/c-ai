@@ -223,6 +223,7 @@
                             <th style="text-align:left;padding:10px">文件</th>
                             <th style="text-align:left;padding:10px">版本</th>
                             <th style="text-align:left;padding:10px">大小</th>
+                            <th style="text-align:left;padding:10px">远端</th>
                             <th style="text-align:left;padding:10px">时间</th>
                             <th style="text-align:right;padding:10px">操作</th>
                         </tr>
@@ -233,6 +234,13 @@
                                 <td style="padding:10px;font-family:ui-monospace,monospace;color:#111827">{{ $backup['filename'] }}</td>
                                 <td style="padding:10px;color:#374151">{{ $backup['version'] ?: '—' }}</td>
                                 <td style="padding:10px;color:#374151">{{ $backup['size_human'] }}</td>
+                                <td style="padding:10px;color:#374151">
+                                    @if(!empty($backup['remote']['key']))
+                                        <span title="{{ $backup['remote']['key'] }}">{{ strtoupper($backup['remote']['driver'] ?? 'cloud') }}</span>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
                                 <td style="padding:10px;color:#6b7280">{{ $backup['created_at'] }}</td>
                                 <td style="padding:10px;text-align:right;white-space:nowrap">
                                     <a href="{{ route('admin.system.backups.download', ['filename' => $backup['filename']]) }}" class="su-btn-secondary" style="padding:6px 10px;text-decoration:none">下载</a>
@@ -241,7 +249,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" style="padding:18px;text-align:center;color:#9ca3af">暂无备份</td></tr>
+                            <tr><td colspan="6" style="padding:18px;text-align:center;color:#9ca3af">暂无备份</td></tr>
                         @endforelse
                     </tbody>
                 </table>

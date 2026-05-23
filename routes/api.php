@@ -31,9 +31,7 @@ Route::middleware('throttle:30,1')->get('/download', function (\Illuminate\Http\
         abort(400, 'Invalid URL');
     }
     $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?: '';
-    $storageUrl = \App\Models\SiteSetting::get('storage_url', '');
-    $storageHost = $storageUrl ? (parse_url($storageUrl, PHP_URL_HOST) ?: '') : '';
-    $allowed = array_filter([$appHost, $storageHost]);
+    $allowed = array_filter(array_merge([$appHost], app(\App\Services\StorageProfileService::class)->allowedHosts()));
     $isAllowed = preg_match('/^(cdn\d*\.dmiapi\.com|cdn\d*\.duomiapi\.com)$/', $host)
         || in_array($host, $allowed, true);
     if (!$isAllowed) {
@@ -164,8 +162,14 @@ Route::middleware('auth:sanctum')->group(function () {
         $request->validate(['image' => 'required|image|max:20480']);
         $file = $request->file('image');
         $storage = app(\App\Services\ImageStorageService::class);
-        $key = $storage->store(file_get_contents($file->getRealPath()), $file->getMimeType());
-        return response()->json(['url' => $storage->url($key)]);
+        $purpose = \App\Services\StorageProfileService::PURPOSE_UPLOAD;
+        $key = $storage->store(file_get_contents($file->getRealPath()), $file->getMimeType(), $purpose);
+        return response()->json([
+            'url' => $storage->url($key, $purpose),
+            'key' => $key,
+            'purpose' => $purpose,
+            'expires_at' => now()->addDays((int) \App\Models\SiteSetting::get('storage_temp_ttl_days', 7))->toDateTimeString(),
+        ]);
     });
 
     Route::post('/reverse-prompt', function (\Illuminate\Http\Request $request) {

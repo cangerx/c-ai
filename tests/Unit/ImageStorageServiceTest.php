@@ -3,7 +3,9 @@
 namespace Tests\Unit;
 
 use App\Services\ImageStorageService;
+use App\Services\StorageProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -17,7 +19,15 @@ class ImageStorageServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Cache::flush();
         $this->service = new ImageStorageService();
+    }
+
+    protected function tearDown(): void
+    {
+        Cache::flush();
+
+        parent::tearDown();
     }
 
     // extensionFromMime 返回正确的扩展名
@@ -40,5 +50,58 @@ class ImageStorageServiceTest extends TestCase
         $this->assertNotEmpty($key);
         $this->assertStringEndsWith('.png', $key);
         Storage::disk('public')->assertExists($key);
+    }
+
+    public function test_storage_profiles_route_uploads_to_temp_when_configured(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+        \App\Models\SiteSetting::set('storage_region', 'auto', 'storage');
+
+        \App\Models\SiteSetting::set('storage_temp_driver', 'oss', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_access_key', 'temp-key', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_secret_key', 'temp-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_bucket', 'short-term', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_endpoint', 'https://oss-cn-hangzhou.aliyuncs.com', 'storage');
+        \App\Models\SiteSetting::set('storage_temp_region', 'oss-cn-hangzhou', 'storage');
+
+        $profiles = app(StorageProfileService::class);
+
+        $this->assertSame('default', $profiles->profileForPurpose(StorageProfileService::PURPOSE_GENERATED));
+        $this->assertSame('temp', $profiles->profileForPurpose(StorageProfileService::PURPOSE_UPLOAD));
+
+        $generated = $profiles->s3ConfigForPurpose(StorageProfileService::PURPOSE_GENERATED);
+        $upload = $profiles->s3ConfigForPurpose(StorageProfileService::PURPOSE_UPLOAD);
+
+        $this->assertSame('long-term', $generated['bucket']);
+        $this->assertSame('short-term', $upload['bucket']);
+        $this->assertSame('https://oss-cn-hangzhou.aliyuncs.com', $upload['endpoint']);
+        $this->assertContains('short-term.oss-cn-hangzhou.aliyuncs.com', $profiles->allowedHosts());
+    }
+
+    public function test_backup_profile_does_not_fall_back_to_default_storage(): void
+    {
+        \App\Models\SiteSetting::set('storage_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_access_key', 'default-key', 'storage');
+        \App\Models\SiteSetting::set('storage_secret_key', 'default-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_bucket', 'long-term', 'storage');
+        \App\Models\SiteSetting::set('storage_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+
+        $profiles = app(StorageProfileService::class);
+
+        $this->assertSame('backup', $profiles->profileForPurpose(StorageProfileService::PURPOSE_BACKUP));
+        $this->assertFalse($profiles->isCloud(StorageProfileService::PURPOSE_BACKUP));
+
+        \App\Models\SiteSetting::set('storage_backup_driver', 'r2', 'storage');
+        \App\Models\SiteSetting::set('storage_backup_access_key', 'backup-key', 'storage');
+        \App\Models\SiteSetting::set('storage_backup_secret_key', 'backup-secret', 'storage');
+        \App\Models\SiteSetting::set('storage_backup_bucket', 'backup-bucket', 'storage');
+        \App\Models\SiteSetting::set('storage_backup_endpoint', 'https://account.r2.cloudflarestorage.com', 'storage');
+
+        $this->assertTrue($profiles->isCloud(StorageProfileService::PURPOSE_BACKUP));
+        $this->assertSame('backup-bucket', $profiles->s3ConfigForPurpose(StorageProfileService::PURPOSE_BACKUP)['bucket']);
     }
 }
