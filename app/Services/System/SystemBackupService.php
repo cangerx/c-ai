@@ -252,6 +252,8 @@ class SystemBackupService
                     '--quick',
                     '--skip-lock-tables',
                     '--no-tablespaces',
+                    '--set-gtid-purged=OFF',
+                    '--column-statistics=0',
                     escapeshellarg((string) ($config['database'] ?? '')),
                     '2>&1',
                     '> ' . escapeshellarg($workDir . '/database/database.sql'),
