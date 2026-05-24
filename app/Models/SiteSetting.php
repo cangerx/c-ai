@@ -13,11 +13,11 @@ class SiteSetting extends Model
 
     public static function getAll(): array
     {
-        if (self::$allSettings !== null) {
+        if (self::$allSettings !== null && !app()->runningInConsole()) {
             return self::$allSettings;
         }
 
-        self::$allSettings = Cache::remember('site_settings:all', 300, function () {
+        $settings = Cache::remember('site_settings:all', 300, function () {
             try {
                 return static::all()->pluck('value', 'key')->toArray();
             } catch (\Throwable $e) {
@@ -25,7 +25,11 @@ class SiteSetting extends Model
             }
         });
 
-        return self::$allSettings;
+        if (!app()->runningInConsole()) {
+            self::$allSettings = $settings;
+        }
+
+        return $settings;
     }
 
     public static function get(string $key, mixed $default = null): mixed
