@@ -247,7 +247,6 @@ class SystemBackupService
             try {
                 $cmd = implode(' ', array_filter([
                     'mysqldump',
-                    '--no-defaults',
                     '--defaults-extra-file=' . escapeshellarg($defaultsFile),
                     '--single-transaction',
                     '--quick',
@@ -277,6 +276,7 @@ class SystemBackupService
             'port=' . (string) ($config['port'] ?? '3306'),
             'user=' . (string) ($config['username'] ?? ''),
             'password=' . (string) ($config['password'] ?? ''),
+            ...(!empty($config['unix_socket']) ? ['socket=' . (string) $config['unix_socket']] : []),
             '',
         ]);
 

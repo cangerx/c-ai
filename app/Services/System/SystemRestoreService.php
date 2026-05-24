@@ -93,7 +93,6 @@ class SystemRestoreService
             $defaultsFile = $this->writeMysqlDefaultsFile($workDir, $config);
             $cmd = implode(' ', array_filter([
                 'mysql',
-                '--no-defaults',
                 '--defaults-extra-file=' . escapeshellarg($defaultsFile),
                 escapeshellarg((string) ($config['database'] ?? '')),
                 '< ' . escapeshellarg($dump),
@@ -121,6 +120,7 @@ class SystemRestoreService
             'port=' . (string) ($config['port'] ?? '3306'),
             'user=' . (string) ($config['username'] ?? ''),
             'password=' . (string) ($config['password'] ?? ''),
+            ...(!empty($config['unix_socket']) ? ['socket=' . (string) $config['unix_socket']] : []),
             '',
         ]);
 
