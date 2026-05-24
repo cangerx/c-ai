@@ -144,16 +144,23 @@ class GenerateController extends Controller
                 $storage = app(ImageStorageService::class);
 
                 foreach ($uploadedFiles as $file) {
-                    $binary = file_get_contents($file->getRealPath());
-                    $key = $storage->store($binary, $file->getMimeType(), \App\Services\StorageProfileService::PURPOSE_UPLOAD);
-                    $files[] = [
-                        'name' => $file->getClientOriginalName(),
-                        'mime_type' => $file->getMimeType(),
-                        'url' => $storage->url($key, \App\Services\StorageProfileService::PURPOSE_UPLOAD),
-                        'key' => $key,
-                        'purpose' => \App\Services\StorageProfileService::PURPOSE_UPLOAD,
-                        'expires_at' => now()->addDays((int) \App\Models\SiteSetting::get('storage_temp_ttl_days', 7))->toDateTimeString(),
-                    ];
+                    try {
+                        $binary = file_get_contents($file->getRealPath());
+                        $key = $storage->store($binary, $file->getMimeType(), \App\Services\StorageProfileService::PURPOSE_UPLOAD);
+                        $files[] = [
+                            'name' => $file->getClientOriginalName(),
+                            'mime_type' => $file->getMimeType(),
+                            'url' => $storage->url($key, \App\Services\StorageProfileService::PURPOSE_UPLOAD),
+                            'key' => $key,
+                            'purpose' => \App\Services\StorageProfileService::PURPOSE_UPLOAD,
+                            'expires_at' => now()->addDays((int) \App\Models\SiteSetting::get('storage_temp_ttl_days', 7))->toDateTimeString(),
+                        ];
+                    } catch (\Throwable $e) {
+                        Log::warning('image-gen inline upload failed', [
+                            'user_id' => $user->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             }
         }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\SiteSetting;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -240,6 +241,15 @@ class StorageProfileService
         $driver = $this->driver($profile);
 
         if ($driver === 'default' || ($profile === 'temp' && $driver === 'local')) {
+            return 'default';
+        }
+
+        if ($profile === 'temp' && in_array($driver, ['oss', 'cos', 'r2'], true) && !$this->isConfigured($profile)) {
+            Log::warning('storage temp profile incomplete, falling back to default profile', [
+                'profile' => $profile,
+                'driver' => $driver,
+            ]);
+
             return 'default';
         }
 

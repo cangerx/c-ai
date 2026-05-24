@@ -163,7 +163,19 @@ Route::middleware('auth:sanctum')->group(function () {
         $file = $request->file('image');
         $storage = app(\App\Services\ImageStorageService::class);
         $purpose = \App\Services\StorageProfileService::PURPOSE_UPLOAD;
-        $key = $storage->store(file_get_contents($file->getRealPath()), $file->getMimeType(), $purpose);
+        try {
+            $key = $storage->store(file_get_contents($file->getRealPath()), $file->getMimeType(), $purpose);
+        } catch (\Throwable $e) {
+            \Log::warning('upload image failed', [
+                'user_id' => optional($request->user())->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => '参考图上传失败：' . $e->getMessage(),
+            ], 422);
+        }
+
         return response()->json([
             'url' => $storage->url($key, $purpose),
             'key' => $key,
