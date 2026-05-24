@@ -317,6 +317,24 @@ class StorageProfileService
 
     protected function setting(string $profile, string $field): string
     {
+        $driverKey = $profile === 'default' ? 'storage_driver' : "storage_{$profile}_driver";
+        $driver = (string) SiteSetting::get($driverKey, 'local');
+        
+        if ($profile !== 'default' && $driver === 'default') {
+            $driver = (string) SiteSetting::get('storage_driver', 'local');
+        }
+
+        if (in_array($driver, ['oss', 'cos', 'r2'], true)) {
+            $specificKey = $profile === 'default' 
+                ? "storage_{$driver}_{$field}" 
+                : "storage_{$profile}_{$driver}_{$field}";
+                
+            $val = (string) SiteSetting::get($specificKey, '');
+            if ($val !== '') {
+                return $val;
+            }
+        }
+
         $key = $profile === 'default' ? "storage_{$field}" : "storage_{$profile}_{$field}";
 
         return (string) SiteSetting::get($key, '');

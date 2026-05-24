@@ -173,7 +173,46 @@ class StorageSettings extends Page implements HasForms
         if (!$settings['storage_mode']) {
             $settings['storage_mode'] = $this->inferMode($settings);
         }
- 
+
+        // 绑定解析特定驱动的主媒介参数
+        $driver = $settings['storage_driver'];
+        if (in_array($driver, ['oss', 'cos', 'r2'], true)) {
+            foreach (['access_key', 'bucket', 'region', 'endpoint', 'url'] as $field) {
+                $specVal = SiteSetting::get("storage_{$driver}_{$field}");
+                if ($specVal !== null && $specVal !== '') {
+                    $settings["storage_{$field}"] = $specVal;
+                }
+            }
+        }
+
+        // 绑定解析特定驱动的临时存储参数
+        $tempDriver = $settings['storage_temp_driver'];
+        if ($tempDriver === 'default') {
+            $tempDriver = $driver;
+        }
+        if (in_array($tempDriver, ['oss', 'cos', 'r2'], true)) {
+            foreach (['access_key', 'bucket', 'region', 'endpoint', 'url'] as $field) {
+                $specVal = SiteSetting::get("storage_temp_{$tempDriver}_{$field}");
+                if ($specVal !== null && $specVal !== '') {
+                    $settings["storage_temp_{$field}"] = $specVal;
+                }
+            }
+        }
+
+        // 绑定解析特定驱动的备份存储参数
+        $backupDriver = $settings['storage_backup_driver'];
+        if ($backupDriver === 'default') {
+            $backupDriver = $driver;
+        }
+        if (in_array($backupDriver, ['oss', 'cos', 'r2'], true)) {
+            foreach (['access_key', 'bucket', 'region', 'endpoint', 'url'] as $field) {
+                $specVal = SiteSetting::get("storage_backup_{$backupDriver}_{$field}");
+                if ($specVal !== null && $specVal !== '') {
+                    $settings["storage_backup_{$field}"] = $specVal;
+                }
+            }
+        }
+
         // 核心解耦点：初始化用途分配虚拟字段
         $settings['storage_assign_generated'] = $settings['storage_driver'] === 'local' ? 'local' : 'cloud';
         $settings['storage_assign_temp'] = $settings['storage_temp_driver'] === 'default' ? 'default' : 'independent';
@@ -285,6 +324,16 @@ class StorageSettings extends Page implements HasForms
                             ->descriptions($this->cloudDriverDescriptions())
                             ->required(fn (Get $get) => $get('storage_assign_generated') === 'cloud')
                             ->live()
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                if (in_array($state, ['oss', 'cos', 'r2'], true)) {
+                                    $set('storage_access_key', SiteSetting::get("storage_{$state}_access_key") ?: SiteSetting::get('storage_access_key', ''));
+                                    $set('storage_secret_key', '');
+                                    $set('storage_bucket', SiteSetting::get("storage_{$state}_bucket") ?: SiteSetting::get('storage_bucket', ''));
+                                    $set('storage_region', SiteSetting::get("storage_{$state}_region") ?: SiteSetting::get('storage_region', ''));
+                                    $set('storage_endpoint', SiteSetting::get("storage_{$state}_endpoint") ?: SiteSetting::get('storage_endpoint', ''));
+                                    $set('storage_url', SiteSetting::get("storage_{$state}_url") ?: SiteSetting::get('storage_url', ''));
+                                }
+                            })
                             ->extraAttributes(['class' => 'storage-driver-radio']),
  
                         Forms\Components\Placeholder::make('driver_doc')
@@ -369,6 +418,16 @@ class StorageSettings extends Page implements HasForms
                             ->options($this->cloudDriverOptions())
                             ->required(fn (Get $get) => $get('storage_assign_temp') === 'independent')
                             ->live()
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                if (in_array($state, ['oss', 'cos', 'r2'], true)) {
+                                    $set('storage_temp_access_key', SiteSetting::get("storage_temp_{$state}_access_key") ?: SiteSetting::get('storage_temp_access_key', ''));
+                                    $set('storage_temp_secret_key', '');
+                                    $set('storage_temp_bucket', SiteSetting::get("storage_temp_{$state}_bucket") ?: SiteSetting::get('storage_temp_bucket', ''));
+                                    $set('storage_temp_region', SiteSetting::get("storage_temp_{$state}_region") ?: SiteSetting::get('storage_temp_region', ''));
+                                    $set('storage_temp_endpoint', SiteSetting::get("storage_temp_{$state}_endpoint") ?: SiteSetting::get('storage_temp_endpoint', ''));
+                                    $set('storage_temp_url', SiteSetting::get("storage_temp_{$state}_url") ?: SiteSetting::get('storage_temp_url', ''));
+                                }
+                            })
                             ->extraAttributes(['class' => 'storage-driver-radio']),
  
                         Forms\Components\Toggle::make('storage_temp_reuse_default')
@@ -429,6 +488,16 @@ class StorageSettings extends Page implements HasForms
                             ->options($this->cloudDriverOptions())
                             ->required(fn (Get $get) => $get('storage_assign_backup') === 'independent')
                             ->live()
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                if (in_array($state, ['oss', 'cos', 'r2'], true)) {
+                                    $set('storage_backup_access_key', SiteSetting::get("storage_backup_{$state}_access_key") ?: SiteSetting::get('storage_backup_access_key', ''));
+                                    $set('storage_backup_secret_key', '');
+                                    $set('storage_backup_bucket', SiteSetting::get("storage_backup_{$state}_bucket") ?: SiteSetting::get('storage_backup_bucket', ''));
+                                    $set('storage_backup_region', SiteSetting::get("storage_backup_{$state}_region") ?: SiteSetting::get('storage_backup_region', ''));
+                                    $set('storage_backup_endpoint', SiteSetting::get("storage_backup_{$state}_endpoint") ?: SiteSetting::get('storage_backup_endpoint', ''));
+                                    $set('storage_backup_url', SiteSetting::get("storage_backup_{$state}_url") ?: SiteSetting::get('storage_backup_url', ''));
+                                }
+                            })
                             ->extraAttributes(['class' => 'storage-driver-radio']),
  
                         Forms\Components\Toggle::make('storage_backup_reuse_default')
@@ -669,6 +738,40 @@ class StorageSettings extends Page implements HasForms
             if (in_array($key, ['storage_secret_key', 'storage_temp_secret_key', 'storage_backup_secret_key'], true) && !filled($value)) {
                 continue;
             }
+
+            // A: 保存主驱动的特定值
+            $driver = $data['storage_driver'];
+            if (in_array($driver, ['oss', 'cos', 'r2'], true) && str_starts_with($key, 'storage_') && !str_starts_with($key, 'storage_temp_') && !str_starts_with($key, 'storage_backup_')) {
+                $field = substr($key, strlen('storage_'));
+                if (in_array($field, ['access_key', 'secret_key', 'bucket', 'region', 'endpoint', 'url'], true)) {
+                    SiteSetting::set("storage_{$driver}_{$field}", (string) ($value ?? ''), 'storage');
+                }
+            }
+
+            // B: 保存临时图驱动的特定值
+            $tempDriver = $data['storage_temp_driver'];
+            if ($tempDriver === 'default') {
+                $tempDriver = $driver;
+            }
+            if (in_array($tempDriver, ['oss', 'cos', 'r2'], true) && str_starts_with($key, 'storage_temp_') && $key !== 'storage_temp_driver' && $key !== 'storage_temp_reuse_default' && $key !== 'storage_temp_ttl_days') {
+                $field = substr($key, strlen('storage_temp_'));
+                if (in_array($field, ['access_key', 'secret_key', 'bucket', 'region', 'endpoint', 'url'], true)) {
+                    SiteSetting::set("storage_temp_{$tempDriver}_{$field}", (string) ($value ?? ''), 'storage');
+                }
+            }
+
+            // C: 保存备份驱动的特定值
+            $backupDriver = $data['storage_backup_driver'];
+            if ($backupDriver === 'default') {
+                $backupDriver = $driver;
+            }
+            if (in_array($backupDriver, ['oss', 'cos', 'r2'], true) && str_starts_with($key, 'storage_backup_') && $key !== 'storage_backup_driver' && $key !== 'storage_backup_reuse_default') {
+                $field = substr($key, strlen('storage_backup_'));
+                if (in_array($field, ['access_key', 'secret_key', 'bucket', 'region', 'endpoint', 'url'], true)) {
+                    SiteSetting::set("storage_backup_{$backupDriver}_{$field}", (string) ($value ?? ''), 'storage');
+                }
+            }
+ 
             SiteSetting::set($key, (string) ($value ?? ''), 'storage');
         }
  
