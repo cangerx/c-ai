@@ -246,8 +246,8 @@ class SystemBackupService
 
             $extraFlags = [];
             try {
-                // 动态检测 mysqldump 是否支持相关参数，保障新旧 MySQL/MariaDB 版本完美兼容
-                $help = shell_exec('mysqldump --help 2>&1') ?: '';
+                // 使用与主命令完全一致的 bash -lc 运行环境进行检测，规避非登录 shell 路径丢失漏洞
+                $help = $this->run('mysqldump --help 2>&1', 15, false) ?: '';
                 if (str_contains($help, '--set-gtid-purged')) {
                     $extraFlags[] = '--set-gtid-purged=OFF';
                 }
