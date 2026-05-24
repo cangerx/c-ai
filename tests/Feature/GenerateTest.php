@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AiChannel;
+use App\Models\GenerationTask;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -110,6 +111,28 @@ class GenerateTest extends TestCase
             'user_id' => $user->id,
             'channel_id' => $openAiChannel->id,
         ]);
+    }
+
+    public function test_status_does_not_fail_active_async_task_with_recent_heartbeat(): void
+    {
+        $user = User::factory()->create(['credits' => 10, 'balance' => 5.00]);
+        $task = GenerationTask::factory()->create([
+            'user_id' => $user->id,
+            'status' => 'processing',
+            'model' => 'gemini-3.1-flash-image-preview',
+            'message' => '等待上游生成结果...',
+            'created_at' => now()->subMinutes(20),
+            'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/apps/image-gen/status?task_id=' . $task->task_id);
+
+        $response->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('status', 'processing');
+
+        $this->assertSame('processing', $task->fresh()->status);
     }
 
     // 未登录用户无法生成

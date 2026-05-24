@@ -251,11 +251,11 @@ class GenerateController extends Controller
             return response()->json(['ok' => false, 'error' => 'Task not found'], 404);
         }
 
-        // 兜底：任务超过 10 分钟仍未结束，强制失败并退款。
+        // 兜底：任务超过 10 分钟没有 worker 心跳，强制失败并退款。
         $MAX_TASK_SECONDS = 10 * 60;
         if (in_array($task->status, ['pending', 'processing'], true)
-            && $task->created_at
-            && $task->created_at->diffInSeconds(now()) > $MAX_TASK_SECONDS) {
+            && $task->updated_at
+            && $task->updated_at->diffInSeconds(now()) > $MAX_TASK_SECONDS) {
             $this->forceFailAndRefund($task, '任务处理超时未完成。');
             $task->refresh();
         }

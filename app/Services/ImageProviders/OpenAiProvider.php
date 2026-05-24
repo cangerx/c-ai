@@ -75,7 +75,7 @@ class OpenAiProvider implements ImageProviderInterface
         $json = $resp['json'];
 
         if ($requestMode === 'async') {
-            $json = $this->pollAsyncResult($channel, $json['id'] ?? '');
+            $json = $this->pollAsyncResult($channel, $json['id'] ?? '', $task);
         }
 
         return $json;
@@ -127,7 +127,7 @@ class OpenAiProvider implements ImageProviderInterface
         return $files;
     }
 
-    protected function pollAsyncResult(AiChannel $channel, string $asyncId): array
+    protected function pollAsyncResult(AiChannel $channel, string $asyncId, ?GenerationTask $task = null): array
     {
         if (empty($asyncId)) {
             throw new RuntimeException('异步接口未返回任务 ID');
@@ -139,6 +139,7 @@ class OpenAiProvider implements ImageProviderInterface
 
         for ($i = 0; $i < 120; $i++) {
             sleep(5);
+            $this->heartbeat($task);
 
             $resp = CurlClient::get($pollUrl, [
                 'Authorization' => "Bearer {$channel->api_key}",
@@ -150,19 +151,37 @@ class OpenAiProvider implements ImageProviderInterface
             }
 
             $result = $resp['json'];
-            $state = $result['state'] ?? '';
+            $state = strtolower(trim((string) ($result['state'] ?? $result['status'] ?? '')));
 
-            if (in_array($state, ['failed', 'error'])) {
+            if (in_array($state, ['failed', 'fail', 'error', 'cancelled', 'canceled'], true)) {
                 throw new RuntimeException('上游异步任务失败: ' . ($result['data']['description'] ?? ''));
             }
 
-            if ($state === 'succeeded') {
-                $images = $result['data']['images'] ?? [];
-                return ['data' => array_map(fn($img) => ['url' => $img['url']], $images)];
+            if (in_array($state, ['succeeded', 'succeed', 'completed', 'complete', 'success', 'done', 'finished', 'finish'], true)) {
+                $images = $result['data']['images'] ?? $result['images'] ?? [];
+                return ['data' => array_values(array_filter(array_map(
+                    fn($img) => !empty($img['url']) ? ['url' => $img['url']] : null,
+                    $images,
+                )))];
             }
         }
 
         throw new RuntimeException('异步任务超时：轮询 10 分钟未获得结果');
+    }
+
+    protected function heartbeat(?GenerationTask $task): void
+    {
+        if (!$task) {
+            return;
+        }
+
+        GenerationTask::where('task_id', $task->task_id)
+            ->whereIn('status', ['pending', 'processing'])
+            ->update([
+                'status' => 'processing',
+                'message' => '等待上游生成结果...',
+                'updated_at' => now(),
+            ]);
     }
 
     protected function localFilePathFromUrl(string $url): ?string

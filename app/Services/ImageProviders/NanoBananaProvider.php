@@ -28,7 +28,7 @@ class NanoBananaProvider implements ImageProviderInterface
 
         $taskId = $json['id'] ?? $json['task_id'] ?? $json['data']['task_id'] ?? null;
         if ($taskId) {
-            return $this->pollResult($baseUrl, $channel->api_key, $taskId);
+            return $this->pollResult($baseUrl, $channel->api_key, $taskId, $task);
         }
 
         if (!empty($json['data'])) {
@@ -129,10 +129,11 @@ class NanoBananaProvider implements ImageProviderInterface
         return $last ?? [];
     }
 
-    protected function pollResult(string $baseUrl, string $apiKey, string $taskId): array
+    protected function pollResult(string $baseUrl, string $apiKey, string $taskId, ?GenerationTask $task = null): array
     {
         for ($i = 0; $i < 120; $i++) {
             sleep(5);
+            $this->heartbeat($task);
 
             $resp = CurlClient::get("{$baseUrl}/api/gemini/nano-banana/{$taskId}", [
                 'Authorization' => $apiKey,
@@ -145,13 +146,13 @@ class NanoBananaProvider implements ImageProviderInterface
 
             $result = $resp['json'];
             $inner = $result['data'] ?? $result;
-            $status = $inner['state'] ?? $inner['status'] ?? $result['state'] ?? $result['status'] ?? '';
+            $status = $this->normalizeStatus($inner['state'] ?? $inner['status'] ?? $result['state'] ?? $result['status'] ?? '');
 
-            if (in_array($status, ['failed', 'error'])) {
+            if ($this->isFailedStatus($status)) {
                 throw new RuntimeException('Nano-Banana 任务失败: ' . ($inner['msg'] ?? $inner['message'] ?? $result['message'] ?? ''));
             }
 
-            if (in_array($status, ['succeeded', 'completed', 'success'])) {
+            if ($this->isSucceededStatus($status)) {
                 $images = $this->extractImageItems($result);
                 if (!empty($images)) {
                     return ['data' => $images];
@@ -161,6 +162,36 @@ class NanoBananaProvider implements ImageProviderInterface
         }
 
         throw new RuntimeException('Nano-Banana 异步任务超时：轮询 10 分钟未获得结果');
+    }
+
+    protected function heartbeat(?GenerationTask $task): void
+    {
+        if (!$task) {
+            return;
+        }
+
+        GenerationTask::where('task_id', $task->task_id)
+            ->whereIn('status', ['pending', 'processing'])
+            ->update([
+                'status' => 'processing',
+                'message' => '等待上游生成结果...',
+                'updated_at' => now(),
+            ]);
+    }
+
+    protected function normalizeStatus(mixed $status): string
+    {
+        return strtolower(trim((string) $status));
+    }
+
+    protected function isFailedStatus(string $status): bool
+    {
+        return in_array($status, ['failed', 'fail', 'error', 'cancelled', 'canceled'], true);
+    }
+
+    protected function isSucceededStatus(string $status): bool
+    {
+        return in_array($status, ['succeeded', 'succeed', 'completed', 'complete', 'success', 'done', 'finished', 'finish'], true);
     }
 
     protected function extractImageItems(array $payload): array
