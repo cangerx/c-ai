@@ -42,8 +42,7 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
 fi
 
 if [ "${APP_ENV:-production}" != "local" ]; then
-  php artisan config:cache
-  php artisan view:cache
+  php artisan app:optimize
 fi
 
 exec "$@"

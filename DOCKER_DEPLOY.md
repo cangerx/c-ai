@@ -69,8 +69,7 @@ docker compose up -d api nginx worker scheduler
 ```bash
 docker compose exec api php artisan migrate --force
 docker compose exec api php artisan storage:link
-docker compose exec api php artisan config:cache
-docker compose exec api php artisan view:cache
+docker compose exec api php artisan app:optimize
 ```
 
 查看服务：
@@ -147,12 +146,8 @@ APP_KEY=旧站APP_KEY
 ```bash
 docker compose exec api php artisan migrate --force
 docker compose exec api php artisan storage:link
-docker compose exec api php artisan config:clear
-docker compose exec api php artisan cache:clear
-docker compose exec api php artisan route:clear
-docker compose exec api php artisan view:clear
-docker compose exec api php artisan config:cache
-docker compose exec api php artisan view:cache
+docker compose exec api php artisan app:optimize --clear
+docker compose exec api php artisan app:optimize
 docker compose restart api worker scheduler nginx
 ```
 
@@ -174,8 +169,7 @@ git pull origin main
 docker compose build api nginx
 docker compose up -d api nginx worker scheduler
 docker compose exec api php artisan migrate --force
-docker compose exec api php artisan config:cache
-docker compose exec api php artisan view:cache
+docker compose exec api php artisan app:optimize
 docker compose restart worker scheduler
 ```
 

@@ -122,9 +122,7 @@ php artisan db:seed --force
 
 ```bash
 cd /www/wwwroot/vxvx.eu.cc
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+php artisan app:optimize
 ```
 
 ### 2.7 目录权限
@@ -343,8 +341,8 @@ server {
 cd /www/wwwroot/vxvx.eu.cc
 git pull origin main
 php artisan migrate --force
-php artisan config:clear && php artisan cache:clear && php artisan view:clear
-php artisan config:cache && php artisan view:cache
+php artisan app:optimize --clear
+php artisan app:optimize
 /etc/init.d/php-fpm-83 restart
 
 # 前端

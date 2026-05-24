@@ -245,7 +245,7 @@ bash restart-worker.sh
 ```bash
 composer require predis/predis
 # .env 设置 REDIS_CLIENT=predis
-php artisan config:cache
+php artisan app:optimize
 ```
 
 **Q: 图片上传失败**
