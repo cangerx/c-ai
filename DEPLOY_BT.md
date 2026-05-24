@@ -45,15 +45,15 @@ zip
 
 宝塔面板 → **网站** → **添加站点**：
 
-- **域名**：填写你的后端域名，例如 `vxvx.eu.cc`
-- **根目录**：`/www/wwwroot/vxvx.eu.cc/public`
+- **域名**：填写你的后端域名，例如 `your-domain.com`
+- **根目录**：`/www/wwwroot/your-domain.com/public`
 - **PHP 版本**：PHP-8.3
 - **数据库**：选择 MySQL，记住账号密码
 
 ### 2.2 上传/拉取代码
 
 ```bash
-cd /www/wwwroot/vxvx.eu.cc
+cd /www/wwwroot/your-domain.com
 git clone https://github.com/cangerx/c-ai.git .
 # 或者上传本地压缩包后解压
 ```
@@ -61,7 +61,7 @@ git clone https://github.com/cangerx/c-ai.git .
 ### 2.3 安装依赖
 
 ```bash
-cd /www/wwwroot/vxvx.eu.cc
+cd /www/wwwroot/your-domain.com
 # 安装 Composer（如未安装）
 curl -sS https://getcomposer.org/installer | php
 mv composer.phar /usr/local/bin/composer
@@ -84,7 +84,7 @@ APP_NAME=苍洱AI
 APP_ENV=production
 APP_KEY=base64:xxx（自动生成）
 APP_DEBUG=false
-APP_URL=https://vxvx.eu.cc
+APP_URL=https://your-domain.com
 
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
@@ -113,7 +113,7 @@ STORAGE_DRIVER=local
 ### 2.5 数据库初始化
 
 ```bash
-cd /www/wwwroot/vxvx.eu.cc
+cd /www/wwwroot/your-domain.com
 php artisan migrate --force
 php artisan db:seed --force
 ```
@@ -121,17 +121,17 @@ php artisan db:seed --force
 ### 2.6 缓存优化
 
 ```bash
-cd /www/wwwroot/vxvx.eu.cc
+cd /www/wwwroot/your-domain.com
 php artisan app:optimize
 ```
 
 ### 2.7 目录权限
 
 ```bash
-chmod -R 755 /www/wwwroot/vxvx.eu.cc/storage
-chmod -R 755 /www/wwwroot/vxvx.eu.cc/bootstrap/cache
-chown -R www:www /www/wwwroot/vxvx.eu.cc/storage
-chown -R www:www /www/wwwroot/vxvx.eu.cc/bootstrap/cache
+chmod -R 755 /www/wwwroot/your-domain.com/storage
+chmod -R 755 /www/wwwroot/your-domain.com/bootstrap/cache
+chown -R www:www /www/wwwroot/your-domain.com/storage
+chown -R www:www /www/wwwroot/your-domain.com/bootstrap/cache
 ```
 
 ### 2.8 配置队列 Worker
@@ -143,7 +143,7 @@ chown -R www:www /www/wwwroot/vxvx.eu.cc/bootstrap/cache
 | 任务类型 | Shell 脚本 |
 | 任务名称 | AI图片生成队列 |
 | 执行周期 | 每分钟 |
-| 脚本内容 | `cd /www/wwwroot/vxvx.eu.cc && php artisan task:worker >> /dev/null 2>&1` |
+| 脚本内容 | `cd /www/wwwroot/your-domain.com && php artisan task:worker >> /dev/null 2>&1` |
 
 > 建议启动 2-3 个 worker，复制添加多个相同任务即可。
 
@@ -156,7 +156,7 @@ chown -R www:www /www/wwwroot/vxvx.eu.cc/bootstrap/cache
 | 任务类型 | Shell 脚本 |
 | 任务名称 | Laravel 调度器 |
 | 执行周期 | 每分钟 |
-| 脚本内容 | `cd /www/wwwroot/vxvx.eu.cc && php artisan schedule:run >> /dev/null 2>&1` |
+| 脚本内容 | `cd /www/wwwroot/your-domain.com && php artisan schedule:run >> /dev/null 2>&1` |
 
 ### 2.10 重启 PHP-FPM
 
@@ -207,7 +207,7 @@ pm2 start npm --name "cang-ai-web" -- run start
 创建 `/www/wwwroot/cang-ai-web/.env.production`：
 
 ```env
-NEXT_PUBLIC_API_URL=https://vxvx.eu.cc/api
+NEXT_PUBLIC_API_URL=https://your-domain.com/api
 NEXT_PUBLIC_APP_URL=https://cang-ai-web.example.com
 ```
 
@@ -223,13 +223,13 @@ NEXT_PUBLIC_APP_URL=https://cang-ai-web.example.com
 server {
     listen 80;
     listen 443 ssl http2;
-    server_name vxvx.eu.cc;
-    root /www/wwwroot/vxvx.eu.cc/public;
+    server_name your-domain.com;
+    root /www/wwwroot/your-domain.com/public;
     index index.php index.html;
 
     # SSL 证书（宝塔自动配置）
-    ssl_certificate /www/server/panel/vhost/cert/vxvx.eu.cc/fullchain.pem;
-    ssl_certificate_key /www/server/panel/vhost/cert/vxvx.eu.cc/privkey.pem;
+    ssl_certificate /www/server/panel/vhost/cert/your-domain.com/fullchain.pem;
+    ssl_certificate_key /www/server/panel/vhost/cert/your-domain.com/privkey.pem;
 
     # 前端静态资源跨域（如前端独立域名）
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
@@ -338,7 +338,7 @@ server {
 
 ```bash
 # 后端
-cd /www/wwwroot/vxvx.eu.cc
+cd /www/wwwroot/your-domain.com
 git pull origin main
 php artisan migrate --force
 php artisan app:optimize --clear
@@ -357,13 +357,13 @@ pm2 restart cang-ai-web
 
 ```bash
 # Laravel 日志
-tail -f /www/wwwroot/vxvx.eu.cc/storage/logs/laravel.log
+tail -f /www/wwwroot/your-domain.com/storage/logs/laravel.log
 
 # Worker 日志（如果使用 pm2 管理 worker）
 pm2 logs cang-ai-worker
 
 # Nginx 错误日志
-tail -f /www/wwwlogs/vxvx.eu.cc.error.log
+tail -f /www/wwwlogs/your-domain.com.error.log
 ```
 
 ### 6.3 重启服务
@@ -401,7 +401,7 @@ pm2 restart cang-ai-web
 
 | 用途 | 路径 |
 |------|------|
-| 后端代码 | `/www/wwwroot/vxvx.eu.cc` |
+| 后端代码 | `/www/wwwroot/your-domain.com` |
 | 前端代码 | `/www/wwwroot/cang-ai-web` |
 | Nginx 配置 | `/www/server/panel/vhost/nginx/` |
 | PHP 配置 | `/www/server/php/83/etc/php.ini` |
