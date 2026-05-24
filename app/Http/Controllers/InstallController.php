@@ -204,6 +204,8 @@ class InstallController extends Controller
 
     private function checkEnv(): array
     {
+        $usesSqlite = (env('DB_CONNECTION') ?: config('database.default')) === 'sqlite';
+
         $checks = [
             ['name' => 'PHP >= 8.3', 'ok' => version_compare(PHP_VERSION, '8.3.0', '>=')],
             ['name' => 'PDO MySQL', 'ok' => extension_loaded('pdo_mysql')],
@@ -215,7 +217,7 @@ class InstallController extends Controller
             ['name' => 'Redis', 'ok' => extension_loaded('redis')],
             ['name' => 'pcntl（队列必需）', 'ok' => extension_loaded('pcntl')],
             ['name' => 'storage/ 可写', 'ok' => is_writable(storage_path())],
-            ['name' => 'database/ 可写', 'ok' => is_writable(database_path())],
+            ['name' => 'database/ 可写（SQLite）', 'ok' => ! $usesSqlite || is_writable(database_path())],
         ];
 
         if (!$this->isPreconfigured()) {
