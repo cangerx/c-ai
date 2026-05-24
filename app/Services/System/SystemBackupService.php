@@ -244,20 +244,31 @@ class SystemBackupService
             $this->ensureCommandExists('mysqldump');
             $defaultsFile = $this->writeMysqlDefaultsFile($workDir, $config);
 
+            $extraFlags = [];
             try {
-                $cmd = implode(' ', array_filter([
+                // 动态检测 mysqldump 是否支持相关参数，保障新旧 MySQL/MariaDB 版本完美兼容
+                $help = shell_exec('mysqldump --help 2>&1') ?: '';
+                if (str_contains($help, '--set-gtid-purged')) {
+                    $extraFlags[] = '--set-gtid-purged=OFF';
+                }
+                if (str_contains($help, '--column-statistics')) {
+                    $extraFlags[] = '--column-statistics=0';
+                }
+            } catch (\Throwable) {}
+
+            try {
+                $cmd = implode(' ', array_filter(array_merge([
                     'mysqldump',
                     '--defaults-extra-file=' . escapeshellarg($defaultsFile),
                     '--single-transaction',
                     '--quick',
                     '--skip-lock-tables',
                     '--no-tablespaces',
-                    '--set-gtid-purged=OFF',
-                    '--column-statistics=0',
+                ], $extraFlags, [
                     escapeshellarg((string) ($config['database'] ?? '')),
                     '2>&1',
                     '> ' . escapeshellarg($workDir . '/database/database.sql'),
-                ]));
+                ])));
 
                 $this->run($cmd, 300);
             } finally {
