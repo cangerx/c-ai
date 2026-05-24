@@ -343,6 +343,7 @@ class SystemUpgrade extends Page
             'storage',
             'bootstrap/cache',
             'vendor',
+            'public/fonts',
             'public/storage',
         ]);
 
@@ -744,7 +745,15 @@ class SystemUpgrade extends Page
             $this->appendLog('→ 覆盖代码: ' . $sourceDir);
 
             $excludeArgs = implode(' ', array_map(fn (string $item): string => '--exclude=' . escapeshellarg($item), $excludes));
-            $cmd = 'rsync -a --delete ' . $excludeArgs . ' ' . escapeshellarg(rtrim($sourceDir, '/') . '/') . ' ' . escapeshellarg($targetDir . '/') . ' 2>&1';
+            $rsyncFlags = implode(' ', [
+                '-rltD',
+                '--delete',
+                '--no-owner',
+                '--no-group',
+                '--no-perms',
+                '--omit-dir-times',
+            ]);
+            $cmd = 'rsync ' . $rsyncFlags . ' ' . $excludeArgs . ' ' . escapeshellarg(rtrim($sourceDir, '/') . '/') . ' ' . escapeshellarg($targetDir . '/') . ' 2>&1';
             $this->runShell($cmd, 180);
             $this->appendLog('✓ 代码覆盖完成');
         } finally {
