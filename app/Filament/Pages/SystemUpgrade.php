@@ -366,18 +366,13 @@ class SystemUpgrade extends Page
 
         // 4. Clear caches now, rebuild after the Livewire response is sent
         $this->appendLog('→ 清除缓存...');
-        $cacheCommands = [
-            'config:clear', 'cache:clear', 'route:clear', 'view:clear', 'event:clear',
-        ];
-        foreach ($cacheCommands as $cmd) {
-            $this->runShell('cd ' . escapeshellarg($appDir) . ' && ' . escapeshellarg($phpBin) . ' artisan ' . escapeshellarg($cmd) . ' 2>&1', 60, false);
-        }
+        $this->runShell('cd ' . escapeshellarg($appDir) . ' && ' . escapeshellarg($phpBin) . ' artisan app:optimize --clear 2>&1', 60, false);
         $this->appendLog('✓ 缓存已清除');
 
         if ($this->scheduleCacheRebuild($appDir, $phpBin)) {
-            $this->appendLog('✓ 缓存将在页面响应后自动重建');
+            $this->appendLog('✓ 缓存与系统优化将在页面响应后自动重建');
         } else {
-            $this->appendLog('⚠ 缓存重建未能加入后台任务');
+            $this->appendLog('⚠ 缓存与系统优化重建未能加入后台任务');
         }
 
         // 5. Restart PHP-FPM (critical: ensures new code is loaded)
@@ -801,9 +796,7 @@ class SystemUpgrade extends Page
     protected function scheduleCacheRebuild(string $appDir, string $phpBin): bool
     {
         $commands = [
-            'config:cache',
-            'route:cache',
-            'view:cache',
+            'app:optimize',
         ];
         $artisanCommands = array_map(
             fn (string $command): string => escapeshellarg($phpBin) . ' artisan ' . escapeshellarg($command),
