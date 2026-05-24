@@ -14,6 +14,16 @@ class AppLoader
             return $this->apps;
         }
 
+        $cachePath = base_path('bootstrap/cache/discovered_apps.php');
+        if (file_exists($cachePath)) {
+            try {
+                $this->apps = require $cachePath;
+                return $this->apps;
+            } catch (\Throwable $e) {
+                // Corrupted cache file, fallback to scanning
+            }
+        }
+
         $appsDir = app_path('Apps');
         if (!is_dir($appsDir)) {
             return [];
@@ -35,7 +45,29 @@ class AppLoader
             $this->apps[$manifest['name']] = $manifest;
         }
 
+        // Auto-compile cache in production
+        if (app()->environment('production')) {
+            try {
+                $this->writeCacheFile($cachePath);
+            } catch (\Throwable $e) {
+                // Ignore if write permission fails
+            }
+        }
+
         return $this->apps;
+    }
+
+    public function writeCacheFile(string $path): void
+    {
+        $content = '<?php return ' . var_export($this->apps, true) . ';';
+        file_put_contents($path, $content);
+    }
+
+    public function clearCacheFile(string $path): void
+    {
+        if (file_exists($path)) {
+            @unlink($path);
+        }
     }
 
     public function getMenuItems(): array

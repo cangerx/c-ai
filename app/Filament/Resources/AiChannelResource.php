@@ -184,7 +184,7 @@ class AiChannelResource extends Resource
                         'error' => '异常',
                         default => $state,
                     }),
-                Tables\Columns\IconColumn::make('is_active')->label('启用')->boolean(),
+                Tables\Columns\ToggleColumn::make('is_active')->label('启用'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('provider')->label('供应商')
@@ -260,9 +260,35 @@ class AiChannelResource extends Resource
             return ['success' => false, 'error' => '缺少 API 地址或 Key'];
         }
         try {
+            $lowerModel = strtolower($model);
+            $isImageModel = false;
+            foreach (['dall-e', 'flux', 'stable-diffusion', 'sd', 'midjourney', 'mj', 'cogview'] as $keyword) {
+                if (str_contains($lowerModel, $keyword)) {
+                    $isImageModel = true;
+                    break;
+                }
+            }
+
             $baseUrl = rtrim($baseUrl, '/');
-            $baseUrl = preg_replace('#/v1$#', '', $baseUrl);
-            $url = $baseUrl . '/v1/images/generations';
+            if ($isImageModel) {
+                $url = str_ends_with($baseUrl, '/v1') ? $baseUrl . '/images/generations' : $baseUrl . '/v1/images/generations';
+                $payload = [
+                    'model' => $model,
+                    'prompt' => 'a simple red circle on white background',
+                    'size' => '1024x1024',
+                    'n' => 1,
+                ];
+            } else {
+                $url = str_ends_with($baseUrl, '/v1') ? $baseUrl . '/chat/completions' : $baseUrl . '/v1/chat/completions';
+                $payload = [
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'user', 'content' => 'ping'],
+                    ],
+                    'max_tokens' => 2,
+                ];
+            }
+
             $start = microtime(true);
             $ch = curl_init($url);
             curl_setopt_array($ch, [
@@ -273,23 +299,25 @@ class AiChannelResource extends Resource
                     'Authorization: Bearer ' . $apiKey,
                     'Content-Type: application/json',
                 ],
-                CURLOPT_POSTFIELDS => json_encode([
-                    'model' => $model,
-                    'prompt' => 'a simple red circle on white background',
-                    'size' => '1024x1024',
-                    'n' => 1,
-                ]),
+                CURLOPT_POSTFIELDS => json_encode($payload),
             ]);
             $result = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $curlError = curl_error($ch);
             curl_close($ch);
             $time = round((microtime(true) - $start) * 1000);
 
             if ($status === 200) {
                 return ['success' => true, 'time' => $time];
             }
+            if ($curlError) {
+                return ['success' => false, 'error' => "Curl Error: {$curlError}"];
+            }
             $body = json_decode($result, true);
-            $error = $body['error']['message'] ?? "HTTP {$status}";
+            $error = $body['error']['message'] ?? $body['error'] ?? "HTTP {$status}";
+            if (is_array($error)) {
+                $error = json_encode($error, JSON_UNESCAPED_UNICODE);
+            }
             return ['success' => false, 'error' => $error];
         } catch (\Throwable $e) {
             return ['success' => false, 'error' => $e->getMessage()];

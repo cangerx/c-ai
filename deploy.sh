@@ -750,11 +750,8 @@ deploy_backend() {
     echo "  [3/6] 执行数据库迁移"
     "$PHP_BIN" artisan migrate --force
 
-    echo "  [4/6] 缓存配置"
-    "$PHP_BIN" artisan config:cache
-    "$PHP_BIN" artisan route:clear 2>/dev/null || true
-    "$PHP_BIN" artisan route:cache
-    "$PHP_BIN" artisan view:cache
+    echo "  [4/6] 一键生成系统优化缓存"
+    "$PHP_BIN" artisan app:optimize
 
     echo "  [5/6] 存储链接+权限"
     if [ ! -L public/storage ] && [ ! -e public/storage ]; then

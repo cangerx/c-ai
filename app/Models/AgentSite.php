@@ -24,6 +24,26 @@ class AgentSite extends Model
                 $site->slug = $site->subdomain ?: str()->random(8);
             }
         });
+
+        static::saved(function (self $site) {
+            $site->clearResolutionCache();
+        });
+
+        static::deleted(function (self $site) {
+            $site->clearResolutionCache();
+        });
+    }
+
+    public function clearResolutionCache(): void
+    {
+        Cache::forget("agent_site:sub:{$this->subdomain}@{$this->subdomain_domain}");
+        Cache::forget("agent_site:sub:{$this->subdomain}@");
+        Cache::forget("agent_site:sub:{$this->subdomain}@" . config('app.domain'));
+        if (!empty($this->custom_domain)) {
+            Cache::forget("agent_site:domain:{$this->custom_domain}");
+        }
+        Cache::forget('agent_sites_columns');
+        Cache::forget('wildcard_domains_list');
     }
 
     public static function resolveForHost(string $host): ?self
@@ -34,10 +54,10 @@ class AgentSite extends Model
         }
 
         try {
-            $columns = Cache::remember('agent_sites_columns', 300, fn () => Schema::hasTable('agent_sites') ? Schema::getColumnListing('agent_sites') : []);
+            $columns = Cache::remember('agent_sites_columns', 86400, fn () => Schema::hasTable('agent_sites') ? Schema::getColumnListing('agent_sites') : []);
             $hasColumn = fn (string $column) => in_array($column, $columns, true);
 
-            $wildcardDomains = Cache::remember('wildcard_domains_list', 300, function () use ($mainDomain) {
+            $wildcardDomains = Cache::remember('wildcard_domains_list', 86400, function () use ($mainDomain) {
                 $domains = json_decode(SiteSetting::get('wildcard_domains', '[]'), true) ?: [];
                 if (!in_array($mainDomain, $domains)) {
                     $domains[] = $mainDomain;
@@ -50,7 +70,7 @@ class AgentSite extends Model
                 if (str_ends_with($host, '.' . $domain)) {
                     $sub = substr($host, 0, -(strlen($domain) + 1));
                     $isMainDomain = ($domain === $mainDomain);
-                    $siteId = Cache::remember("agent_site_id:sub:{$sub}@{$domain}", 300, function () use ($sub, $domain, $isMainDomain, $hasColumn) {
+                    $site = Cache::remember("agent_site:sub:{$sub}@{$domain}", 86400, function () use ($sub, $domain, $isMainDomain, $hasColumn) {
                         $query = self::where('subdomain', $sub);
 
                         if ($hasColumn('subdomain_domain')) {
@@ -66,25 +86,25 @@ class AgentSite extends Model
                             $query->where('is_active', true);
                         }
 
-                        return $query->value('id');
+                        return $query->first();
                     });
 
-                    return $siteId ? self::find($siteId) : null;
+                    return $site;
                 }
             }
 
             if ($hasColumn('custom_domain')) {
-                $siteId = Cache::remember("agent_site_id:domain:{$host}", 300, function () use ($host, $hasColumn) {
+                $site = Cache::remember("agent_site:domain:{$host}", 86400, function () use ($host, $hasColumn) {
                     $query = self::where('custom_domain', $host);
 
                     if ($hasColumn('is_active')) {
                         $query->where('is_active', true);
                     }
 
-                    return $query->value('id');
+                    return $query->first();
                 });
 
-                return $siteId ? self::find($siteId) : null;
+                return $site;
             }
         } catch (\Throwable $e) {
             Cache::forget('agent_sites_columns');
