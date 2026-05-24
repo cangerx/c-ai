@@ -15,8 +15,11 @@ CANG-AI Docker 一键部署
   bash docker-install.sh logs         查看应用日志
 
 可选环境变量:
-  APP_URL=https://你的域名
+  APP_URL=https://后端域名
+  FRONTEND_APP_URL=https://前端域名
+  FRONTEND_API_URL=https://后端域名
   HTTP_PORT=127.0.0.1:8080
+  FRONTEND_PORT=127.0.0.1:3000
 EOF
 }
 
@@ -31,6 +34,10 @@ random_secret() {
   else
     date +%s%N | sha256sum | awk '{print $1}'
   fi
+}
+
+url_host() {
+  printf '%s' "$1" | sed -E 's#^https?://##; s#/.*$##; s#:.*$##'
 }
 
 set_env() {
@@ -79,14 +86,35 @@ prepare_env() {
     [ -n "$app_url" ] || app_url="https://example.com"
   fi
 
+  local frontend_app_url="${FRONTEND_APP_URL:-}"
+  if [ -z "$frontend_app_url" ]; then
+    frontend_app_url=$(grep '^FRONTEND_APP_URL=' .env | cut -d= -f2- || true)
+    [ -n "$frontend_app_url" ] || frontend_app_url="$app_url"
+  fi
+
+  local frontend_api_url="${FRONTEND_API_URL:-}"
+  if [ -z "$frontend_api_url" ]; then
+    frontend_api_url=$(grep '^FRONTEND_API_URL=' .env | cut -d= -f2- || true)
+    [ -n "$frontend_api_url" ] || frontend_api_url="$app_url"
+  fi
+
+  local app_host frontend_host
+  app_host="$(url_host "$app_url")"
+  frontend_host="$(url_host "$frontend_app_url")"
+
   set_env APP_NAME "CANG-AI"
   set_env APP_ENV "production"
   set_env APP_DEBUG "false"
   set_env APP_URL "$app_url"
+  set_env FRONTEND_APP_URL "$frontend_app_url"
+  set_env FRONTEND_API_URL "$frontend_api_url"
   set_env_if_empty APP_KEY "base64:$(random_secret)"
   set_env HTTP_PORT "${HTTP_PORT:-127.0.0.1:8080}"
+  set_env FRONTEND_PORT "${FRONTEND_PORT:-127.0.0.1:3000}"
   set_env RUN_MIGRATIONS "false"
   set_env INSTALL_PRECONFIGURED "true"
+  set_env CORS_ALLOWED_ORIGINS "$frontend_app_url,$frontend_host"
+  set_env SANCTUM_STATEFUL_DOMAINS "$frontend_host,$app_host"
 
   set_env_if_empty MYSQL_ROOT_PASSWORD "$(random_secret)"
   set_env DB_CONNECTION "mysql"
@@ -113,7 +141,7 @@ prepare_env() {
 start_stack() {
   docker compose build
   docker compose up -d mysql redis
-  docker compose up -d api nginx worker scheduler
+  docker compose up -d api nginx worker scheduler frontend
 }
 
 print_next_steps() {
@@ -123,8 +151,11 @@ print_next_steps() {
 
 部署已启动。
 
-宝塔反向代理目标:
+宝塔后端反向代理目标:
   http://127.0.0.1:${port##*:}
+
+宝塔前端反向代理目标:
+  http://127.0.0.1:$(grep '^FRONTEND_PORT=' .env | cut -d= -f2- | sed 's/^.*://')
 
 首次访问你的域名会进入安装向导，只需要填写站点名称和管理员账号。
 
@@ -147,8 +178,8 @@ case "$ACTION" in
   update)
     require_docker
     git pull origin main || true
-    docker compose build api nginx
-    docker compose up -d api nginx worker scheduler
+    docker compose build api nginx frontend
+    docker compose up -d api nginx worker scheduler frontend
     docker compose exec api php artisan migrate --force
     docker compose exec api php artisan app:optimize
     docker compose restart worker scheduler

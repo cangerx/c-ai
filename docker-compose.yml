@@ -102,6 +102,30 @@ services:
     networks:
       - cang
 
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        FRONTEND_REPO: "${FRONTEND_REPO:-https://github.com/cangerx/cang-ai-web.git}"
+        FRONTEND_REF: "${FRONTEND_REF:-main}"
+        NEXT_PUBLIC_API_URL: "${FRONTEND_API_URL:-http://127.0.0.1:8080}"
+        NEXT_PUBLIC_APP_URL: "${FRONTEND_APP_URL:-http://127.0.0.1:3000}"
+    image: cang-ai-web:latest
+    container_name: cang-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: "${FRONTEND_API_URL:-http://127.0.0.1:8080}"
+      NEXT_PUBLIC_APP_URL: "${FRONTEND_APP_URL:-http://127.0.0.1:3000}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    ports:
+      - "${FRONTEND_PORT:-127.0.0.1:3000}:3000"
+    networks:
+      - cang
+
   worker:
     image: cang-ai-api:latest
     restart: unless-stopped

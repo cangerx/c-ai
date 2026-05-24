@@ -21,10 +21,13 @@ cd /www/wwwroot/cang-ai
 
 ## 3. 一键启动
 
-把域名换成你的真实域名：
+把域名换成你的真实域名。推荐两个域名：
+
+- 前端：`https://ggx.me`
+- 后端/后台：`https://admin.ggx.me`
 
 ```bash
-APP_URL=https://api.example.com bash docker-install.sh
+APP_URL=https://admin.ggx.me FRONTEND_APP_URL=https://ggx.me FRONTEND_API_URL=https://admin.ggx.me bash docker-install.sh
 ```
 
 脚本会自动完成：
@@ -33,11 +36,22 @@ APP_URL=https://api.example.com bash docker-install.sh
 - 生成 `APP_KEY`
 - 生成 MySQL root 密码和业务数据库密码
 - 使用 Docker 启动 Nginx、PHP、MySQL、Redis、Worker、Scheduler
-- 默认只监听宿主机 `127.0.0.1:8080`
+- 使用 Docker 构建并启动前端 Next.js
+- 后端默认只监听宿主机 `127.0.0.1:8080`
+- 前端默认只监听宿主机 `127.0.0.1:3000`
 
 ## 4. 宝塔反向代理
 
-宝塔添加站点并申请 SSL，然后设置反向代理：
+宝塔添加两个站点并申请 SSL，然后设置反向代理。
+
+前端站点 `ggx.me`：
+
+```text
+目标 URL: http://127.0.0.1:3000
+发送域名: $host
+```
+
+后端/后台站点 `admin.ggx.me`：
 
 ```text
 目标 URL: http://127.0.0.1:8080
@@ -58,7 +72,11 @@ location / {
 
 ## 5. 打开网页安装
 
-访问你的域名，会自动进入安装向导。
+访问你的后端域名，会自动进入安装向导：
+
+```text
+https://admin.ggx.me/install
+```
 
 只需要填写：
 
@@ -89,13 +107,14 @@ bash docker-install.sh update
 默认反向代理端口是 `127.0.0.1:8080`。如果 8080 被占用：
 
 ```bash
-HTTP_PORT=127.0.0.1:18080 APP_URL=https://api.example.com bash docker-install.sh
+HTTP_PORT=127.0.0.1:18080 FRONTEND_PORT=127.0.0.1:13000 APP_URL=https://admin.ggx.me FRONTEND_APP_URL=https://ggx.me FRONTEND_API_URL=https://admin.ggx.me bash docker-install.sh
 ```
 
-宝塔反向代理目标也改成：
+宝塔反向代理目标也对应修改：
 
 ```text
-http://127.0.0.1:18080
+前端: http://127.0.0.1:13000
+后端: http://127.0.0.1:18080
 ```
 
 ## 备份
