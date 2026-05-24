@@ -6,9 +6,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         default-mysql-client \
         git \
+        libcurl4-openssl-dev \
         libfreetype6-dev \
+        libicu-dev \
         libjpeg62-turbo-dev \
+        libonig-dev \
         libpng-dev \
+        libxml2-dev \
         libzip-dev \
         rsync \
         tar \
@@ -17,8 +21,11 @@ RUN apt-get update \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
+        curl \
         exif \
         gd \
+        intl \
+        mbstring \
         opcache \
         pcntl \
         pdo_mysql \

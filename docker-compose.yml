@@ -73,6 +73,7 @@ services:
       WAIT_FOR_DB: "true"
       TZ: "${TZ:-Asia/Shanghai}"
     volumes:
+      - ./.env:/var/www/html/.env
       - public_assets:/var/www/html/public
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
@@ -104,7 +105,7 @@ services:
   worker:
     image: cang-ai-api:latest
     restart: unless-stopped
-    command: php artisan task:worker --max-retries=3
+    command: sh -c 'while [ ! -f storage/installed ]; do echo "Waiting for installation..."; sleep 10; done; exec php artisan task:worker --max-retries=3'
     env_file:
       - ${APP_ENV_FILE:-.env}
     environment:
@@ -127,6 +128,7 @@ services:
       SKIP_PUBLIC_SYNC: "true"
       TZ: "${TZ:-Asia/Shanghai}"
     volumes:
+      - ./.env:/var/www/html/.env
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
     depends_on:
@@ -141,7 +143,7 @@ services:
     image: cang-ai-api:latest
     container_name: cang-scheduler
     restart: unless-stopped
-    command: php artisan schedule:work
+    command: sh -c 'while [ ! -f storage/installed ]; do echo "Waiting for installation..."; sleep 10; done; exec php artisan schedule:work'
     env_file:
       - ${APP_ENV_FILE:-.env}
     environment:
@@ -164,6 +166,7 @@ services:
       SKIP_PUBLIC_SYNC: "true"
       TZ: "${TZ:-Asia/Shanghai}"
     volumes:
+      - ./.env:/var/www/html/.env
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
     depends_on:

@@ -41,7 +41,7 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
   php artisan migrate --force
 fi
 
-if [ "${APP_ENV:-production}" != "local" ]; then
+if [ -f storage/installed ] && [ "${APP_ENV:-production}" != "local" ]; then
   php artisan app:optimize
 fi
 

@@ -120,7 +120,7 @@
             <svg viewBox="0 0 24 24"><path d="m21 15-3.086-8.45a.611.611 0 0 0-.572-.4h-.001a.611.611 0 0 0-.57.4L13.688 15m7.312 0h-7.312M10 15l-3.086-8.45a.611.611 0 0 0-.572-.4h-.001a.611.611 0 0 0-.57.4L2.688 15M10 15H2.688M2 20h20"/></svg>
         </div>
         <h1>CANG-AI 安装向导</h1>
-        <p class="subtitle">三步完成部署</p>
+        <p class="subtitle">{{ !empty($preconfigured) ? '创建管理员后即可使用' : '三步完成部署' }}</p>
 
         <div class="steps">
             <div class="dot" id="dot1"></div>
@@ -149,11 +149,14 @@
                 <button class="btn btn-secondary" onclick="location.reload()">重新检测</button>
             @else
                 <div class="success-box">✓ 环境检测通过</div>
-                <button class="btn" onclick="goStep(2)">下一步：配置数据库</button>
+                <button class="btn" onclick="goStep({{ !empty($preconfigured) ? 3 : 2 }})">
+                    {{ !empty($preconfigured) ? '下一步：创建管理员' : '下一步：配置数据库' }}
+                </button>
             @endif
         </div>
 
         <!-- Step 2: 数据库配置 -->
+        @if(empty($preconfigured))
         <div class="step-panel" id="step2">
             <div class="section-title">数据库配置</div>
 
@@ -195,18 +198,23 @@
             <button class="btn" id="testDbBtn" onclick="testDatabase()">测试连接</button>
             <button class="btn btn-secondary" style="margin-top:8px" onclick="goStep(1)">上一步</button>
         </div>
+        @else
+        <div class="step-panel" id="step2"></div>
+        @endif
 
         <!-- Step 3: 站点配置 -->
         <div class="step-panel" id="step3">
-            <div class="section-title">站点配置</div>
+            <div class="section-title">{{ !empty($preconfigured) ? '初始化站点' : '站点配置' }}</div>
             <form method="POST" action="/install" id="installForm">
                 <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="db_connection" id="f_db_connection" value="mysql">
-                <input type="hidden" name="db_host" id="f_db_host">
-                <input type="hidden" name="db_port" id="f_db_port">
-                <input type="hidden" name="db_database" id="f_db_database">
-                <input type="hidden" name="db_username" id="f_db_username">
-                <input type="hidden" name="db_password" id="f_db_password">
+                @if(empty($preconfigured))
+                    <input type="hidden" name="db_connection" id="f_db_connection" value="mysql">
+                    <input type="hidden" name="db_host" id="f_db_host">
+                    <input type="hidden" name="db_port" id="f_db_port">
+                    <input type="hidden" name="db_database" id="f_db_database">
+                    <input type="hidden" name="db_username" id="f_db_username">
+                    <input type="hidden" name="db_password" id="f_db_password">
+                @endif
 
                 <div class="form-group">
                     <label class="form-label">站点名称</label>
@@ -227,7 +235,7 @@
                     <input class="form-input" type="password" name="admin_password" placeholder="至少 6 位" required minlength="6">
                 </div>
                 <button type="submit" class="btn" id="submitBtn">开始安装</button>
-                <button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="goStep(2)">上一步</button>
+                <button type="button" class="btn btn-secondary" style="margin-top:8px" onclick="goStep({{ !empty($preconfigured) ? 1 : 2 }})">上一步</button>
             </form>
         </div>
     </div>
@@ -235,6 +243,7 @@
 
 <script>
 let currentStep = {{ $step ?? 1 }};
+const preconfigured = {{ !empty($preconfigured) ? 'true' : 'false' }};
 
 function goStep(n) {
     document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
@@ -246,6 +255,10 @@ function goStep(n) {
 }
 
 function testDatabase() {
+    if (preconfigured) {
+        goStep(3);
+        return;
+    }
     const btn = document.getElementById('testDbBtn');
     const result = document.getElementById('dbTestResult');
     const dbType = document.querySelector('input[name="db_type"]:checked').value;
@@ -295,9 +308,12 @@ function testDatabase() {
 }
 
 // DB type toggle
-document.querySelectorAll('input[name="db_type"]').forEach(r => {
-    r.addEventListener('change', () => {
-        document.getElementById('mysqlFields').classList.toggle('hidden', r.value === 'sqlite' && r.checked);
+document.querySelectorAll('input[name="db_type"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        const mysqlFields = document.getElementById('mysqlFields');
+        if (mysqlFields) {
+            mysqlFields.classList.toggle('hidden', radio.value === 'sqlite' && radio.checked);
+        }
     });
 });
 
