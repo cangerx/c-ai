@@ -106,6 +106,8 @@ prepare_env() {
   set_env SESSION_DRIVER "database"
 
   mkdir -p storage bootstrap/cache docker-data/mysql docker-data/redis
+  chmod 664 .env 2>/dev/null || true
+  chown -R 33:33 .env storage bootstrap/cache 2>/dev/null || true
 }
 
 start_stack() {
