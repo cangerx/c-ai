@@ -102,6 +102,44 @@ bash docker-install.sh logs
 bash docker-install.sh update
 ```
 
+## 镜像版升级
+
+发布 tag 后，GitHub Actions 会推送镜像到 GHCR。服务器可以不再本地构建：
+
+```bash
+cd /www/wwwroot/cang-ai
+git pull origin main
+IMAGE_TAG=v0.2.6 bash docker-release-update.sh
+```
+
+如果 GHCR 包是私有的，先带 token 执行：
+
+```bash
+GHCR_USERNAME=你的GitHub用户名 GHCR_TOKEN=你的PAT IMAGE_TAG=v0.2.6 bash docker-release-update.sh
+```
+
+注意：Next.js 的 `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_APP_URL` 会在镜像构建时固化。
+如果你的域名不是默认的 `https://ggx.me` 和 `https://admin.ggx.me`，发布镜像前需要在 GitHub Actions 手动运行工作流并填写：
+
+```text
+frontend_api_url=https://你的后端域名
+frontend_app_url=https://你的前端域名
+image_tag=你的版本号
+```
+
+如果前端仓库也有对应 tag，建议同时填写：
+
+```text
+frontend_ref=v前端版本号
+```
+
+底层等价于：
+
+```bash
+IMAGE_TAG=v0.2.6 docker compose -f docker-compose.ghcr.yml pull
+IMAGE_TAG=v0.2.6 docker compose -f docker-compose.ghcr.yml up -d
+```
+
 ## 如果端口冲突
 
 默认反向代理端口是 `127.0.0.1:8080`。如果 8080 被占用：

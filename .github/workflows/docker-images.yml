@@ -1,0 +1,149 @@
+name: Docker Images
+
+env:
+  REGISTRY: ghcr.io
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to publish in addition to sha/main tags
+        required: false
+        type: string
+      frontend_ref:
+        description: cang-ai-web git ref to build
+        required: false
+        default: main
+        type: string
+      frontend_api_url:
+        description: Public backend URL baked into the frontend build
+        required: false
+        default: https://admin.ggx.me
+        type: string
+      frontend_app_url:
+        description: Public frontend URL baked into the frontend build
+        required: false
+        default: https://ggx.me
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        shell: bash
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag || '' }}
+          INPUT_FRONTEND_REF: ${{ github.event.inputs.frontend_ref || '' }}
+          INPUT_FRONTEND_API_URL: ${{ github.event.inputs.frontend_api_url || '' }}
+          INPUT_FRONTEND_APP_URL: ${{ github.event.inputs.frontend_app_url || '' }}
+          VAR_FRONTEND_REF: ${{ vars.FRONTEND_REF || '' }}
+          VAR_FRONTEND_API_URL: ${{ vars.FRONTEND_API_URL || '' }}
+          VAR_FRONTEND_APP_URL: ${{ vars.FRONTEND_APP_URL || '' }}
+        run: |
+          set -euo pipefail
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          version="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            version="${INPUT_IMAGE_TAG:-main}"
+          fi
+
+          frontend_ref="${INPUT_FRONTEND_REF:-${VAR_FRONTEND_REF:-main}}"
+          frontend_api_url="${INPUT_FRONTEND_API_URL:-${VAR_FRONTEND_API_URL:-https://admin.ggx.me}}"
+          frontend_app_url="${INPUT_FRONTEND_APP_URL:-${VAR_FRONTEND_APP_URL:-https://ggx.me}}"
+
+          api_image="${REGISTRY}/${owner}/cang-ai-api"
+          nginx_image="${REGISTRY}/${owner}/cang-ai-nginx"
+          web_image="${REGISTRY}/${owner}/cang-ai-web"
+
+          api_tags=("${api_image}:${version}" "${api_image}:sha-${GITHUB_SHA}")
+          nginx_tags=("${nginx_image}:${version}" "${nginx_image}:sha-${GITHUB_SHA}")
+          web_tags=("${web_image}:${version}" "${web_image}:sha-${GITHUB_SHA}")
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            api_tags+=("${api_image}:latest")
+            nginx_tags+=("${nginx_image}:latest")
+            web_tags+=("${web_image}:latest")
+          elif [ "${GITHUB_REF_NAME}" = "main" ]; then
+            api_tags+=("${api_image}:main")
+            nginx_tags+=("${nginx_image}:main")
+            web_tags+=("${web_image}:main")
+          fi
+
+          {
+            echo "owner=${owner}"
+            echo "version=${version}"
+            echo "api_image=${api_image}"
+            echo "nginx_image=${nginx_image}"
+            echo "web_image=${web_image}"
+            echo "frontend_ref=${frontend_ref}"
+            echo "frontend_api_url=${frontend_api_url}"
+            echo "frontend_app_url=${frontend_app_url}"
+            echo "api_tags<<EOF"
+            printf '%s\n' "${api_tags[@]}"
+            echo "EOF"
+            echo "nginx_tags<<EOF"
+            printf '%s\n' "${nginx_tags[@]}"
+            echo "EOF"
+            echo "web_tags<<EOF"
+            printf '%s\n' "${web_tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.api_tags }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push Nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/nginx/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.nginx_tags }}
+          cache-from: type=gha,scope=nginx
+          cache-to: type=gha,mode=max,scope=nginx
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/frontend/Dockerfile
+          push: true
+          build-args: |
+            FRONTEND_REPO=https://github.com/cangerx/cang-ai-web.git
+            FRONTEND_REF=${{ steps.meta.outputs.frontend_ref }}
+            NEXT_PUBLIC_API_URL=${{ steps.meta.outputs.frontend_api_url }}
+            NEXT_PUBLIC_APP_URL=${{ steps.meta.outputs.frontend_app_url }}
+          tags: ${{ steps.meta.outputs.web_tags }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web

@@ -12,7 +12,11 @@ ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 WORKDIR /src
 
 RUN apk add --no-cache git \
-    && git clone --depth 1 --branch "${FRONTEND_REF}" "${FRONTEND_REPO}" . \
+    && git init \
+    && git remote add origin "${FRONTEND_REPO}" \
+    && git fetch --depth 1 origin "${FRONTEND_REF}" \
+    && git checkout --detach FETCH_HEAD \
+    && git remote remove origin \
     && mkdir -p public \
     && if [ -f package-lock.json ]; then npm ci; else npm install; fi \
     && npm run build
