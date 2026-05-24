@@ -1,0 +1,182 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: cang-mysql
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --skip-log-bin
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-change-root-password}"
+      MYSQL_DATABASE: "${DB_DATABASE:-cang_ai}"
+      MYSQL_USER: "${DB_USERNAME:-cang_ai}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-change-db-password}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - ./docker-data/mysql:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/cang-ai.cnf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cang
+
+  redis:
+    image: redis:7-alpine
+    container_name: cang-redis
+    restart: unless-stopped
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ] && [ "$$REDIS_PASSWORD" != "null" ];
+      then redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else redis-server --appendonly yes;
+      fi'
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-null}"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - ./docker-data/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$${REDIS_PASSWORD}\" ] && [ \"$${REDIS_PASSWORD}\" != \"null\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG; else redis-cli ping | grep PONG; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cang
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    image: cang-ai-api:latest
+    container_name: cang-api
+    restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE:-.env}
+    environment:
+      APP_ENV: "${APP_ENV:-production}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_SOCKET: ""
+      DB_DATABASE: "${DB_DATABASE:-cang_ai}"
+      DB_USERNAME: "${DB_USERNAME:-cang_ai}"
+      DB_PASSWORD: "${DB_PASSWORD:-change-db-password}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-null}"
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: database
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-false}"
+      WAIT_FOR_DB: "true"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - public_assets:/var/www/html/public
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cang
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    image: cang-ai-nginx:latest
+    container_name: cang-nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - public_assets:/var/www/html/public:ro
+      - ./storage/app/public:/var/www/html/storage/app/public:ro
+    depends_on:
+      - api
+    networks:
+      - cang
+
+  worker:
+    image: cang-ai-api:latest
+    restart: unless-stopped
+    command: php artisan task:worker --max-retries=3
+    env_file:
+      - ${APP_ENV_FILE:-.env}
+    environment:
+      APP_ENV: "${APP_ENV:-production}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_SOCKET: ""
+      DB_DATABASE: "${DB_DATABASE:-cang_ai}"
+      DB_USERNAME: "${DB_USERNAME:-cang_ai}"
+      DB_PASSWORD: "${DB_PASSWORD:-change-db-password}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-null}"
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: database
+      RUN_MIGRATIONS: "false"
+      WAIT_FOR_DB: "true"
+      SKIP_PUBLIC_SYNC: "true"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cang
+
+  scheduler:
+    image: cang-ai-api:latest
+    container_name: cang-scheduler
+    restart: unless-stopped
+    command: php artisan schedule:work
+    env_file:
+      - ${APP_ENV_FILE:-.env}
+    environment:
+      APP_ENV: "${APP_ENV:-production}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_SOCKET: ""
+      DB_DATABASE: "${DB_DATABASE:-cang_ai}"
+      DB_USERNAME: "${DB_USERNAME:-cang_ai}"
+      DB_PASSWORD: "${DB_PASSWORD:-change-db-password}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-null}"
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: database
+      RUN_MIGRATIONS: "false"
+      WAIT_FOR_DB: "true"
+      SKIP_PUBLIC_SYNC: "true"
+      TZ: "${TZ:-Asia/Shanghai}"
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cang
+
+networks:
+  cang:
+    driver: bridge
+
+volumes:
+  public_assets:
