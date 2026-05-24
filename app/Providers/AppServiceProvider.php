@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
         $loader = $this->app->make(AppLoader::class);
         View::share('appMenuGroups', $loader->getMenuItems());
         $this->configureLivewireUploads();
+        $this->configureUrlScheme();
 
         // 动态加载邮件配置
         try {
@@ -66,5 +68,12 @@ class AppServiceProvider extends ServiceProvider
             'max:' . $maxKilobytes,
         ]);
         Config::set('livewire.temporary_file_upload.max_upload_time', (int) env('SYSTEM_BACKUP_UPLOAD_MAX_TIME', 30));
+    }
+
+    protected function configureUrlScheme(): void
+    {
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
     }
 }
