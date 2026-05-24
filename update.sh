@@ -15,10 +15,8 @@ composer install --no-dev --optimize-autoloader --no-interaction -q
 echo ">>> 迁移数据库..."
 php artisan migrate --force
 
-echo ">>> 刷新缓存..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+echo ">>> 刷新缓存并优化..."
+php artisan app:optimize
 
 echo ">>> 重启 Worker..."
 pkill -f "task:worker" 2>/dev/null || true
