@@ -23,6 +23,16 @@ if [ ! -L public/storage ]; then
   php artisan storage:link >/dev/null 2>&1 || true
 fi
 
+# 若 config 缓存中的 locale 与当前 APP_LOCALE 不一致，清掉缓存让其下次按真实 env 重建
+if [ -f bootstrap/cache/config.php ]; then
+  CACHED_LOCALE=$(php -r "\$c=@include 'bootstrap/cache/config.php'; echo \$c['app']['locale']??'';" 2>/dev/null || true)
+  WANT_LOCALE="${APP_LOCALE:-zh_CN}"
+  if [ -n "$CACHED_LOCALE" ] && [ "$CACHED_LOCALE" != "$WANT_LOCALE" ]; then
+    echo "Locale mismatch (cached=$CACHED_LOCALE want=$WANT_LOCALE), clearing config cache..."
+    rm -f bootstrap/cache/config.php
+  fi
+fi
+
 if [ "${WAIT_FOR_DB:-true}" = "true" ]; then
   until php -r '
     $host = getenv("DB_HOST") ?: "mysql";

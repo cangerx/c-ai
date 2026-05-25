@@ -126,6 +126,9 @@ class InstallController extends Controller
             $this->setEnv('APP_URL', $request->input('site_url'));
             $this->setEnv('APP_ENV', 'production');
             $this->setEnv('APP_DEBUG', 'false');
+            $this->setEnv('APP_LOCALE', 'zh_CN');
+            $this->setEnv('APP_FALLBACK_LOCALE', 'zh_CN');
+            $this->setEnv('APP_FAKER_LOCALE', 'zh_CN');
 
             $this->ensureAppKey();
 
