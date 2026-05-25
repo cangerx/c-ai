@@ -59,6 +59,8 @@ class SiteSettings extends Page implements HasForms
         // 代理
         'recharge_purchase_url' => 'agent',
         'wildcard_domains' => 'agent',
+        // 前端主题
+        'active_theme' => 'general',
     ];
 
     public ?array $data = [];
@@ -184,6 +186,19 @@ class SiteSettings extends Page implements HasForms
                         ->placeholder('输入域名后回车，如 ai.com')
                         ->helperText('需在 DNS 对每个域名做 *.domain 泛解析指向本服务器'),
                 ]),
+
+                Section::make('前端主题')
+                    ->description('选择前端站点默认渲染哪套模板。用户无 cookie 时使用此默认值。')
+                    ->schema([
+                        Forms\Components\TextInput::make('active_theme')
+                            ->label('默认模板 key')
+                            ->placeholder('default')
+                            ->helperText(
+                                '前端 src/themes/<key>/ 下注册的模板 key，例如：default、chatgpt-like。' .
+                                '改动后立即对未设置 cookie 的访客生效；已设置 cookie 的用户不受影响。'
+                            )
+                            ->maxLength(64),
+                    ]),
             ])
             ->statePath('data');
     }

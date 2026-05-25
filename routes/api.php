@@ -81,7 +81,18 @@ Route::get('/config', function (\Illuminate\Http\Request $request) {
             'footer_icp' => $agentSite?->footer_icp ?: \App\Models\SiteSetting::get('footer_icp', ''),
             'hero_title' => $agentSite?->hero_title ?: \App\Models\SiteSetting::get('hero_title', ''),
             'hero_subtitle' => $agentSite?->hero_subtitle ?: \App\Models\SiteSetting::get('hero_subtitle', ''),
+            'active_theme' => \App\Models\SiteSetting::get('active_theme', 'default'),
         ];
+    });
+});
+
+/**
+ * 轻量端点：仅返回前端默认模板 key
+ * 前端 SSR 在 cookie 缺失时调一次，避免拉取整个 /config
+ */
+Route::get('/site/theme', function () {
+    return \Illuminate\Support\Facades\Cache::remember('api:site:theme', 60, function () {
+        return ['active' => \App\Models\SiteSetting::get('active_theme', 'default')];
     });
 });
 
