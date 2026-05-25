@@ -12,7 +12,10 @@ class OpenAiProvider implements ImageProviderInterface
     public function generate(GenerationTask $task, AiChannel $channel): array
     {
         $size = $this->normalizeSize($task->size ?: 'auto');
-        $requestMode = $channel->request_mode ?? 'sync';
+        // provider=openai-poll 强制走异步轮询，向后兼容旧 request_mode 字段
+        $requestMode = ($channel->provider === 'openai-poll')
+            ? 'async'
+            : ($channel->request_mode ?? 'sync');
 
         $imageUrls = [];
         if ($task->mode === 'image' && !empty($task->files)) {

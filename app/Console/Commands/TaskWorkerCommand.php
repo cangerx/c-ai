@@ -8,6 +8,7 @@ use App\Models\UsageLog;
 use App\Notifications\TaskCompleted;
 use App\Notifications\TaskFailed;
 use App\Services\ChannelDispatcher;
+use App\Services\ImageProviders\AsyncOpenAiProvider;
 use App\Services\ImageProviders\ImageProviderInterface;
 use App\Services\ImageProviders\NanoBananaProvider;
 use App\Services\ImageProviders\OpenAiProvider;
@@ -103,7 +104,10 @@ class TaskWorkerCommand extends Command
                 }
 
                 $start = microtime(true);
-                $json = $this->getProvider($channel->provider)->generate($task, $channel);
+                $provider = $this->getProvider($channel->provider);
+                $json = $provider instanceof AsyncOpenAiProvider
+                    ? $provider->generateAt($task, $channel, $index)
+                    : $provider->generate($task, $channel);
                 $elapsed = round(microtime(true) - $start, 2);
 
                 Log::channel('upstream')->info('provider_response', [
@@ -112,11 +116,21 @@ class TaskWorkerCommand extends Command
                     'channel_name' => $channel->display_name ?: $channel->name,
                     'provider' => $channel->provider,
                     'elapsed' => $elapsed,
+                    'deferred' => !empty($json['_deferred']),
                 ]);
 
                 // API 调用成功，释放负载
                 $dispatcher->release($channel->id);
                 $released = true;
+
+                // async-oo：上游接单成功，挂起等回调。本 worker slot 立即释放，下一张图继续派发。
+                // 回调来时由 App\Http\Controllers\Api\AsyncCallbackController 入库 storeItem/saveItemAtIndex。
+                if (!empty($json['_deferred'])) {
+                    GenerationTask::where('task_id', $task->task_id)
+                        ->whereIn('status', ['pending', 'processing'])
+                        ->update(['message' => '已提交上游异步处理，等待回调...']);
+                    return;
+                }
 
                 $extracted = $this->extractItems($json);
                 if (empty($extracted)) {
@@ -182,6 +196,8 @@ class TaskWorkerCommand extends Command
     {
         return match ($provider) {
             'nano-banana' => new NanoBananaProvider(),
+            'async-oo' => new AsyncOpenAiProvider(),
+            'openai-poll' => new OpenAiProvider(),  // generate() 内会检测 channel->provider 走轮询
             default => new OpenAiProvider(),
         };
     }

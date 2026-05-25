@@ -32,14 +32,21 @@ class AiChannelResource extends Resource
                     ->helperText('唯一标识，用于系统内部识别'),
                 Forms\Components\TextInput::make('display_name')->label('渠道备注')
                     ->helperText('备注信息，方便区分多个渠道'),
-                Forms\Components\Select::make('provider')->label('供应商')
+                Forms\Components\Select::make('provider')->label('供应商 / 调用方式')
                     ->options([
-                        'openai' => 'OpenAI',
+                        'openai' => 'OpenAI（同步）',
+                        'openai-poll' => 'OpenAI（异步轮询 · 上游排队后本站轮询取结果）',
+                        'async-oo' => 'OpenAI（异步回调 · 上游完成后 POST 回调本站）',
                         'nano-banana' => 'Nano-Banana (Gemini)',
                         'azure' => 'Azure',
                         'anthropic' => 'Anthropic',
                         'custom' => '自定义',
-                    ])->required(),
+                    ])
+                    ->helperText(
+                        '同步：worker 阻塞等响应 · 异步轮询：worker 定期查询进度 · 异步回调：发完即放手，上游完成后通知本站'
+                    )
+                    ->live()
+                    ->required(),
                 Forms\Components\TextInput::make('base_url')->label('API 地址')->url()->required()
                     ->placeholder('https://api.openai.com/v1')
                     ->live(onBlur: true),
@@ -117,7 +124,9 @@ class AiChannelResource extends Resource
                 Forms\Components\TextInput::make('priority')->label('优先级')->numeric()->default(0)
                     ->helperText('数值越大优先级越高'),
                 Forms\Components\Select::make('request_mode')->label('请求模式')
-                    ->options(['sync' => '同步', 'async' => '异步'])->default('sync'),
+                    ->options(['sync' => '同步', 'async' => '异步'])->default('sync')
+                    ->hidden()
+                    ->dehydrated(false),
                 Forms\Components\TextInput::make('rate_limit')->label('速率限制')->numeric()->default(60)
                     ->suffix('次/分'),
                 Forms\Components\TextInput::make('max_errors')->label('最大错误数')->numeric()->default(5)
@@ -143,8 +152,17 @@ class AiChannelResource extends Resource
                     ->weight('medium'),
                 Tables\Columns\TextColumn::make('provider')->label('供应商')
                     ->badge()
+                    ->formatStateUsing(fn (string $state) => match ($state) {
+                        'openai' => 'OpenAI',
+                        'openai-poll' => 'OpenAI 轮询',
+                        'async-oo' => 'OpenAI 回调',
+                        'nano-banana' => 'Nano-Banana',
+                        default => $state,
+                    })
                     ->color(fn (string $state) => match ($state) {
                         'openai' => 'success',
+                        'openai-poll' => 'info',
+                        'async-oo' => 'primary',
                         'azure' => 'info',
                         'anthropic' => 'warning',
                         default => 'gray',
@@ -189,7 +207,15 @@ class AiChannelResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('provider')->label('供应商')
-                    ->options(['openai' => 'OpenAI', 'azure' => 'Azure', 'anthropic' => 'Anthropic', 'custom' => '自定义']),
+                    ->options([
+                        'openai' => 'OpenAI（同步）',
+                        'openai-poll' => 'OpenAI（轮询）',
+                        'async-oo' => 'OpenAI（回调）',
+                        'nano-banana' => 'Nano-Banana',
+                        'azure' => 'Azure',
+                        'anthropic' => 'Anthropic',
+                        'custom' => '自定义',
+                    ]),
                 Tables\Filters\SelectFilter::make('status')->label('状态')
                     ->options(['active' => '正常', 'paused' => '暂停', 'error' => '异常']),
             ])

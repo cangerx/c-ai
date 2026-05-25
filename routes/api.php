@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AsyncCallbackController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BillingController;
 use App\Http\Controllers\Api\DownloadController;
@@ -19,6 +20,10 @@ Route::post('/payment/notify/{provider}', [BillingController::class, 'notify']);
 
 Route::middleware('throttle:30,1')->get('/download', [DownloadController::class, 'proxy']);
 Route::middleware('throttle:60,1')->get('/download-url', [DownloadController::class, 'presign']);
+
+// async-oo provider 上游回调入口（仅靠 64-hex 一次性 token 鉴权，不走 sanctum）
+Route::post('/channels/async-oo/callback/{token}', AsyncCallbackController::class)
+    ->where('token', '[a-f0-9]{64}');
 
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/templates', [TemplateController::class, 'index']);

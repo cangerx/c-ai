@@ -11,3 +11,4 @@ Artisan::command('inspire', function () {
 Schedule::command('images:clean-expired --hours=2')->hourly()->withoutOverlapping();
 Schedule::command('images:clean-expired --temp')->hourly()->withoutOverlapping();
 Schedule::command('generation:recover-stuck')->everyMinute()->withoutOverlapping();
+Schedule::command('async-oo:sweep')->everyMinute()->withoutOverlapping();
