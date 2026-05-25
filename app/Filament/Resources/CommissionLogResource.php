@@ -18,6 +18,7 @@ class CommissionLogResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-currency-dollar';
     protected static ?string $navigationLabel = '佣金记录';
     protected static ?string $modelLabel = '佣金';
+    protected static ?string $pluralModelLabel = '佣金';
     protected static string | UnitEnum | null $navigationGroup = '代理商';
     protected static ?int $navigationSort = 9;
 

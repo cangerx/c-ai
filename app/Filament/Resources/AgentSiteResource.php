@@ -21,6 +21,7 @@ class AgentSiteResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-building-storefront';
     protected static ?string $navigationLabel = '分站管理';
     protected static ?string $modelLabel = '分站';
+    protected static ?string $pluralModelLabel = '分站';
     protected static string | UnitEnum | null $navigationGroup = '代理商';
     protected static ?int $navigationSort = 6;
 

@@ -17,6 +17,7 @@ class WithdrawalRequestResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationLabel = '提现监控';
     protected static ?string $modelLabel = '提现';
+    protected static ?string $pluralModelLabel = '提现';
     protected static string | UnitEnum | null $navigationGroup = '代理商';
     protected static ?int $navigationSort = 8;
 

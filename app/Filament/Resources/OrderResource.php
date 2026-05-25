@@ -26,6 +26,7 @@ class OrderResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationLabel = '充值订单';
     protected static ?string $modelLabel = '订单';
+    protected static ?string $pluralModelLabel = '订单';
     protected static string | UnitEnum | null $navigationGroup = '业务配置';
     protected static ?int $navigationSort = 6;
 

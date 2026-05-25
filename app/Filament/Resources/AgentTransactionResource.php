@@ -18,6 +18,7 @@ class AgentTransactionResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationLabel = '充值流水';
     protected static ?string $modelLabel = '充值流水';
+    protected static ?string $pluralModelLabel = '充值流水';
     protected static string | UnitEnum | null $navigationGroup = '代理商';
     protected static ?int $navigationSort = 1;
 

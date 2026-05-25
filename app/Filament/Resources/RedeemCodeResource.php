@@ -23,6 +23,7 @@ class RedeemCodeResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-ticket';
     protected static ?string $navigationLabel = '兑换码';
     protected static ?string $modelLabel = '兑换码';
+    protected static ?string $pluralModelLabel = '兑换码';
     protected static string | UnitEnum | null $navigationGroup = '业务配置';
     protected static ?int $navigationSort = 4;
 

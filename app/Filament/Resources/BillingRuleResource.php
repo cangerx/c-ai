@@ -20,6 +20,7 @@ class BillingRuleResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-calculator';
     protected static ?string $navigationLabel = '计费规则';
     protected static ?string $modelLabel = '计费规则';
+    protected static ?string $pluralModelLabel = '计费规则';
     protected static string | UnitEnum | null $navigationGroup = '业务配置';
     protected static ?int $navigationSort = 3;
 

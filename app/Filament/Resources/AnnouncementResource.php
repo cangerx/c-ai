@@ -19,6 +19,7 @@ class AnnouncementResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-megaphone';
     protected static ?string $navigationLabel = '公告管理';
     protected static ?string $modelLabel = '公告';
+    protected static ?string $pluralModelLabel = '公告';
     protected static ?int $navigationSort = 8;
 
     public static function form(Schema $schema): Schema

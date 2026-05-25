@@ -21,6 +21,7 @@ class AiModelResource extends Resource
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-cpu-chip';
     protected static ?string $navigationLabel = '模型管理';
     protected static ?string $modelLabel = '模型';
+    protected static ?string $pluralModelLabel = '模型';
     protected static string | UnitEnum | null $navigationGroup = 'AI 配置';
     protected static ?int $navigationSort = 2;
 
