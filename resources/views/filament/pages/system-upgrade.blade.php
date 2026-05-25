@@ -73,6 +73,7 @@
         </div>
 
         @php
+            $isDocker = file_exists('/.dockerenv');
             $backend = $versionInfo['backend'] ?? [];
             $frontend = $versionInfo['frontend'] ?? [];
             $hasUpdate = ($backend['has_update'] ?? false) || ($frontend['has_update'] ?? false);
@@ -85,6 +86,21 @@
                 };
             };
         @endphp
+
+        @if($isDocker)
+            <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-radius:10px;background:#fef2f2;border:1px solid #fee2e2">
+                <span class="su-pulse-warn" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block"></span>
+                <div>
+                    <div style="font-size:14px;font-weight:700;color:#991b1b">⚠️ 自动在线升级已禁用（当前运行于 Docker 容器）</div>
+                    <div style="font-size:12px;color:#b91c1c;margin-top:4px;line-height:1.6">
+                        系统检测到当前运行在 Docker 隔离环境中。为了防止由于容器重建或重启导致您在线升级的代码被彻底覆盖抹除，后台的在线“一键升级”已被安全禁用。
+                        <br />
+                        请您直接登录服务器宿主机，进入项目根目录执行以下命令来安全完成系统更新：
+                        <code style="background:#fca5a5;padding:2px 6px;border-radius:4px;font-family:monospace;font-weight:bold;color:#7f1d1d;margin-left:4px">bash docker-install.sh update</code>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         {{-- 更新提醒 --}}
         <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:10px;border:1px solid {{ $hasUpdate ? '#fde68a' : '#bbf7d0' }};background:{{ $hasUpdate ? '#fffbeb' : '#f0fdf4' }}">
@@ -165,21 +181,21 @@
 
         {{-- 操作按钮 --}}
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding-top:4px">
-            <button wire:click="upgradeAll" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-primary">
+            <button @if($isDocker) disabled style="background:#9ca3af;opacity:0.6;cursor:not-allowed" @else wire:click="upgradeAll" @endif wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-primary">
                 <svg width="16" height="16" wire:loading.attr="style" wire:target="upgradeAll" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
                 一键全栈升级
             </button>
 
-            <button wire:click="upgradeBackend" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
+            <button @if($isDocker) disabled style="opacity:0.5;cursor:not-allowed" @else wire:click="upgradeBackend" @endif wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
                 <svg width="16" height="16" fill="none" stroke="#f59e0b" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"></path>
                 </svg>
                 仅后端
             </button>
 
-            <button wire:click="upgradeFrontend" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
+            <button @if($isDocker) disabled style="opacity:0.5;cursor:not-allowed" @else wire:click="upgradeFrontend" @endif wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
                 <svg width="16" height="16" fill="none" stroke="#3b82f6" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                 </svg>

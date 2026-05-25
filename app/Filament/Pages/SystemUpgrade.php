@@ -197,6 +197,16 @@ class SystemUpgrade extends Page
         $this->log = '';
         $this->running = true;
 
+        if (file_exists('/.dockerenv')) {
+            Notification::make()
+                ->title('升级已被禁用')
+                ->body('当前系统部署在 Docker 容器中。为了防止容器重启后代码丢失，请登录宿主机运行：`bash docker-install.sh update` 安全升级！')
+                ->danger()
+                ->send();
+            $this->running = false;
+            return;
+        }
+
         try {
             $this->appendLog('=== 开始全栈升级 ===');
             $this->prepareRuntimeForUpgrade();
@@ -223,6 +233,16 @@ class SystemUpgrade extends Page
         $this->log = '';
         $this->running = true;
 
+        if (file_exists('/.dockerenv')) {
+            Notification::make()
+                ->title('升级已被禁用')
+                ->body('当前系统部署在 Docker 容器中。为了防止容器重启后代码丢失，请登录宿主机运行：`bash docker-install.sh update` 安全升级！')
+                ->danger()
+                ->send();
+            $this->running = false;
+            return;
+        }
+
         try {
             $this->prepareRuntimeForUpgrade();
             $this->createPreUpgradeBackup();
@@ -244,6 +264,16 @@ class SystemUpgrade extends Page
     {
         $this->log = '';
         $this->running = true;
+
+        if (file_exists('/.dockerenv')) {
+            Notification::make()
+                ->title('升级已被禁用')
+                ->body('当前系统部署在 Docker 容器中。为了防止容器重启后代码丢失，请登录宿主机运行：`bash docker-install.sh update` 安全升级！')
+                ->danger()
+                ->send();
+            $this->running = false;
+            return;
+        }
 
         try {
             $this->prepareRuntimeForUpgrade();
