@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BillingController;
+use App\Http\Controllers\Api\DownloadController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RedeemController;
 use App\Http\Controllers\Api\TemplateController;
@@ -16,37 +17,8 @@ Route::get('/health', fn () => response()->json(['ok' => true]));
 Route::get('/billing/packages', [BillingController::class, 'packages']);
 Route::post('/payment/notify/{provider}', [BillingController::class, 'notify']);
 
-Route::middleware('throttle:30,1')->get('/download', function (\Illuminate\Http\Request $request) {
-    $url = $request->query('url', '');
-    if (!$url || !filter_var($url, FILTER_VALIDATE_URL)) {
-        abort(400, 'Invalid URL');
-    }
-    $scheme = parse_url($url, PHP_URL_SCHEME);
-    if (!in_array($scheme, ['http', 'https'], true)) {
-        abort(400, 'Invalid URL');
-    }
-    $host = parse_url($url, PHP_URL_HOST) ?: '';
-    $ip = gethostbyname($host);
-    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-        abort(400, 'Invalid URL');
-    }
-    $appHost = parse_url(config('app.url'), PHP_URL_HOST) ?: '';
-    $allowed = array_filter(array_merge([$appHost], app(\App\Services\StorageProfileService::class)->allowedHosts()));
-    $isAllowed = preg_match('/^(cdn\d*\.dmiapi\.com|cdn\d*\.duomiapi\.com)$/', $host)
-        || in_array($host, $allowed, true);
-    if (!$isAllowed) {
-        abort(400, 'Invalid URL');
-    }
-    $response = \Illuminate\Support\Facades\Http::timeout(30)->get($url);
-    if (!$response->successful()) abort(502);
-    $contentType = $response->header('Content-Type') ?: 'image/png';
-    $filename = preg_replace('/[^\w.\-]/', '_', basename(parse_url($url, PHP_URL_PATH)) ?: 'image.png');
-    return response($response->body(), 200, [
-        'Content-Type' => $contentType,
-        'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        'Cache-Control' => 'public, max-age=86400',
-    ]);
-});
+Route::middleware('throttle:30,1')->get('/download', [DownloadController::class, 'proxy']);
+Route::middleware('throttle:60,1')->get('/download-url', [DownloadController::class, 'presign']);
 
 Route::middleware('throttle:60,1')->group(function () {
     Route::get('/templates', [TemplateController::class, 'index']);
