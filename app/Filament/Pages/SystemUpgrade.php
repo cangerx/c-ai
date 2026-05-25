@@ -30,9 +30,16 @@ class SystemUpgrade extends Page
     public array $remoteBackups = [];
     public mixed $backupUpload = null;
     public string $backupImportPath = '';
+    
+    public bool $isDocker = false;
+    public bool $hasDockerWebhook = false;
+    public string $dockerWebhookUrl = '';
 
     public function mount(): void
     {
+        $this->isDocker = file_exists('/.dockerenv');
+        $this->dockerWebhookUrl = (string) env('DOCKER_UPGRADE_WEBHOOK_URL', '');
+        $this->hasDockerWebhook = !empty($this->dockerWebhookUrl);
         $this->refreshState();
     }
 
@@ -282,6 +289,52 @@ class SystemUpgrade extends Page
         } catch (\Throwable $e) {
             $this->appendLog('✗ 前端升级失败：' . $e->getMessage());
             Notification::make()->title('前端升级失败')->body($e->getMessage())->danger()->send();
+        } finally {
+            $this->refreshState();
+            $this->running = false;
+        }
+    }
+
+    /**
+     * Docker 容器一键云端拉取更新与重启 (通过 Webhook)
+     */
+    public function triggerDockerUpgrade(): void
+    {
+        $this->log = '';
+        $this->running = true;
+
+        if (!file_exists('/.dockerenv')) {
+            Notification::make()->title('操作失败')->body('当前并非 Docker 运行环境，无法触发容器升级。')->danger()->send();
+            $this->running = false;
+            return;
+        }
+
+        $webhookUrl = env('DOCKER_UPGRADE_WEBHOOK_URL', '');
+        if (empty($webhookUrl)) {
+            Notification::make()->title('未配置 Webhook')->body('请先在 .env 中配置 DOCKER_UPGRADE_WEBHOOK_URL 以启用此功能。')->danger()->send();
+            $this->running = false;
+            return;
+        }
+
+        try {
+            $this->appendLog('=== 开始一键拉取 Docker 镜像并重启 ===');
+            $this->appendLog('→ 正在通知宿主机 Webhook: ' . $webhookUrl);
+            
+            // 发送网络请求触发宿主机脚本
+            $response = \Illuminate\Support\Facades\Http::timeout(15)
+                ->withHeaders(['User-Agent' => 'cang-ai-upgrade'])
+                ->post($webhookUrl);
+
+            if ($response->successful()) {
+                $this->appendLog('✓ 成功发送升级指令！容器正在拉取最新镜像并重启，请稍候刷新页面。');
+                $this->appendLog('=== 指令执行完毕 ===');
+                Notification::make()->title('升级指令已发送')->body('容器正在拉取镜像并进行热重载，约 5-10 秒内完成，请稍候刷新。')->success()->send();
+            } else {
+                throw new \RuntimeException('Webhook 接口返回错误 (' . $response->status() . '): ' . mb_substr($response->body(), 0, 300));
+            }
+        } catch (\Throwable $e) {
+            $this->appendLog('✗ 触发 Docker 升级失败：' . $e->getMessage());
+            Notification::make()->title('Docker 升级触发失败')->body($e->getMessage())->danger()->send();
         } finally {
             $this->refreshState();
             $this->running = false;

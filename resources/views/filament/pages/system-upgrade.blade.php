@@ -181,26 +181,49 @@
 
         {{-- 操作按钮 --}}
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding-top:4px">
-            <button @if($isDocker) disabled style="background:#9ca3af;opacity:0.6;cursor:not-allowed" @else wire:click="upgradeAll" @endif wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-primary">
-                <svg width="16" height="16" wire:loading.attr="style" wire:target="upgradeAll" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                一键全栈升级
-            </button>
+            @if(!$isDocker)
+                {{-- 传统直接/二进制部署模式 --}}
+                <button wire:click="upgradeAll" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-primary">
+                    <svg width="16" height="16" wire:loading.attr="style" wire:target="upgradeAll" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    一键全栈升级
+                </button>
 
-            <button @if($isDocker) disabled style="opacity:0.5;cursor:not-allowed" @else wire:click="upgradeBackend" @endif wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
-                <svg width="16" height="16" fill="none" stroke="#f59e0b" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"></path>
-                </svg>
-                仅后端
-            </button>
+                <button wire:click="upgradeBackend" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
+                    <svg width="16" height="16" fill="none" stroke="#f59e0b" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"></path>
+                    </svg>
+                    仅后端
+                </button>
 
-            <button @if($isDocker) disabled style="opacity:0.5;cursor:not-allowed" @else wire:click="upgradeFrontend" @endif wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
-                <svg width="16" height="16" fill="none" stroke="#3b82f6" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                </svg>
-                仅前端
-            </button>
+                <button wire:click="upgradeFrontend" wire:loading.attr="disabled" wire:target="upgradeAll, upgradeBackend, upgradeFrontend, createBackup, importBackup, restoreBackup" class="su-btn-secondary">
+                    <svg width="16" height="16" fill="none" stroke="#3b82f6" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    仅前端
+                </button>
+            @else
+                {{-- Docker 容器化部署模式 --}}
+                @if($hasDockerWebhook)
+                    <button wire:click="triggerDockerUpgrade" wire:loading.attr="disabled" wire:target="triggerDockerUpgrade, createBackup, importBackup, restoreBackup" class="su-btn-primary" style="background:linear-gradient(135deg, #10b981, #059669);box-shadow: 0 2px 8px rgba(16,185,129,0.3)">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        一键拉取镜像并热重载
+                    </button>
+                @else
+                    <button disabled class="su-btn-primary" style="background:#9ca3af;opacity:0.6;cursor:not-allowed;box-shadow:none">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                        </svg>
+                        容器一键更新已锁定
+                    </button>
+                    <span style="font-size:12px;color:#9ca3af;margin-left:6px">
+                        ℹ️ 未配置宿主机 Webhook 链接。请在 <code style="background:#f3f4f6;padding:2px 4px;border-radius:4px;color:#4b5563">.env</code> 中配置 <code style="background:#f3f4f6;padding:2px 4px;border-radius:4px;color:#4b5563">DOCKER_UPGRADE_WEBHOOK_URL</code> 以开启后台一键升级。
+                    </span>
+                @endif
+            @endif
 
             @if($log)
                 <button wire:click="$set('log', '')" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;color:#9ca3af;background:none;border:none;cursor:pointer">
